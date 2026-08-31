@@ -92,6 +92,16 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         print(f"[!] Warning during admin bootstrap: {exc}")
 
+    # Auto-sync services from Delix Gains on startup
+    try:
+        from app.workers.service_sync import sync_services_from_provider
+
+        async with AsyncSessionLocal() as db:
+            total, created, updated = await sync_services_from_provider(db, provider_slug="delix")
+            print(f"[+] Service sync complete: {total} fetched, {created} created, {updated} updated.")
+    except Exception as exc:
+        print(f"[!] Warning during service sync: {exc}")
+
     poller_task = asyncio.create_task(order_status_poller_loop())
     yield
     # Shutdown tasks
