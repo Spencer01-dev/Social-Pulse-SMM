@@ -43,6 +43,23 @@ async def order_status_poller_loop():
 async def lifespan(app: FastAPI):
     # Startup tasks
     print(f"[*] Initializing {settings.PROJECT_NAME} backend in {settings.ENVIRONMENT} mode...")
+    
+    # Auto-initialize database tables if not existing
+    try:
+        from app.models.base import Base
+        import app.models.user
+        import app.models.provider
+        import app.models.service
+        import app.models.order
+        import app.models.transaction
+        import app.models.ticket
+        from app.core.database import engine
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("[+] Database schema verified and initialized.")
+    except Exception as exc:
+        print(f"[!] Warning during database init: {exc}")
+
     poller_task = asyncio.create_task(order_status_poller_loop())
     yield
     # Shutdown tasks
