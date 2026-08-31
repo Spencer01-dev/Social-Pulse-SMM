@@ -120,7 +120,7 @@ export const OrderListPage: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={fetchOrders}
+            onClick={() => fetchOrders()}
             leftIcon={<RefreshCw className="w-4 h-4" />}
           >
             Refresh
