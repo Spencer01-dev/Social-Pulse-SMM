@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: 245 158 11;
+  }
+  
+  body {
+    @apply bg-[#121418] text-slate-100 font-sans;
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(245, 158, 11, 0.05) 0px, transparent 45%),
+      radial-gradient(at 100% 100%, rgba(217, 119, 6, 0.04) 0px, transparent 45%);
+    background-attachment: fixed;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #121418;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2b303c;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3f4657;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-[#1a1d24]/90 backdrop-blur-xl border border-[#2b303c] shadow-xl;
+  }
+  
+  .glass-header {
+    @apply bg-[#121418]/90 backdrop-blur-md border-b border-[#2b303c];
+  }
+
+  .text-gradient-amber {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500;
+  }
+
+  .btn-amber-active {
+    @apply bg-[#f59e0b] hover:bg-[#fbbf24] text-slate-950 font-bold shadow-lg shadow-amber-500/25;
+  }
+}

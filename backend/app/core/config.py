@@ -1,0 +1,92 @@
+import os
+from pathlib import Path
+from typing import List, Union
+from pydantic import AnyHttpUrl, validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=os.path.join(BASE_DIR, ".env"),
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore"
+    )
+
+    PROJECT_NAME: str = "SocialPulse"
+    ENVIRONMENT: str = "development"
+    DEBUG: bool = True
+    API_V1_STR: str = "/api/v1"
+    
+    # JWT Authentication
+    SECRET_KEY: str = "socialpulse_super_secret_jwt_key_2026_change_in_prod"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # Database
+    POSTGRES_SERVER: str = "localhost"
+    POSTGRES_PORT: int = 5433
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "@Oscar599"
+    POSTGRES_DB: str = "socialpulse_db"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:%40Oscar599@localhost:5433/socialpulse_db"
+    SYNC_DATABASE_URL: str = "postgresql://postgres:%40Oscar599@localhost:5433/socialpulse_db"
+
+    # Redis
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_URL: str = "redis://localhost:6379/0"
+    CELERY_BROKER_URL: str = "redis://localhost:6379/0"
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
+
+    # CORS
+    BACKEND_CORS_ORIGINS: List[str] = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173"
+    ]
+
+    # Upstream Provider (Delix Gains KE)
+    DELIX_API_URL: str = "https://delixgainske.com/api/v2"
+    DELIX_API_KEY: str = "EVDcnX9t9VSVJdUveItbi1tbvGuVqyBCUigzGE9pEv5n7Zwa8qmJGrDoeZs3"
+    USE_MOCK_PROVIDERS: bool = False
+
+    # Payments
+    MPESA_ENVIRONMENT: str = "sandbox"
+    MPESA_CONSUMER_KEY: str = ""
+    MPESA_CONSUMER_SECRET: str = ""
+    MPESA_SHORTCODE: str = "174379"
+    MPESA_PASSKEY: str = ""
+    MPESA_CALLBACK_URL: str = "http://localhost:8000/api/v1/payments/mpesa/callback"
+
+    OKX_API_KEY: str = ""
+    OKX_SECRET_KEY: str = ""
+    OKX_PASSPHRASE: str = ""
+    OKX_USE_SIMULATOR: bool = True
+
+    BINANCE_API_KEY: str = ""
+    BINANCE_SECRET_KEY: str = ""
+    BINANCE_PAY_API_KEY: str = ""
+    BINANCE_PAY_SECRET_KEY: str = ""
+    BINANCE_MERCHANT_ID: str = ""
+    BINANCE_BASE_URL: str = "https://bpay.binanceapi.com"
+
+    # Currency
+    PRIMARY_CURRENCY: str = "KES"
+    DEFAULT_USD_TO_KES: float = 130.00
+    DEFAULT_USDT_TO_KES: float = 131.50
+    EXCHANGE_RATE_MARKUP_PERCENT: float = 2.0
+
+    # Pan-African Payment Gateways
+    FLUTTERWAVE_PUBLIC_KEY: str = ""
+    FLUTTERWAVE_SECRET_KEY: str = ""
+    FLUTTERWAVE_SECRET_HASH: str = "socialpulse_secret_hash"
+    
+    PAYSTACK_PUBLIC_KEY: str = ""
+    PAYSTACK_SECRET_KEY: str = ""
+
+
+settings = Settings()
