@@ -84,32 +84,32 @@ export const DashboardHome: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 sm:space-y-8 animate-fade-in w-full">
       {/* Welcome Hero Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-amber-950/40 p-6 sm:p-10 border border-slate-800 shadow-2xl">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-amber-950/40 p-5 sm:p-8 md:p-10 border border-[#2b303c] shadow-2xl">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6">
           <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold uppercase tracking-wider mb-4">
-              <Sparkles className="w-3.5 h-3.5" />
+            <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-3 sm:mb-4">
+              <Sparkles className="w-3.5 h-3.5 shrink-0" />
               <span>Premier Social Growth Platform</span>
             </div>
-            <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
+            <h1 className="text-xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight leading-tight">
               Scale Your Reach with <span className="text-[#f59e0b]">SocialPulse</span>
             </h1>
-            <p className="mt-3 text-slate-300 text-sm sm:text-base leading-relaxed">
+            <p className="mt-2.5 sm:mt-3 text-slate-300 text-xs sm:text-sm md:text-base leading-relaxed">
               The premier social media marketing platform for creators, brands, and agencies with instant automated fulfillment, verified high-retention services, and real-time live tracking.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Link to="/orders/new">
-              <Button variant="primary" size="lg" className="shadow-lg shadow-amber-500/25">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 shrink-0">
+            <Link to="/orders/new" className="w-full sm:w-auto">
+              <Button variant="primary" size="md" className="w-full sm:w-auto shadow-lg shadow-amber-500/25 justify-center">
                 <ShoppingBag className="w-4 h-4 mr-2" />
                 <span>Create New Order</span>
               </Button>
             </Link>
-            <Link to="/services">
-              <Button variant="outline" size="lg">
+            <Link to="/services" className="w-full sm:w-auto">
+              <Button variant="outline" size="md" className="w-full sm:w-auto justify-center">
                 <span>View Service Catalog</span>
               </Button>
             </Link>
@@ -120,27 +120,27 @@ export const DashboardHome: React.FC = () => {
         <div className="absolute -top-24 -right-24 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
       </div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      {/* Metrics Row - 2 cols on mobile, 4 cols on desktop */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         {stats.map((stat, i) => {
           const Icon = stat.icon;
           return (
-            <Card key={i} className="relative overflow-hidden hover:border-slate-700/80 transition-all">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <Card key={i} className="relative overflow-hidden hover:border-slate-700/80 transition-all p-3.5 sm:p-5">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-400 truncate">
                   {stat.title}
                 </span>
-                <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${stat.accent} flex items-center justify-center text-slate-950 font-bold shadow-md`}>
-                  <Icon className="w-4 h-4" />
+                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-br ${stat.accent} flex items-center justify-center text-slate-950 font-bold shadow-md shrink-0`}>
+                  <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
               </div>
 
-              <div className="mt-4">
-                <div className="text-2xl font-extrabold text-white tracking-tight">
+              <div className="mt-3 sm:mt-4">
+                <div className="text-lg sm:text-2xl font-extrabold text-white tracking-tight truncate">
                   {stat.value}
                 </div>
-                <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
-                  <span>{stat.change}</span>
+                <div className="mt-1 flex items-center gap-1 text-[10px] sm:text-xs text-slate-400 truncate">
+                  <span className="truncate">{stat.change}</span>
                 </div>
               </div>
             </Card>

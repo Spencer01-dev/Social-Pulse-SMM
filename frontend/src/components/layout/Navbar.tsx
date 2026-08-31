@@ -21,23 +21,23 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
   };
 
   return (
-    <header className="sticky top-0 z-30 h-16 glass-header px-4 sm:px-6 flex items-center justify-between border-b border-[#2b303c]">
-      <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-30 h-14 sm:h-16 glass-header px-3 sm:px-6 flex items-center justify-between border-b border-[#2b303c] max-w-full overflow-hidden">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         <button
           onClick={onToggleSidebar}
-          className="p-2 -ml-2 rounded-xl text-slate-400 hover:text-white hover:bg-[#222630] lg:hidden transition-colors"
+          className="p-1.5 sm:p-2 -ml-1 sm:-ml-2 rounded-xl text-slate-400 hover:text-white hover:bg-[#222630] lg:hidden transition-colors"
           aria-label="Toggle Navigation"
         >
           <Menu className="w-5 h-5" />
         </button>
 
         {/* Brand Logo */}
-        <Link to="/" className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-[#f59e0b] text-slate-950 flex items-center justify-center font-black text-lg shadow-lg shadow-amber-500/25">
+        <Link to="/" className="flex items-center gap-2">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#f59e0b] text-slate-950 flex items-center justify-center font-black text-base sm:text-lg shadow-lg shadow-amber-500/25 shrink-0">
             ⚡
           </div>
           <div>
-            <span className="text-lg font-extrabold tracking-tight text-white flex items-center gap-1.5">
+            <span className="text-base sm:text-lg font-extrabold tracking-tight text-white flex items-center gap-1">
               Social<span className="text-[#f59e0b]">Pulse</span>
             </span>
           </div>
@@ -45,7 +45,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
       </div>
 
       {/* Right Controls */}
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
         {/* Real-Time Pan-African & Global Currency Switcher */}
         <CurrencySwitcher />
 
@@ -54,17 +54,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
             {/* Golden Balance Pill with active currency */}
             <Link
               to="/deposit"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#f59e0b] hover:bg-[#fbbf24] text-slate-950 font-black text-xs rounded-xl transition-all shadow-md shadow-amber-500/20 active:scale-95"
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 bg-[#f59e0b] hover:bg-[#fbbf24] text-slate-950 font-black text-xs rounded-xl transition-all shadow-md shadow-amber-500/20 active:scale-95 shrink-0"
               title="Add Funds to Wallet"
             >
               <span>{formatCurrency(Number(user.balance || 0))}</span>
-              <ChevronDown className="w-3.5 h-3.5" />
+              <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             </Link>
 
             {/* Account Profile Button */}
             <Link
               to="/profile"
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#222630] hover:bg-[#2b303c] text-slate-200 font-bold text-xs rounded-xl border border-[#2b303c] transition-colors"
+              className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#222630] hover:bg-[#2b303c] text-slate-200 font-bold text-xs rounded-xl border border-[#2b303c] transition-colors"
             >
               <UserIcon className="w-3.5 h-3.5 text-[#f59e0b]" />
               <span>Account</span>
@@ -73,7 +73,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
             {/* Logout Button */}
             <button
               onClick={handleLogout}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#222630] hover:bg-rose-950/30 text-slate-300 hover:text-rose-400 font-bold text-xs rounded-xl border border-[#2b303c] transition-colors"
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 bg-[#222630] hover:bg-rose-950/30 text-slate-300 hover:text-rose-400 font-bold text-xs rounded-xl border border-[#2b303c] transition-colors"
               title="Sign Out"
             >
               <LogOut className="w-3.5 h-3.5" />
@@ -81,13 +81,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
             </button>
           </>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <Link to="/login">
-              <Button variant="ghost" size="sm" leftIcon={<LogIn className="w-4 h-4" />}>
-                Sign In
-              </Button>
+              <button className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 bg-[#222630] hover:bg-[#2b303c] text-slate-200 hover:text-white font-bold text-xs rounded-xl border border-[#2b303c] transition-all active:scale-95">
+                <LogIn className="w-3.5 h-3.5 text-[#f59e0b]" />
+                <span>Sign In</span>
+              </button>
             </Link>
-            <Link to="/register">
+            <Link to="/register" className="hidden sm:inline-block">
               <Button variant="primary" size="sm">
                 Get Started
               </Button>

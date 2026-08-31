@@ -113,16 +113,16 @@ export const ServicesPage: React.FC = () => {
       </div>
 
       {/* Platform Selector Pills */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none -mx-3.5 px-3.5 sm:mx-0 sm:px-0">
         <button
           onClick={() => {
             setSelectedPlatform('all');
             setSelectedCategory('all');
           }}
-          className={`px-4 py-2 rounded-2xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-2 ${
+          className={`px-3.5 sm:px-4 py-2 rounded-xl sm:rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 shrink-0 ${
             selectedPlatform === 'all'
-              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25 border border-blue-400/30'
-              : 'bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-800/80 border border-slate-800'
+              ? 'bg-[#f59e0b] text-slate-950 shadow-lg shadow-amber-500/25 border border-amber-400'
+              : 'bg-[#1b1f27] text-slate-300 hover:text-white hover:bg-[#252a35] border border-[#2b303c]'
           }`}
         >
           <Globe className="w-4 h-4" />
@@ -136,16 +136,20 @@ export const ServicesPage: React.FC = () => {
               setSelectedPlatform(p.platform);
               setSelectedCategory('all');
             }}
-            className={`px-4 py-2 rounded-2xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-2 ${
+            className={`px-3.5 sm:px-4 py-2 rounded-xl sm:rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 shrink-0 ${
               selectedPlatform === p.platform
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25 border border-blue-400/30'
-                : 'bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-800/80 border border-slate-800'
+                ? 'bg-[#f59e0b] text-slate-950 shadow-lg shadow-amber-500/25 border border-amber-400'
+                : 'bg-[#1b1f27] text-slate-300 hover:text-white hover:bg-[#252a35] border border-[#2b303c]'
             }`}
           >
             {getPlatformIcon(p.platform)}
             <span>{p.name}</span>
             {p.service_count > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-300">
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                selectedPlatform === p.platform
+                  ? 'bg-slate-950/20 text-slate-950 font-black'
+                  : 'bg-slate-800 text-slate-300'
+              }`}>
                 {p.service_count}
               </span>
             )}
