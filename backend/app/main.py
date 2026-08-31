@@ -60,6 +60,38 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         print(f"[!] Warning during database init: {exc}")
 
+    # Bootstrap super_admin account if not exists
+    try:
+        from sqlalchemy import select
+        from app.models.user import User, UserRole
+        from app.core.security import get_password_hash
+        from decimal import Decimal
+
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                select(User).where(User.email == "muneneoscar599@gmail.com")
+            )
+            existing = result.scalars().first()
+            if not existing:
+                admin_user = User(
+                    email="muneneoscar599@gmail.com",
+                    username="admin",
+                    hashed_password=get_password_hash("@Oscar599"),
+                    role=UserRole.SUPER_ADMIN,
+                    is_active=True,
+                    is_verified=True,
+                    full_name="Spencer Admin",
+                    balance=Decimal("200.00"),
+                    currency="KES",
+                )
+                db.add(admin_user)
+                await db.commit()
+                print("[+] Super Admin account bootstrapped successfully.")
+            else:
+                print("[*] Super Admin account already exists.")
+    except Exception as exc:
+        print(f"[!] Warning during admin bootstrap: {exc}")
+
     poller_task = asyncio.create_task(order_status_poller_loop())
     yield
     # Shutdown tasks
