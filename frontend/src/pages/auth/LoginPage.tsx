@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Lock, Mail, ArrowRight, ShieldCheck, UserCheck, AlertCircle } from 'lucide-react';
+import { Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/common/Button';
 
@@ -27,40 +27,35 @@ export const LoginPage: React.FC = () => {
     setLoading(true);
     try {
       await login({
-        email_or_username: identifier,
+        email_or_username: identifier.trim(),
         password: password,
       });
       navigate(from, { replace: true });
     } catch (err: any) {
-      const msg = err.response?.data?.detail || 'Invalid email or password. Please try again.';
+      const msg = err.response?.data?.detail || 'Invalid email/username or password. Please try again.';
       setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleQuickFill = (emailVal: string, passVal: string) => {
-    setIdentifier(emailVal);
-    setPassword(passVal);
-  };
-
   return (
     <div className="min-h-screen flex flex-col justify-center items-center px-4 py-12 bg-[#0B0F19] relative overflow-hidden">
       {/* Ambient background glow */}
-      <div className="absolute top-1/4 -left-32 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/4 -left-32 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Brand Header */}
       <div className="text-center mb-8 relative z-10">
         <Link to="/" className="inline-flex items-center gap-2.5 mb-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/30">
+          <div className="w-10 h-10 rounded-2xl bg-[#f59e0b] text-slate-950 flex items-center justify-center font-black text-xl shadow-lg shadow-amber-500/25">
             ⚡
           </div>
-          <span className="text-2xl font-bold tracking-tight text-white">
-            Social<span className="text-gradient">Pulse</span>
+          <span className="text-2xl font-extrabold tracking-tight text-white">
+            Social<span className="text-[#f59e0b]">Pulse</span>
           </span>
         </Link>
-        <p className="text-sm text-slate-400">Sign in to your reseller portal and manage your campaigns</p>
+        <p className="text-sm text-slate-400">Sign in to your account and manage your campaigns</p>
       </div>
 
       {/* Main Login Card */}
@@ -85,9 +80,10 @@ export const LoginPage: React.FC = () => {
                 type="text"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="admin@socialpulse.io or username"
-                className="w-full pl-10 pr-4 py-3 bg-slate-950/60 border border-slate-800 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                placeholder="Enter your email or username"
+                className="w-full pl-10 pr-4 py-3 bg-slate-950/60 border border-slate-800 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
                 required
+                autoComplete="username"
               />
             </div>
           </div>
@@ -97,9 +93,6 @@ export const LoginPage: React.FC = () => {
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
                 Password
               </label>
-              <a href="#" className="text-xs text-blue-400 hover:text-blue-300">
-                Forgot password?
-              </a>
             </div>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -109,9 +102,10 @@ export const LoginPage: React.FC = () => {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••••"
-                className="w-full pl-10 pr-4 py-3 bg-slate-950/60 border border-slate-800 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                placeholder="Enter your password"
+                className="w-full pl-10 pr-4 py-3 bg-slate-950/60 border border-slate-800 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors"
                 required
+                autoComplete="current-password"
               />
             </div>
           </div>
@@ -120,7 +114,7 @@ export const LoginPage: React.FC = () => {
             type="submit"
             variant="primary"
             size="lg"
-            className="w-full shadow-lg shadow-blue-500/25"
+            className="w-full shadow-lg shadow-amber-500/25"
             isLoading={loading}
             rightIcon={<ArrowRight className="w-4 h-4" />}
           >
@@ -128,30 +122,9 @@ export const LoginPage: React.FC = () => {
           </Button>
         </form>
 
-        {/* Demo Fast Logins */}
-        <div className="mt-8 pt-6 border-t border-slate-800/80">
-          <p className="text-xs text-slate-400 mb-3 text-center">Development Sandbox Shortcuts:</p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickFill('admin@socialpulse.io', 'Admin@123456')}
-              className="flex items-center justify-center gap-1.5 p-2 rounded-xl bg-purple-950/30 border border-purple-500/20 text-purple-300 text-xs font-medium hover:bg-purple-900/30 transition-colors"
-            >
-              <ShieldCheck className="w-3.5 h-3.5" /> Super Admin
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickFill('demo_customer', 'Customer@123456')}
-              className="flex items-center justify-center gap-1.5 p-2 rounded-xl bg-blue-950/30 border border-blue-500/20 text-blue-300 text-xs font-medium hover:bg-blue-900/30 transition-colors"
-            >
-              <UserCheck className="w-3.5 h-3.5" /> Customer
-            </button>
-          </div>
-        </div>
-
         <p className="mt-6 text-center text-xs text-slate-400">
           Don't have an account yet?{' '}
-          <Link to="/register" className="font-semibold text-blue-400 hover:text-blue-300">
+          <Link to="/register" className="font-semibold text-amber-400 hover:text-amber-300">
             Create account
           </Link>
         </p>

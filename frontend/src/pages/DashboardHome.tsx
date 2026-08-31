@@ -1,121 +1,123 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import {
   TrendingUp,
-  Activity,
-  Server,
   Zap,
-  ArrowUpRight,
   ShieldCheck,
-  RefreshCw,
-  CheckCircle2,
-  AlertTriangle,
   Globe2,
-  Clock
+  Sparkles,
+  ShoppingBag,
+  CreditCard,
+  Headphones,
+  CheckCircle2,
+  ArrowRight,
+  Flame
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
-import { systemService } from '../services/api';
-import { HealthStatus } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useCurrency } from '../context/CurrencyContext';
 
 export const DashboardHome: React.FC = () => {
   const { user } = useAuth();
   const { formatCurrency } = useCurrency();
-  const [health, setHealth] = useState<HealthStatus | null>(null);
-  const [loadingHealth, setLoadingHealth] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchHealth = async () => {
-    setLoadingHealth(true);
-    setError(null);
-    try {
-      const data = await systemService.getHealth();
-      setHealth(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to connect to SocialPulse Backend API');
-    } finally {
-      setLoadingHealth(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchHealth();
-  }, []);
 
   const stats = [
     {
       title: 'Current Balance',
       value: formatCurrency(Number(user?.balance || 0)),
       change: 'Instant top-up ready',
-      isPositive: true,
       icon: Zap,
       accent: 'from-amber-500 to-amber-600',
     },
     {
-      title: 'Active Orders',
-      value: '0',
-      change: 'All orders processed',
-      isPositive: true,
+      title: 'Active Campaigns',
+      value: 'Instant Start',
+      change: 'Zero delivery delay',
       icon: TrendingUp,
-      accent: 'from-indigo-600 to-purple-600',
+      accent: 'from-emerald-500 to-emerald-600',
     },
     {
-      title: 'Total Spent',
-      value: 'KES 0.00',
-      change: 'Lifetime expenditure',
-      isPositive: true,
-      icon: Activity,
-      accent: 'from-emerald-600 to-teal-600',
+      title: 'High-Speed Fulfillment',
+      value: '99.9%',
+      change: 'Automated live tracking',
+      icon: Globe2,
+      accent: 'from-blue-500 to-blue-600',
     },
     {
-      title: 'API Status',
-      value: health?.status === 'healthy' ? 'Operational' : 'Initializing',
-      change: health ? `Latency: ${health.database.latency_ms ?? 0}ms` : 'Checking backend...',
-      isPositive: health?.status === 'healthy',
-      icon: Server,
-      accent: 'from-amber-600 to-orange-600',
+      title: 'Supported Gateways',
+      value: 'M-Pesa & Card',
+      change: 'Instant automated credit',
+      icon: ShieldCheck,
+      accent: 'from-orange-500 to-orange-600',
     },
   ];
 
-  const phases = [
-    { id: 1, title: 'Phase 1: Project Core & Scaffolding', status: 'completed', desc: 'FastAPI, React/Vite, PostgreSQL, Docker Compose, Architecture' },
-    { id: 2, title: 'Phase 2: Authentication & User Roles', status: 'upcoming', desc: 'JWT, Refresh tokens, Roles (Customer, Reseller, Admin)' },
-    { id: 3, title: 'Phase 3: Services & Delix Gains Provider', status: 'completed', desc: 'Delix Gains sync, category mapping, price markup system' },
-    { id: 4, title: 'Phase 4: Orders Engine & Workers', status: 'upcoming', desc: 'Order lifecycle, background status sync, auto-refunds' },
-    { id: 5, title: 'Phase 5: Wallet Ledger & M-Pesa', status: 'upcoming', desc: 'Double-entry ledger, Daraja API STK Push, instant credit' },
-    { id: 6, title: 'Phase 6: Crypto (OKX & Binance)', status: 'upcoming', desc: 'OKX Pay & Binance Merchant APIs, server-side validation' },
+  const quickCategories = [
+    { name: 'TikTok Growth', tag: 'High Speed', icon: '🎵', desc: 'Views, Likes, Followers & Shares with start-count tracking', path: '/orders/new' },
+    { name: 'Instagram Boost', tag: '0% Drop', icon: '📸', desc: 'Verified profile followers, post likes & reel impressions', path: '/orders/new' },
+    { name: 'YouTube Campaigns', tag: 'Non-Drop', icon: '▶️', desc: 'Watch time hours, video views & organic channel subscribers', path: '/orders/new' },
+    { name: 'Facebook Services', tag: 'Instant', icon: '👍', desc: 'Page likes, post reactions, video views & group members', path: '/orders/new' },
+  ];
+
+  const platformFeatures = [
+    {
+      title: 'Automated Start-Count Tracking',
+      desc: 'Our intelligent tracking engine captures the exact initial baseline count of your post and monitors delivery progression in real-time.',
+      icon: Zap,
+    },
+    {
+      title: 'Instant Pan-African Top-Ups',
+      desc: 'Deposit instantly with M-Pesa STK push, debit cards, and cryptocurrency with zero manual delays.',
+      icon: CreditCard,
+    },
+    {
+      title: 'Guaranteed Retention & Auto-Refill',
+      desc: 'Premium high-quality services backed by automated refills and transparent order lifecycle updates.',
+      icon: CheckCircle2,
+    },
+    {
+      title: '24/7 Priority Support Helpdesk',
+      desc: 'Dedicated support ticket system with rapid agent turnaround times for all campaign inquiries.',
+      icon: Headphones,
+    },
   ];
 
   return (
-    <div className="space-y-8 animate-fadeIn">
-      {/* Hero Welcome Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-purple-900/20 border border-blue-500/20 p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
+    <div className="space-y-8 animate-fade-in">
+      {/* Welcome Hero Banner */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-amber-950/40 p-6 sm:p-10 border border-slate-800 shadow-2xl">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-400/20 text-blue-400 text-xs font-semibold uppercase tracking-wider mb-4">
-              <SparklesIcon className="w-3.5 h-3.5" /> Next-Gen SMM SaaS Reseller
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold uppercase tracking-wider mb-4">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Premier Social Growth Platform</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
-              Welcome to <span className="text-gradient">SocialPulse</span>
+            <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
+              Scale Your Reach with <span className="text-[#f59e0b]">SocialPulse</span>
             </h1>
-            <p className="mt-2 text-slate-300 text-sm sm:text-base leading-relaxed">
-              High-throughput social media marketing automation platform powered by FastAPI, asynchronous PostgreSQL, and Delix Gains KE provider integration.
+            <p className="mt-3 text-slate-300 text-sm sm:text-base leading-relaxed">
+              The premier social media marketing platform for creators, brands, and agencies with instant automated fulfillment, verified high-retention services, and real-time live tracking.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <Button variant="primary" size="md">
-              Create New Order
-            </Button>
-            <Button variant="outline" size="md">
-              Explore Services
-            </Button>
+            <Link to="/orders/new">
+              <Button variant="primary" size="lg" className="shadow-lg shadow-amber-500/25">
+                <ShoppingBag className="w-4 h-4 mr-2" />
+                <span>Create New Order</span>
+              </Button>
+            </Link>
+            <Link to="/services">
+              <Button variant="outline" size="lg">
+                <span>View Service Catalog</span>
+              </Button>
+            </Link>
           </div>
         </div>
 
         {/* Decorative ambient light */}
-        <div className="absolute -top-24 -right-24 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
       </div>
 
       {/* Metrics Row */}
@@ -128,7 +130,7 @@ export const DashboardHome: React.FC = () => {
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                   {stat.title}
                 </span>
-                <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${stat.accent} flex items-center justify-center text-white shadow-md`}>
+                <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${stat.accent} flex items-center justify-center text-slate-950 font-bold shadow-md`}>
                   <Icon className="w-4 h-4" />
                 </div>
               </div>
@@ -146,137 +148,80 @@ export const DashboardHome: React.FC = () => {
         })}
       </div>
 
-      {/* Grid: System Status Diagnostic & Platform Roadmap */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Diagnostic Panel */}
-        <Card
-          title="System Architecture Diagnostics"
-          subtitle="Real-time connectivity check across core services"
-          className="lg:col-span-1"
-          action={
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={fetchHealth}
-              isLoading={loadingHealth}
-              leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+      {/* Featured Growth Categories */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <Flame className="w-5 h-5 text-amber-400" />
+              <span>Trending Growth Categories</span>
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Select a platform to configure and launch your campaign instantly
+            </p>
+          </div>
+          <Link to="/services" className="text-xs font-semibold text-amber-400 hover:text-amber-300 flex items-center gap-1">
+            <span>All Services</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {quickCategories.map((cat, idx) => (
+            <Link
+              key={idx}
+              to={cat.path}
+              className="p-5 rounded-2xl bg-slate-950/40 hover:bg-slate-900/60 border border-slate-800/80 hover:border-amber-500/40 transition-all group flex flex-col justify-between"
             >
-              Refresh
-            </Button>
-          }
-        >
-          <div className="space-y-4">
-            {/* Backend API status */}
-            <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800/80 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
-                  <Globe2 className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-white">FastAPI Backend</h4>
-                  <p className="text-xs text-slate-400">REST API v1</p>
-                </div>
-              </div>
-              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                health ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400'
-              }`}>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                {health ? 'Online' : 'Pending'}
-              </span>
-            </div>
-
-            {/* PostgreSQL status */}
-            <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800/80 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
-                  <Server className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-white">PostgreSQL 16</h4>
-                  <p className="text-xs text-slate-400">
-                    {health?.database.message || 'Database connection pool'}
-                  </p>
-                </div>
-              </div>
-              <span className="text-xs font-medium text-slate-300">
-                {health?.database.latency_ms ? `${health.database.latency_ms}ms` : 'Ready'}
-              </span>
-            </div>
-
-            {/* Redis & Celery status */}
-            <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800/80 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center">
-                  <Zap className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-white">Redis 7 & Celery</h4>
-                  <p className="text-xs text-slate-400">
-                    {health?.redis.message || 'Task broker & cache'}
-                  </p>
-                </div>
-              </div>
-              <span className="text-xs font-medium text-slate-300">
-                {health?.redis.latency_ms ? `${health.redis.latency_ms}ms` : 'Ready'}
-              </span>
-            </div>
-
-            {error && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                <span>Backend offline. Start backend on port 8000.</span>
-              </div>
-            )}
-          </div>
-        </Card>
-
-        {/* Development Roadmap */}
-        <Card
-          title="Modular Platform Roadmap"
-          subtitle="Systematic 10-phase enterprise implementation progress"
-          className="lg:col-span-2"
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {phases.map((phase) => (
-              <div
-                key={phase.id}
-                className={`p-4 rounded-xl border transition-all ${
-                  phase.status === 'completed'
-                    ? 'bg-blue-950/20 border-blue-500/30'
-                    : 'bg-slate-950/40 border-slate-800/60 opacity-80'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-white flex items-center gap-2">
-                    {phase.status === 'completed' ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    ) : (
-                      <Clock className="w-4 h-4 text-slate-500" />
-                    )}
-                    {phase.title}
-                  </span>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
-                    phase.status === 'completed'
-                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                      : 'bg-slate-800 text-slate-400'
-                  }`}>
-                    {phase.status}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-2xl">{cat.icon}</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    {cat.tag}
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 mt-1">{phase.desc}</p>
+                <h3 className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">
+                  {cat.name}
+                </h3>
+                <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                  {cat.desc}
+                </p>
               </div>
-            ))}
-          </div>
-        </Card>
+
+              <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-slate-400 group-hover:text-white">
+                <span className="font-medium">Order Now</span>
+                <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
+          ))}
+        </div>
       </div>
+
+      {/* Platform Features Grid */}
+      <Card
+        title="Why Choose SocialPulse"
+        subtitle="Built for reliability, maximum retention, and seamless campaign execution"
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {platformFeatures.map((feat, index) => {
+            const Icon = feat.icon;
+            return (
+              <div
+                key={index}
+                className="p-4 rounded-2xl bg-slate-950/40 border border-slate-800/60 flex items-start gap-3.5"
+              >
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Icon className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white mb-1">{feat.title}</h4>
+                  <p className="text-xs text-slate-400 leading-relaxed">{feat.desc}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
     </div>
   );
 };
-
-function SparklesIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg fill="currentColor" viewBox="0 0 24 24" {...props}>
-      <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-    </svg>
-  );
-}
