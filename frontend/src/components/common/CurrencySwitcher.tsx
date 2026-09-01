@@ -29,7 +29,9 @@ export const CurrencySwitcher: React.FC = () => {
         className="inline-flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 bg-[#1b1f27] hover:bg-[#252a35] text-slate-200 hover:text-white rounded-xl border border-[#2b303c] transition-all text-xs font-bold shadow-sm active:scale-95 group shrink-0"
         aria-label="Select Currency"
       >
-        <span className="text-sm sm:text-base leading-none select-none">{currentMetadata.flag}</span>
+        <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/25 select-none leading-none">
+          {currentMetadata.flag}
+        </span>
         <span className="font-extrabold tracking-wide text-amber-400 group-hover:text-amber-300">
           {currentMetadata.code}
         </span>
@@ -44,11 +46,11 @@ export const CurrencySwitcher: React.FC = () => {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-72 sm:w-80 max-w-[calc(100vw-24px)] bg-[#15181e]/95 backdrop-blur-xl border border-[#2b303c] rounded-2xl shadow-2xl z-50 p-2 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute right-0 mt-2 w-72 sm:w-80 max-w-[calc(100vw-24px)] bg-[#15181e] border border-[#2b303c] rounded-2xl shadow-2xl z-50 p-2 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
           <div className="px-3 py-2 border-b border-[#222630] flex items-center justify-between mb-1">
             <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
               <Globe className="w-3.5 h-3.5 text-amber-400" />
-              Pan-African & Global Currencies
+              Supported Currencies
             </span>
             <span className="text-[10px] text-amber-400/80 font-mono">Live Rates</span>
           </div>
@@ -71,7 +73,9 @@ export const CurrencySwitcher: React.FC = () => {
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-xl select-none">{item.flag}</span>
+                    <span className="text-[11px] font-black px-2 py-1 rounded bg-[#11141a] text-amber-400 border border-[#2b303c] select-none min-w-[38px] text-center">
+                      {item.flag}
+                    </span>
                     <div>
                       <div className="flex items-center gap-1.5 leading-tight">
                         <span className="text-xs font-bold text-white">{item.code}</span>

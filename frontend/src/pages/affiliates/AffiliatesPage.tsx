@@ -28,20 +28,20 @@ export const AffiliatesPage: React.FC = () => {
       </div>
 
       {/* 5% Lifetime Commission Banner */}
-      <div className="p-6 rounded-3xl bg-gradient-to-r from-amber-600 via-[#f59e0b] to-amber-500 text-slate-950 font-black flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+      <div className="p-6 rounded-3xl bg-[#181a20] border border-[#2b303c] text-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-slate-950 text-[#f59e0b] flex items-center justify-center font-black text-xl flex-shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-[#f59e0b] border border-amber-500/30 flex items-center justify-center font-black text-xl flex-shrink-0">
             5%
           </div>
           <div>
-            <h3 className="text-lg font-black leading-tight">5% Lifetime Commission</h3>
-            <p className="text-xs font-semibold opacity-90">
+            <h3 className="text-lg font-black leading-tight text-white">5% Lifetime Commission</h3>
+            <p className="text-xs text-slate-400">
               Whenever a user signs up with your link and adds funds, you earn 5% instantly in your wallet!
             </p>
           </div>
         </div>
 
-        <div className="px-4 py-2 bg-slate-950 text-white rounded-2xl text-xs font-bold whitespace-nowrap">
+        <div className="px-4 py-2 bg-[#121418] border border-[#2b303c] text-amber-400 rounded-2xl text-xs font-bold whitespace-nowrap">
           Min Payout: Ksh 500.00
         </div>
       </div>

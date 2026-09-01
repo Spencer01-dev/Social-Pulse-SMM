@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronDown, User as UserIcon, Menu, LogOut, LogIn } from 'lucide-react';
+import { ChevronDown, User as UserIcon, Menu, LogOut, LogIn, Zap } from 'lucide-react';
 import { Button } from '../common/Button';
 import { CurrencySwitcher } from '../common/CurrencySwitcher';
 import { useAuth } from '../../context/AuthContext';
@@ -33,8 +33,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
 
         {/* Brand Logo */}
         <Link to="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#f59e0b] text-slate-950 flex items-center justify-center font-black text-base sm:text-lg shadow-lg shadow-amber-500/25 shrink-0">
-            ⚡
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#f59e0b] text-slate-950 flex items-center justify-center font-black shadow-lg shadow-amber-500/20 shrink-0">
+            <Zap className="w-4 h-4 sm:w-4.5 sm:h-4.5 fill-slate-950 text-slate-950" />
           </div>
           <div>
             <span className="text-base sm:text-lg font-extrabold tracking-tight text-white flex items-center gap-1">

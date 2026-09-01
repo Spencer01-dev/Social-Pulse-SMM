@@ -228,11 +228,11 @@ export const NewOrderPage: React.FC = () => {
                   isLoading={addingFunds}
                   leftIcon={<Zap className="w-3.5 h-3.5" />}
                 >
-                  ⚡ Add +KES 1,000 Test Funds
+                  Add Test Funds
                 </Button>
                 <Link to="/deposit">
                   <Button type="button" variant="secondary" size="sm">
-                    Deposit via M-Pesa
+                    Deposit Funds
                   </Button>
                 </Link>
               </div>

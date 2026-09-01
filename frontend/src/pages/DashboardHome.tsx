@@ -11,7 +11,11 @@ import {
   Headphones,
   CheckCircle2,
   ArrowRight,
-  Flame
+  Flame,
+  Music2,
+  Camera,
+  Video,
+  Share2
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
@@ -26,54 +30,50 @@ export const DashboardHome: React.FC = () => {
     {
       title: 'Current Balance',
       value: formatCurrency(Number(user?.balance || 0)),
-      change: 'Instant top-up ready',
+      change: 'Instant top up ready',
       icon: Zap,
-      accent: 'from-amber-500 to-amber-600',
     },
     {
       title: 'Active Campaigns',
       value: 'Instant Start',
       change: 'Zero delivery delay',
       icon: TrendingUp,
-      accent: 'from-emerald-500 to-emerald-600',
     },
     {
-      title: 'High-Speed Fulfillment',
+      title: 'High Speed Fulfillment',
       value: '99.9%',
       change: 'Automated live tracking',
       icon: Globe2,
-      accent: 'from-blue-500 to-blue-600',
     },
     {
       title: 'Supported Gateways',
-      value: 'M-Pesa & Card',
+      value: 'Mpesa and Card',
       change: 'Instant automated credit',
       icon: ShieldCheck,
-      accent: 'from-orange-500 to-orange-600',
     },
   ];
 
   const quickCategories = [
-    { name: 'TikTok Growth', tag: 'High Speed', icon: '🎵', desc: 'Views, Likes, Followers & Shares with start-count tracking', path: '/orders/new' },
-    { name: 'Instagram Boost', tag: '0% Drop', icon: '📸', desc: 'Verified profile followers, post likes & reel impressions', path: '/orders/new' },
-    { name: 'YouTube Campaigns', tag: 'Non-Drop', icon: '▶️', desc: 'Watch time hours, video views & organic channel subscribers', path: '/orders/new' },
-    { name: 'Facebook Services', tag: 'Instant', icon: '👍', desc: 'Page likes, post reactions, video views & group members', path: '/orders/new' },
+    { name: 'TikTok Growth', tag: 'High Speed', icon: Music2, desc: 'Views, Likes, Followers and Shares with start count tracking', path: '/orders/new' },
+    { name: 'Instagram Boost', tag: '0% Drop', icon: Camera, desc: 'Verified profile followers, post likes and reel impressions', path: '/orders/new' },
+    { name: 'YouTube Campaigns', tag: 'Non Drop', icon: Video, desc: 'Watch time hours, video views and organic channel subscribers', path: '/orders/new' },
+    { name: 'Facebook Services', tag: 'Instant', icon: Share2, desc: 'Page likes, post reactions, video views and group members', path: '/orders/new' },
   ];
 
   const platformFeatures = [
     {
-      title: 'Automated Start-Count Tracking',
-      desc: 'Our intelligent tracking engine captures the exact initial baseline count of your post and monitors delivery progression in real-time.',
+      title: 'Automated Start Count Tracking',
+      desc: 'Our intelligent tracking engine captures the exact initial baseline count of your post and monitors delivery progression in real time.',
       icon: Zap,
     },
     {
-      title: 'Instant Pan-African Top-Ups',
-      desc: 'Deposit instantly with M-Pesa STK push, debit cards, and cryptocurrency with zero manual delays.',
+      title: 'Instant Pan African Top Ups',
+      desc: 'Deposit instantly with Mpesa STK push, debit cards, and cryptocurrency with zero manual delays.',
       icon: CreditCard,
     },
     {
-      title: 'Guaranteed Retention & Auto-Refill',
-      desc: 'Premium high-quality services backed by automated refills and transparent order lifecycle updates.',
+      title: 'Guaranteed Retention and Auto Refill',
+      desc: 'Premium high quality services backed by automated refills and transparent order lifecycle updates.',
       icon: CheckCircle2,
     },
     {
@@ -86,7 +86,7 @@ export const DashboardHome: React.FC = () => {
   return (
     <div className="space-y-6 sm:space-y-8 animate-fade-in w-full">
       {/* Welcome Hero Banner */}
-      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-amber-950/40 p-5 sm:p-8 md:p-10 border border-[#2b303c] shadow-2xl">
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-[#181a20] p-5 sm:p-8 md:p-10 border border-[#2b303c] shadow-2xl">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6">
           <div className="max-w-2xl">
             <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[11px] sm:text-xs font-bold uppercase tracking-wider mb-3 sm:mb-4">
@@ -97,13 +97,13 @@ export const DashboardHome: React.FC = () => {
               Scale Your Reach with <span className="text-[#f59e0b]">SocialPulse</span>
             </h1>
             <p className="mt-2.5 sm:mt-3 text-slate-300 text-xs sm:text-sm md:text-base leading-relaxed">
-              The premier social media marketing platform for creators, brands, and agencies with instant automated fulfillment, verified high-retention services, and real-time live tracking.
+              The premier social media marketing platform for creators, brands, and agencies with instant automated fulfillment, verified high retention services, and real time live tracking.
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 shrink-0">
             <Link to="/orders/new" className="w-full sm:w-auto">
-              <Button variant="primary" size="md" className="w-full sm:w-auto shadow-lg shadow-amber-500/25 justify-center">
+              <Button variant="primary" size="md" className="w-full sm:w-auto shadow-lg shadow-amber-500/20 justify-center">
                 <ShoppingBag className="w-4 h-4 mr-2" />
                 <span>Create New Order</span>
               </Button>
@@ -115,22 +115,19 @@ export const DashboardHome: React.FC = () => {
             </Link>
           </div>
         </div>
-
-        {/* Decorative ambient light */}
-        <div className="absolute -top-24 -right-24 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
       </div>
 
-      {/* Metrics Row - 2 cols on mobile, 4 cols on desktop */}
+      {/* Metrics Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         {stats.map((stat, i) => {
           const Icon = stat.icon;
           return (
-            <Card key={i} className="relative overflow-hidden hover:border-slate-700/80 transition-all p-3.5 sm:p-5">
+            <Card key={i} className="relative overflow-hidden hover:border-slate-700/80 transition-all p-3.5 sm:p-5 bg-[#181a20] border-[#2b303c]">
               <div className="flex items-center justify-between gap-1">
                 <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-slate-400 truncate">
                   {stat.title}
                 </span>
-                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-br ${stat.accent} flex items-center justify-center text-slate-950 font-bold shadow-md shrink-0`}>
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#222630] border border-[#2b303c] flex items-center justify-center text-[#f59e0b] font-bold shrink-0">
                   <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
               </div>
@@ -167,33 +164,38 @@ export const DashboardHome: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {quickCategories.map((cat, idx) => (
-            <Link
-              key={idx}
-              to={cat.path}
-              className="p-5 rounded-2xl bg-slate-950/40 hover:bg-slate-900/60 border border-slate-800/80 hover:border-amber-500/40 transition-all group flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-2xl">{cat.icon}</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                    {cat.tag}
-                  </span>
+          {quickCategories.map((cat, idx) => {
+            const Icon = cat.icon;
+            return (
+              <Link
+                key={idx}
+                to={cat.path}
+                className="p-5 rounded-2xl bg-[#181a20] hover:bg-[#20242c] border border-[#2b303c] hover:border-amber-500/40 transition-all group flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-8 h-8 rounded-xl bg-[#222630] border border-[#2b303c] text-amber-400 flex items-center justify-center">
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                      {cat.tag}
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">
+                    {cat.name}
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                    {cat.desc}
+                  </p>
                 </div>
-                <h3 className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">
-                  {cat.name}
-                </h3>
-                <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-                  {cat.desc}
-                </p>
-              </div>
 
-              <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-slate-400 group-hover:text-white">
-                <span className="font-medium">Order Now</span>
-                <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-1 transition-transform" />
-              </div>
-            </Link>
-          ))}
+                <div className="mt-4 pt-3 border-t border-[#2b303c] flex items-center justify-between text-xs text-slate-400 group-hover:text-white">
+                  <span className="font-medium">Order Now</span>
+                  <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-1 transition-transform" />
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </div>
 

@@ -19,7 +19,8 @@ import {
   Share2,
   Bell,
   ShieldAlert,
-  LogOut
+  LogOut,
+  Zap
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -81,7 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         <div className="flex items-center justify-between p-4 border-b border-[#2b303c] lg:hidden">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-[#f59e0b] text-slate-950 flex items-center justify-center font-black">
-              ⚡
+              <Zap className="w-4 h-4 fill-slate-950 text-slate-950" />
             </div>
             <span className="font-extrabold text-white">SocialPulse</span>
           </div>

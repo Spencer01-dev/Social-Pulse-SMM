@@ -625,8 +625,8 @@ export const DepositPage: React.FC = () => {
       {simulatorModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-[#161a22] border border-amber-500/40 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center space-y-5 shadow-2xl">
-            <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto text-2xl font-black">
-              ⚡
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto shadow-lg shadow-amber-500/20">
+              <Zap className="w-7 h-7 fill-amber-400 text-amber-400" />
             </div>
             <div>
               <div className="inline-block px-3 py-1 bg-amber-500/10 text-amber-400 text-[11px] font-extrabold uppercase tracking-wider rounded-full border border-amber-500/20 mb-2">
@@ -709,7 +709,7 @@ export const DepositPage: React.FC = () => {
       )}
 
       {/* Hero Wallet Balance Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#191d26] via-[#202532] to-[#191d26] p-6 sm:p-8 border border-[#2b303c] shadow-xl">
+      <div className="relative overflow-hidden rounded-3xl bg-[#181a20] p-6 sm:p-8 border border-[#2b303c] shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative z-10">
           <div>
             <div className="flex items-center gap-2 mb-1">

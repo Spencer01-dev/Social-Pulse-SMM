@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff, Zap } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/common/Button';
 
@@ -41,26 +41,22 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center px-4 py-12 bg-[#0B0F19] relative overflow-hidden">
-      {/* Ambient background glow */}
-      <div className="absolute top-1/4 -left-32 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
-
+    <div className="min-h-screen flex flex-col justify-center items-center px-4 py-12 bg-[#121418] relative">
       {/* Brand Header */}
       <div className="text-center mb-8 relative z-10">
         <Link to="/" className="inline-flex items-center gap-2.5 mb-3">
-          <div className="w-10 h-10 rounded-2xl bg-[#f59e0b] text-slate-950 flex items-center justify-center font-black text-xl shadow-lg shadow-amber-500/25">
-            ⚡
+          <div className="w-10 h-10 rounded-2xl bg-[#f59e0b] text-slate-950 flex items-center justify-center font-black shadow-lg shadow-amber-500/20">
+            <Zap className="w-5 h-5 fill-slate-950 text-slate-950" />
           </div>
           <span className="text-2xl font-extrabold tracking-tight text-white">
             Social<span className="text-[#f59e0b]">Pulse</span>
           </span>
         </Link>
-        <p className="text-sm text-slate-400">Sign in to your account and manage your campaigns</p>
+        <p className="text-xs sm:text-sm text-slate-400">Sign in to your account and manage your campaigns</p>
       </div>
 
       {/* Main Login Card */}
-      <div className="w-full max-w-md glass-card rounded-3xl p-8 relative z-10 shadow-2xl border border-slate-800">
+      <div className="w-full max-w-md bg-[#181a20] rounded-3xl p-6 sm:p-8 relative z-10 shadow-2xl border border-[#2b303c]">
         {error && (
           <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm flex items-start gap-3">
             <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />

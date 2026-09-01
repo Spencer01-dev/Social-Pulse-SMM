@@ -97,7 +97,7 @@ export const ServicesPage: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Services & Pricing <span className="text-gradient">Catalog</span>
+            Services & Pricing <span className="text-[#f59e0b]">Catalog</span>
           </h1>
           <p className="text-sm text-slate-400 mt-1">
             Instant delivery, high-retention social media growth packages at wholesale prices

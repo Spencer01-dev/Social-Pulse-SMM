@@ -102,7 +102,7 @@ export const AdminDashboardPage: React.FC = () => {
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Revenue */}
-        <Card className="flex items-center justify-between border-blue-500/20 bg-gradient-to-br from-slate-900/90 to-blue-950/20">
+        <Card className="flex items-center justify-between border-blue-500/20 bg-[#181a20]">
           <div>
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
               Total Platform Revenue
@@ -120,7 +120,7 @@ export const AdminDashboardPage: React.FC = () => {
         </Card>
 
         {/* Gross Profit & Margin */}
-        <Card className="flex items-center justify-between border-emerald-500/20 bg-gradient-to-br from-slate-900/90 to-emerald-950/20">
+        <Card className="flex items-center justify-between border-emerald-500/20 bg-[#181a20]">
           <div>
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
               Gross Profit Earned
@@ -129,7 +129,7 @@ export const AdminDashboardPage: React.FC = () => {
               +KES {overview ? Number(overview.total_gross_profit).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'}
             </span>
             <span className="text-[11px] text-emerald-300 font-semibold block mt-0.5">
-              ★ {overview ? overview.profit_margin_percent : '0'}% Profit Margin
+              {overview ? overview.profit_margin_percent : '0'}% Profit Margin
             </span>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
@@ -138,7 +138,7 @@ export const AdminDashboardPage: React.FC = () => {
         </Card>
 
         {/* Total Orders Volume */}
-        <Card className="flex items-center justify-between border-purple-500/20 bg-gradient-to-br from-slate-900/90 to-purple-950/20">
+        <Card className="flex items-center justify-between border-purple-500/20 bg-[#181a20]">
           <div>
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
               Fulfillment Orders
@@ -156,7 +156,7 @@ export const AdminDashboardPage: React.FC = () => {
         </Card>
 
         {/* Total Active Users & Deposits */}
-        <Card className="flex items-center justify-between border-indigo-500/20 bg-gradient-to-br from-slate-900/90 to-indigo-950/20">
+        <Card className="flex items-center justify-between border-indigo-500/20 bg-[#181a20]">
           <div>
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
               Registered Accounts
