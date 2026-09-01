@@ -53,6 +53,7 @@ async def lifespan(app: FastAPI):
         import app.models.order
         import app.models.transaction
         import app.models.ticket
+        import app.models.child_panel
         from app.core.database import engine
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)

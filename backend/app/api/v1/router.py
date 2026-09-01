@@ -8,6 +8,7 @@ from app.api.v1.endpoints import (
     admin_wallet,
     auth,
     binance_payments,
+    child_panels,
     crypto_payments,
     health,
     orders,
@@ -67,3 +68,6 @@ api_router.include_router(admin_tickets.router)
 
 # Admin Platform Configuration & Settings
 api_router.include_router(admin_settings.router)
+
+# Rented Child SMM Panels
+api_router.include_router(child_panels.router)
