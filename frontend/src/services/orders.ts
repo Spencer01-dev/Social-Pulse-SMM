@@ -4,6 +4,7 @@ import { AdminOrder, CustomerOrder, OrderCreatePayload, OrderStatus } from '../t
 export interface OrderFilterParams {
   status?: OrderStatus;
   search?: string;
+  all_orders?: boolean;
   skip?: number;
   limit?: number;
 }

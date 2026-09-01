@@ -10,7 +10,7 @@ from app.api.deps import get_current_active_user
 from app.core.database import get_db
 from app.models.order import Order, OrderStatus
 from app.models.service import Service
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.providers.manager import get_provider
 from app.schemas.order import CustomerOrderResponse, OrderCreate
 
@@ -136,22 +136,26 @@ async def create_order(
 async def list_my_orders(
     status: Optional[OrderStatus] = None,
     search: Optional[str] = None,
+    all_orders: bool = Query(False, description="If admin, view all orders across platform"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ) -> Any:
     """
-    List all orders created by the authenticated user with filters and search.
+    List orders with filters and search. Admins can view all orders.
     """
     query = (
         select(Order)
         .options(selectinload(Order.service))
-        .where(Order.user_id == current_user.id)
         .order_by(desc(Order.created_at))
         .offset(skip)
         .limit(limit)
     )
+
+    is_admin = current_user.role in [UserRole.ADMIN, UserRole.SUPER_ADMIN]
+    if not (is_admin and all_orders):
+        query = query.where(Order.user_id == current_user.id)
 
     if status:
         query = query.where(Order.status == status)

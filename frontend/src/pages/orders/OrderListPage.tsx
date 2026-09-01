@@ -11,14 +11,21 @@ import {
   AlertTriangle,
   XCircle,
   Copy,
-  Check
+  Check,
+  ShieldAlert,
+  Layers
 } from 'lucide-react';
 import { ordersService } from '../../services/orders';
 import { CustomerOrder, OrderStatus } from '../../types';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
+import { useAuth } from '../../context/AuthContext';
 
 export const OrderListPage: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const [viewAll, setViewAll] = useState(isAdmin);
+
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus | 'all'>('all');
   const [search, setSearch] = useState('');
@@ -31,6 +38,7 @@ export const OrderListPage: React.FC = () => {
       const data = await ordersService.getMyOrders({
         status: selectedStatus !== 'all' ? selectedStatus : undefined,
         search: search || undefined,
+        all_orders: isAdmin ? viewAll : undefined,
       });
       setOrders(data);
     } catch (err) {
@@ -49,7 +57,7 @@ export const OrderListPage: React.FC = () => {
     }, 8000);
 
     return () => clearInterval(interval);
-  }, [selectedStatus, search]);
+  }, [selectedStatus, search, viewAll]);
 
   const copyOrderId = (id: string) => {
     navigator.clipboard.writeText(id);
@@ -133,16 +141,52 @@ export const OrderListPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Admin Scope Switcher Banner */}
+      {isAdmin && (
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0" />
+            <div>
+              <span className="text-xs font-extrabold text-amber-400 uppercase tracking-wider block">Staff Order Controls</span>
+              <p className="text-xs text-slate-300">
+                {viewAll
+                  ? 'Showing all platform orders across all accounts.'
+                  : 'Showing only orders created by your super admin account.'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setViewAll(!viewAll)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                viewAll
+                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                  : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
+              }`}
+            >
+              {viewAll ? 'View My Orders Only' : 'View All System Orders'}
+            </button>
+            <Link
+              to="/admin/orders"
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 text-xs font-bold border border-amber-500/30 flex items-center gap-1.5 transition-colors"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Full Orders Monitor</span>
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Status Filter Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
         {statusTabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setSelectedStatus(tab.id)}
-            className={`px-4 py-2 rounded-2xl text-xs font-semibold whitespace-nowrap transition-all ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
               selectedStatus === tab.id
-                ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-sm'
-                : 'bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-800/80 border border-slate-800'
+                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25 border border-amber-400 font-extrabold'
+                : 'bg-[#1b1f27] text-slate-300 hover:text-white hover:bg-[#252a35] border border-[#2b303c]'
             }`}
           >
             {tab.label}
