@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
   PlusCircle,
   ListOrdered,
@@ -18,7 +18,8 @@ import {
   Sparkles,
   Share2,
   Bell,
-  ShieldAlert
+  ShieldAlert,
+  LogOut
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -28,8 +29,15 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+
+  const handleLogout = () => {
+    logout();
+    onClose();
+    navigate('/login');
+  };
 
   const customerNav = [
     { name: 'New Order', href: '/orders/new', icon: PlusCircle },
@@ -152,17 +160,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Footer active session status */}
-        <div className="p-3 border-t border-[#2b303c] bg-[#14161a]">
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${isAuthenticated ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
-            <div className="text-xs truncate">
-              <span className="font-bold text-white block truncate">
-                {isAuthenticated && user ? `@${user.username}` : 'Guest'}
-              </span>
-              <span className="text-[10px] text-[#f59e0b] font-semibold">
-                {isAuthenticated && user ? `Ksh ${Number(user.balance || 0).toFixed(2)}` : 'Not Logged In'}
-              </span>
+        <div className="p-3 border-t border-[#2b303c] bg-[#14161a] space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 truncate">
+              <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isAuthenticated ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
+              <div className="text-xs truncate">
+                <span className="font-bold text-white block truncate">
+                  {isAuthenticated && user ? `@${user.username}` : 'Guest'}
+                </span>
+                <span className="text-[10px] text-[#f59e0b] font-semibold">
+                  {isAuthenticated && user ? `Ksh ${Number(user.balance || 0).toFixed(2)}` : 'Not Logged In'}
+                </span>
+              </div>
             </div>
+
+            {isAuthenticated && (
+              <button
+                onClick={handleLogout}
+                className="px-2.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/20 transition-all flex items-center gap-1.5 text-xs font-bold shrink-0 active:scale-95"
+                title="Sign Out"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Logout</span>
+              </button>
+            )}
           </div>
         </div>
       </aside>

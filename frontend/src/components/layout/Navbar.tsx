@@ -73,11 +73,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
             {/* Logout Button */}
             <button
               onClick={handleLogout}
-              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 bg-[#222630] hover:bg-rose-950/30 text-slate-300 hover:text-rose-400 font-bold text-xs rounded-xl border border-[#2b303c] transition-colors"
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 font-bold text-xs rounded-xl border border-rose-500/20 transition-colors shrink-0 active:scale-95"
               title="Sign Out"
             >
               <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Logout</span>
+              <span>Logout</span>
             </button>
           </>
         ) : (
