@@ -20,6 +20,13 @@ def get_provider(slug: str = "delix", api_url: Optional[str] = None, api_key: Op
         effective_key = api_key or settings.DELIX_API_KEY
         return DelixGainsProvider(api_url=api_url or settings.DELIX_API_URL, api_key=effective_key)
 
+    if slug_clean in ["exonums", "exonums.com"]:
+        return GenericSMMProvider(
+            name="Exonums",
+            api_url=api_url or settings.EXONUMS_API_URL,
+            api_key=api_key or settings.EXONUMS_API_KEY,
+        )
+
     # Generic SMM v2 Provider fallback
     if api_url and (api_key or settings.DELIX_API_KEY):
         return GenericSMMProvider(

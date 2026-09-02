@@ -79,6 +79,12 @@ class SmartProviderRouter:
                         api_url=provider_record.api_url or settings.DELIX_API_URL,
                         api_key=settings.DELIX_API_KEY
                     )
+                elif provider_record.slug in ["exonums", "exonums.com"]:
+                    client = GenericSMMProvider(
+                        name="Exonums",
+                        api_url=provider_record.api_url or settings.EXONUMS_API_URL,
+                        api_key=settings.EXONUMS_API_KEY
+                    )
                 else:
                     client = GenericSMMProvider(
                         name=provider_record.name,

@@ -136,11 +136,8 @@ class GenericSMMProvider(ProviderInterface):
 
         return ProviderOrderResponse(
             provider_order_id=str(data["order"]),
-            initial_status="Pending",
-            start_count=0,
-            remains=quantity,
-            charge=Decimal("0.00"),
-            currency="USD",
+            status="Pending",
+            raw_response=data,
         )
 
     async def get_order_status(self, provider_order_id: str) -> ProviderOrderStatus:

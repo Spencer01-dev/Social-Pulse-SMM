@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     DELIX_API_KEY: str = "EVDcnX9t9VSVJdUveItbi1tbvGuVqyBCUigzGE9pEv5n7Zwa8qmJGrDoeZs3"
     USE_MOCK_PROVIDERS: bool = False
 
+    # Upstream Provider (Exonums)
+    EXONUMS_API_URL: str = "https://exonums.com/api/v2"
+    EXONUMS_API_KEY: str = ""
+
     # Payments
     MPESA_ENVIRONMENT: str = "sandbox"
     MPESA_CONSUMER_KEY: str = ""

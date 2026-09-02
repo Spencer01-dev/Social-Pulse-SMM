@@ -77,12 +77,26 @@ async def sync_services_from_provider(
     provider_record = provider_query.scalars().first()
 
     if not provider_record:
+        # Determine provider metadata based on slug
+        if provider_slug in ["delix", "delixgains"]:
+            p_name = "Delix Gains KE"
+            p_url = settings.DELIX_API_URL
+            p_currency = "KES"
+        elif provider_slug in ["exonums", "exonums.com"]:
+            p_name = "Exonums"
+            p_url = settings.EXONUMS_API_URL
+            p_currency = "USD"
+        else:
+            p_name = provider_slug.capitalize()
+            p_url = settings.DELIX_API_URL
+            p_currency = "USD"
+
         provider_record = Provider(
-            name="Delix Gains KE" if provider_slug in ["delix", "delixgains"] else "Sandbox Mock Provider",
+            name=p_name,
             slug=provider_slug,
-            api_url=settings.DELIX_API_URL,
+            api_url=p_url,
             is_active=True,
-            currency="KES",
+            currency=p_currency,
             balance=Decimal("0.00")
         )
         db.add(provider_record)
