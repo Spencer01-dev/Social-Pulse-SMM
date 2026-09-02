@@ -144,8 +144,9 @@ export const AdminOrdersPage: React.FC = () => {
     }
   };
 
-  const totalRevenue = orders.reduce((acc, o) => acc + Number(o.charge), 0);
-  const totalProfit = orders.reduce((acc, o) => acc + Number(o.profit), 0);
+  const activeOrders = orders.filter(o => !['canceled', 'failed'].includes(o.status));
+  const totalRevenue = activeOrders.reduce((acc, o) => acc + Number(o.charge), 0);
+  const totalProfit = activeOrders.reduce((acc, o) => acc + Number(o.profit), 0);
 
   return (
     <div className="space-y-6">

@@ -4,7 +4,9 @@ import { HealthStatus } from '../types';
 const API_BASE_URL =
   import.meta.env.VITE_API_URL ||
   import.meta.env.VITE_API_BASE_URL ||
-  'https://social-pulse-smm.onrender.com/api/v1';
+  (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:8000/api/v1'
+    : 'https://social-pulse-smm.onrender.com/api/v1');
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,

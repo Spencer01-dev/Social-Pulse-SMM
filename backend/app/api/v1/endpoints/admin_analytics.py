@@ -32,13 +32,15 @@ async def get_analytics_overview(
     Get executive KPI metrics (Total Revenue, Provider Cost, Gross Profit, Users, Orders).
     """
     # 1. Orders Financial Aggregation
+    # Exclude canceled and failed orders from financial metrics (those are refunded)
+    active_order_filter = ~Order.status.in_([OrderStatus.CANCELED, OrderStatus.FAILED])
     order_agg = await db.execute(
         select(
             func.coalesce(func.sum(Order.charge), Decimal("0.00")),
             func.coalesce(func.sum(Order.provider_cost), Decimal("0.00")),
             func.coalesce(func.sum(Order.profit), Decimal("0.00")),
             func.count(Order.id)
-        )
+        ).where(active_order_filter)
     )
     total_rev, total_cost, total_profit, total_orders = order_agg.first()
 
@@ -97,7 +99,10 @@ async def get_daily_revenue_trends(
             func.coalesce(func.sum(Order.profit), Decimal("0.00")),
             func.count(Order.id)
         )
-        .where(Order.created_at >= start_date)
+        .where(
+            Order.created_at >= start_date,
+            ~Order.status.in_([OrderStatus.CANCELED, OrderStatus.FAILED])
+        )
         .group_by(func.date_trunc('day', Order.created_at))
         .order_by(func.date_trunc('day', Order.created_at))
     )
@@ -141,6 +146,7 @@ async def get_platform_metrics(
             func.coalesce(func.sum(Order.profit), Decimal("0.00"))
         )
         .join(Service, Order.service_id == Service.id)
+        .where(~Order.status.in_([OrderStatus.CANCELED, OrderStatus.FAILED]))
         .group_by(Service.platform)
     )
     result = await db.execute(query)
@@ -193,6 +199,7 @@ async def get_top_services(
             func.coalesce(func.sum(Order.profit), Decimal("0.00")).label("total_profit")
         )
         .join(Order, Service.id == Order.service_id)
+        .where(~Order.status.in_([OrderStatus.CANCELED, OrderStatus.FAILED]))
         .group_by(Service.id, Service.name, Service.platform)
         .order_by(desc("total_rev"))
         .limit(limit)
