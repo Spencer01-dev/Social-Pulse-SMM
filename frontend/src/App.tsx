@@ -25,12 +25,14 @@ import { RefillPage } from './pages/orders/RefillPage';
 import { ChildPanelPage } from './pages/childpanel/ChildPanelPage';
 import { AffiliatesPage } from './pages/affiliates/AffiliatesPage';
 import { ServiceUpdatesPage } from './pages/services/ServiceUpdatesPage';
+import { WhatsAppChannelPopup } from './components/common/WhatsAppChannelPopup';
 
 export const App: React.FC = () => {
   return (
     <AuthProvider>
       <CurrencyProvider>
         <BrowserRouter>
+          <WhatsAppChannelPopup />
           <Routes>
             {/* Public Auth Routes */}
             <Route path="/login" element={<LoginPage />} />
