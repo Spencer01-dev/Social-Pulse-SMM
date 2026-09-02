@@ -21,7 +21,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
   };
 
   return (
-    <header className="sticky top-0 z-30 h-14 sm:h-16 glass-header px-3 sm:px-6 flex items-center justify-between border-b border-[#2b303c] max-w-full overflow-hidden">
+    <header className="sticky top-0 z-40 h-14 sm:h-16 glass-header px-3 sm:px-6 flex items-center justify-between border-b border-[#2b303c] w-full">
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         <button
           onClick={onToggleSidebar}
