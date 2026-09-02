@@ -1,6 +1,5 @@
 from typing import Any, Dict
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 
 from app.api.deps import require_roles
 from app.core.config import settings
@@ -36,18 +35,14 @@ async def get_platform_settings(
                 "has_consumer_key": bool(settings.MPESA_CONSUMER_KEY),
                 "callback_url": settings.MPESA_CALLBACK_URL,
             },
-            "okx": {
-                "has_api_key": bool(settings.OKX_API_KEY),
-                "supported_chains": ["TRC20", "TON", "POLYGON"],
-            },
-            "binance": {
-                "has_api_key": bool(settings.BINANCE_API_KEY or settings.BINANCE_PAY_API_KEY),
-                "base_url": settings.BINANCE_BASE_URL,
+            "paystack": {
+                "has_public_key": bool(settings.PAYSTACK_PUBLIC_KEY),
+                "has_secret_key": bool(settings.PAYSTACK_SECRET_KEY),
+                "supported_currencies": ["NGN", "GHS", "KES", "ZAR", "USD"],
             }
         },
         "exchange_rates": {
             "default_usd_to_kes": settings.DEFAULT_USD_TO_KES,
-            "default_usdt_to_kes": settings.DEFAULT_USDT_TO_KES,
             "markup_percent": settings.EXCHANGE_RATE_MARKUP_PERCENT,
         }
     }

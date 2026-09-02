@@ -27,7 +27,7 @@ class STKQueryResponse:
 
 
 class PaymentGatewayInterface(ABC):
-    """Abstract interface for payment gateways (M-Pesa, OKX, Binance)."""
+    """Abstract interface for payment gateways (M-Pesa, Paystack)."""
 
     @abstractmethod
     async def initiate_deposit(self, phone_or_wallet: str, amount: Decimal, **kwargs: Any) -> Any:

@@ -11,11 +11,13 @@ logger = logging.getLogger(__name__)
 
 class PaystackProvider:
     """
-    Paystack Payment Engine.
+    Paystack Payment Engine — Primary non-M-Pesa payment gateway for SocialPulse.
     Supports:
     - Nigeria (NGN): Bank Transfer, Cards, USSD, Apple Pay
     - Ghana (GHS): MTN MoMo, Vodafone Cash, AirtelTigo
     - Kenya (KES): M-Pesa, Cards
+    - South Africa (ZAR): Cards, EFT
+    - International (USD): Visa / Mastercard
     """
 
     BASE_URL = "https://api.paystack.co"

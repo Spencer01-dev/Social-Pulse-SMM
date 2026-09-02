@@ -16,9 +16,6 @@ class TransactionType(str, enum.Enum):
 
 class PaymentMethod(str, enum.Enum):
     MPESA = "mpesa"
-    OKX = "okx"
-    BINANCE = "binance"
-    FLUTTERWAVE = "flutterwave"
     PAYSTACK = "paystack"
     MANUAL = "manual"
     INTERNAL = "internal"

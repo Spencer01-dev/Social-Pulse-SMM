@@ -6,14 +6,6 @@ from app.schemas.analytics import (
     RecentActivityItem,
     TopServiceItem,
 )
-from app.schemas.crypto import (
-    BinancePayOrderRequest,
-    BinancePayOrderResponse,
-    CryptoDepositRequest,
-    CryptoDepositResponse,
-    CryptoVerifyRequest,
-    CryptoVerifyResponse,
-)
 from app.schemas.health import HealthCheckResponse, ServiceStatus
 from app.schemas.order import (
     AdminOrderResponse,
@@ -23,9 +15,14 @@ from app.schemas.order import (
 )
 from app.schemas.payment import (
     AdminBalanceAdjustRequest,
+    CurrenciesResponse,
+    CurrencyMeta,
     MpesaSTKPushRequest,
     MpesaSTKPushResponse,
     MpesaSTKStatusResponse,
+    PaymentVerifyResponse,
+    PaystackInitRequest,
+    PaystackInitResponse,
     TransactionResponse,
 )
 from app.schemas.reseller import (
@@ -90,12 +87,11 @@ __all__ = [
     "MpesaSTKStatusResponse",
     "TransactionResponse",
     "AdminBalanceAdjustRequest",
-    "CryptoDepositRequest",
-    "CryptoDepositResponse",
-    "CryptoVerifyRequest",
-    "CryptoVerifyResponse",
-    "BinancePayOrderRequest",
-    "BinancePayOrderResponse",
+    "PaystackInitRequest",
+    "PaystackInitResponse",
+    "PaymentVerifyResponse",
+    "CurrencyMeta",
+    "CurrenciesResponse",
     "AnalyticsOverviewResponse",
     "DailyRevenueItem",
     "PlatformMetricItem",

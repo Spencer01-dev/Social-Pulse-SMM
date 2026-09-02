@@ -48,26 +48,9 @@ class TransactionResponse(BaseModel):
         from_attributes = True
 
 
-class FlutterwaveInitRequest(BaseModel):
-    amount: Decimal = Field(..., gt=0, description="Amount in specified currency")
-    currency: str = Field(default="NGN", description="Currency code (NGN, GHS, TZS, BIF, KES, USD)")
-    redirect_url: Optional[str] = Field(default=None, description="Client redirect return URL")
-    phone_number: Optional[str] = None
-
-
-class FlutterwaveInitResponse(BaseModel):
-    status: str
-    message: str
-    tx_ref: str
-    amount: Decimal
-    currency: str
-    link: str
-    is_simulator: bool = False
-
-
 class PaystackInitRequest(BaseModel):
     amount: Decimal = Field(..., gt=0, description="Amount in specified currency")
-    currency: str = Field(default="NGN", description="Currency code (NGN, GHS, KES)")
+    currency: str = Field(default="NGN", description="Currency code (NGN, GHS, KES, USD, ZAR)")
     callback_url: Optional[str] = Field(default=None, description="Client redirect return URL")
 
 

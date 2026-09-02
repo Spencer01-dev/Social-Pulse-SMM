@@ -1,8 +1,6 @@
 import apiClient from './api';
 import {
   CurrenciesResponse,
-  FlutterwaveInitRequest,
-  FlutterwaveInitResponse,
   MpesaSTKPushRequest,
   MpesaSTKPushResponse,
   MpesaSTKStatusResponse,
@@ -30,17 +28,6 @@ export const paymentsService = {
   // Supported Multi-Currencies & Live Rates
   getCurrencies: async (): Promise<CurrenciesResponse> => {
     const response = await apiClient.get<CurrenciesResponse>('/payments/currencies');
-    return response.data;
-  },
-
-  // Flutterwave Pan-African Engine
-  initiateFlutterwave: async (payload: FlutterwaveInitRequest): Promise<FlutterwaveInitResponse> => {
-    const response = await apiClient.post<FlutterwaveInitResponse>('/payments/flutterwave/initialize', payload);
-    return response.data;
-  },
-
-  verifyFlutterwave: async (txRef: string): Promise<PaymentVerifyResponse> => {
-    const response = await apiClient.get<PaymentVerifyResponse>(`/payments/flutterwave/verify/${txRef}`);
     return response.data;
   },
 

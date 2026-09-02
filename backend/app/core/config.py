@@ -86,31 +86,13 @@ class Settings(BaseSettings):
     MPESA_PASSKEY: str = ""
     MPESA_CALLBACK_URL: str = "http://localhost:8000/api/v1/payments/mpesa/callback"
 
-    OKX_API_KEY: str = ""
-    OKX_SECRET_KEY: str = ""
-    OKX_PASSPHRASE: str = ""
-    OKX_USE_SIMULATOR: bool = True
-
-    BINANCE_API_KEY: str = ""
-    BINANCE_SECRET_KEY: str = ""
-    BINANCE_PAY_API_KEY: str = ""
-    BINANCE_PAY_SECRET_KEY: str = ""
-    BINANCE_MERCHANT_ID: str = ""
-    BINANCE_BASE_URL: str = "https://bpay.binanceapi.com"
+    PAYSTACK_PUBLIC_KEY: str = ""
+    PAYSTACK_SECRET_KEY: str = ""
 
     # Currency
     PRIMARY_CURRENCY: str = "KES"
     DEFAULT_USD_TO_KES: float = 130.00
-    DEFAULT_USDT_TO_KES: float = 131.50
     EXCHANGE_RATE_MARKUP_PERCENT: float = 2.0
-
-    # Pan-African Payment Gateways
-    FLUTTERWAVE_PUBLIC_KEY: str = ""
-    FLUTTERWAVE_SECRET_KEY: str = ""
-    FLUTTERWAVE_SECRET_HASH: str = "socialpulse_secret_hash"
-    
-    PAYSTACK_PUBLIC_KEY: str = ""
-    PAYSTACK_SECRET_KEY: str = ""
 
 
 settings = Settings()

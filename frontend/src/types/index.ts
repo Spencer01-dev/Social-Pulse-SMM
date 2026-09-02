@@ -30,9 +30,9 @@ export type TransactionType =
   | 'manual_adjustment'
   | 'bonus';
 
-export type PaymentMethod = 'mpesa' | 'okx' | 'binance' | 'flutterwave' | 'paystack' | 'manual' | 'internal';
+export type PaymentMethod = 'mpesa' | 'paystack' | 'manual' | 'internal';
 
-export type SupportedCurrency = 'KES' | 'NGN' | 'GHS' | 'TZS' | 'BIF' | 'USD' | 'USDT';
+export type SupportedCurrency = 'KES' | 'NGN' | 'GHS' | 'ZAR' | 'USD';
 
 export interface CurrencyMetadata {
   code: string;
@@ -48,23 +48,6 @@ export interface CurrencyMetadata {
 export interface CurrenciesResponse {
   base_currency: string;
   currencies: Record<string, CurrencyMetadata>;
-}
-
-export interface FlutterwaveInitRequest {
-  amount: number;
-  currency: string;
-  redirect_url?: string;
-  phone_number?: string;
-}
-
-export interface FlutterwaveInitResponse {
-  status: string;
-  message: string;
-  tx_ref: string;
-  amount: number;
-  currency: string;
-  link: string;
-  is_simulator: boolean;
 }
 
 export interface PaystackInitRequest {

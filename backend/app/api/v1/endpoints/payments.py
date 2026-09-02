@@ -16,13 +16,10 @@ from app.models.transaction import (
 )
 from app.models.user import User
 from app.payments.exchange_rate import exchange_rate_service
-from app.payments.flutterwave import flutterwave_provider
 from app.payments.mpesa import mpesa_client, normalize_phone_number
 from app.payments.paystack import paystack_provider
 from app.schemas.payment import (
     CurrenciesResponse,
-    FlutterwaveInitRequest,
-    FlutterwaveInitResponse,
     MpesaSTKPushRequest,
     MpesaSTKPushResponse,
     MpesaSTKStatusResponse,
@@ -37,13 +34,17 @@ router = APIRouter(prefix="/payments", tags=["Payments & Mobile Money"])
 @router.get("/currencies", response_model=CurrenciesResponse)
 async def get_supported_currencies() -> Any:
     """
-    Get all supported African & Global currencies with live exchange rates relative to KES.
+    Get all supported currencies with live exchange rates relative to KES.
     """
     return {
         "base_currency": "KES",
         "currencies": exchange_rate_service.get_supported_currencies()
     }
 
+
+# =========================================================================
+# SAFARICOM M-PESA DARAJA STK PUSH ENGINE
+# =========================================================================
 
 @router.post("/mpesa/stk-push", response_model=MpesaSTKPushResponse)
 async def initiate_mpesa_stk_push(
@@ -252,232 +253,7 @@ async def query_mpesa_stk_status(
 
 
 # =========================================================================
-# FLUTTERWAVE PAN-AFRICAN ENGINE
-# =========================================================================
-
-@router.post("/flutterwave/initialize", response_model=FlutterwaveInitResponse)
-async def initialize_flutterwave_checkout(
-    req: FlutterwaveInitRequest,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
-) -> Any:
-    """
-    Initialize a Flutterwave Pan-African standard checkout link.
-    Supports NGN, GHS, TZS, BIF, KES, USD.
-    """
-    curr = req.currency.upper()
-    tx_ref = f"FLW-{uuid.uuid4().hex[:12].upper()}"
-    redirect_url = req.redirect_url or f"{request.base_url}wallet/deposit"
-
-    # Pre-calculate equivalent KES value
-    kes_equivalent = exchange_rate_service.convert_to_kes(req.amount, curr)
-
-    # Initialize via Flutterwave Provider
-    try:
-        flw_resp = await flutterwave_provider.initialize_payment(
-            user_email=current_user.email,
-            user_name=current_user.full_name or current_user.username,
-            amount=req.amount,
-            currency=curr,
-            redirect_url=redirect_url,
-            phone_number=req.phone_number or current_user.phone_number,
-            custom_tx_ref=tx_ref
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Flutterwave initialization failed: {str(exc)}"
-        )
-
-    # Record Pending Transaction
-    transaction = Transaction(
-        user_id=current_user.id,
-        type=TransactionType.DEPOSIT,
-        amount=kes_equivalent,
-        balance_before=current_user.balance,
-        balance_after=current_user.balance,
-        currency="KES",
-        payment_method=PaymentMethod.FLUTTERWAVE,
-        payment_reference=tx_ref,
-        status=TransactionStatus.PENDING,
-        description=f"Flutterwave Deposit ({curr} {req.amount})",
-        metadata_json={
-            "tx_ref": tx_ref,
-            "currency_paid": curr,
-            "amount_paid": float(req.amount),
-            "kes_equivalent": float(kes_equivalent),
-            "is_simulator": flw_resp.get("is_simulator", False)
-        }
-    )
-
-    db.add(transaction)
-    await db.commit()
-
-    return FlutterwaveInitResponse(
-        status="success",
-        message=flw_resp.get("message", "Payment link generated"),
-        tx_ref=tx_ref,
-        amount=req.amount,
-        currency=curr,
-        link=flw_resp.get("link", ""),
-        is_simulator=flw_resp.get("is_simulator", False)
-    )
-
-
-@router.get("/flutterwave/verify/{tx_ref}", response_model=PaymentVerifyResponse)
-async def verify_flutterwave_payment(
-    tx_ref: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
-) -> Any:
-    """
-    Verify a Flutterwave transaction and instantly credit user balance upon confirmation.
-    """
-    query = await db.execute(
-        select(Transaction)
-        .options(selectinload(Transaction.user))
-        .where(
-            Transaction.payment_reference == tx_ref,
-            Transaction.payment_method == PaymentMethod.FLUTTERWAVE,
-            Transaction.user_id == current_user.id
-        )
-        .with_for_update()
-    )
-    transaction = query.scalars().first()
-
-    if not transaction:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flutterwave transaction not found.")
-
-    if transaction.status == TransactionStatus.COMPLETED:
-        return PaymentVerifyResponse(
-            success=True,
-            status="completed",
-            message="Transaction already completed.",
-            tx_ref=tx_ref,
-            amount_paid=Decimal(str(transaction.metadata_json.get("amount_paid", 0))),
-            currency_paid=transaction.metadata_json.get("currency_paid", "NGN"),
-            credited_kes=transaction.amount,
-            new_balance=current_user.balance
-        )
-
-    # Verify with Flutterwave Provider
-    verify_res = await flutterwave_provider.verify_transaction(tx_ref)
-    if verify_res.get("is_verified") or verify_res.get("status") == "successful":
-        meta = transaction.metadata_json or {}
-        currency_paid = meta.get("currency_paid", "NGN")
-        amount_paid = Decimal(str(meta.get("amount_paid", "0"))) or Decimal(str(verify_res.get("amount", 0)))
-        credited_kes = exchange_rate_service.convert_to_kes(amount_paid, currency_paid)
-
-        balance_before = current_user.balance
-        current_user.balance += credited_kes
-        balance_after = current_user.balance
-
-        transaction.balance_before = balance_before
-        transaction.balance_after = balance_after
-        transaction.amount = credited_kes
-        transaction.status = TransactionStatus.COMPLETED
-        transaction.description = f"Flutterwave Verified Deposit ({currency_paid} {amount_paid})"
-        transaction.metadata_json = {
-            **meta,
-            "verified_at": str(uuid.uuid4()),
-            "provider_response": verify_res
-        }
-
-        db.add(current_user)
-        db.add(transaction)
-        await db.commit()
-        await db.refresh(current_user)
-
-        return PaymentVerifyResponse(
-            success=True,
-            status="completed",
-            message="Payment successfully verified and wallet credited!",
-            tx_ref=tx_ref,
-            amount_paid=amount_paid,
-            currency_paid=currency_paid,
-            credited_kes=credited_kes,
-            new_balance=current_user.balance
-        )
-
-    return PaymentVerifyResponse(
-        success=False,
-        status="pending",
-        message="Payment verification still pending or failed.",
-        tx_ref=tx_ref
-    )
-
-
-@router.post("/flutterwave/webhook")
-async def flutterwave_webhook_callback(
-    request: Request,
-    db: AsyncSession = Depends(get_db)
-) -> Any:
-    """
-    Public Webhook endpoint for Flutterwave event callbacks.
-    """
-    secret_hash = getattr(flutterwave_provider, "secret_hash", "")
-    received_hash = request.headers.get("verif-hash")
-    if secret_hash and received_hash and received_hash != secret_hash:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid signature")
-
-    try:
-        payload = await request.json()
-    except Exception:
-        return {"status": "error", "message": "Invalid JSON"}
-
-    data = payload.get("data", {})
-    tx_ref = data.get("tx_ref")
-    event_status = data.get("status")
-
-    if not tx_ref:
-        return {"status": "ignored", "message": "No tx_ref in payload"}
-
-    query = await db.execute(
-        select(Transaction)
-        .options(selectinload(Transaction.user))
-        .where(
-            Transaction.payment_reference == tx_ref,
-            Transaction.payment_method == PaymentMethod.FLUTTERWAVE
-        )
-        .with_for_update()
-    )
-    transaction = query.scalars().first()
-
-    if not transaction or transaction.status != TransactionStatus.PENDING:
-        return {"status": "acknowledged", "message": "Transaction already processed or not found."}
-
-    user = transaction.user
-    if event_status == "successful":
-        meta = transaction.metadata_json or {}
-        currency_paid = data.get("currency", meta.get("currency_paid", "NGN"))
-        amount_paid = Decimal(str(data.get("amount", meta.get("amount_paid", "0"))))
-        credited_kes = exchange_rate_service.convert_to_kes(amount_paid, currency_paid)
-
-        balance_before = user.balance
-        user.balance += credited_kes
-        balance_after = user.balance
-
-        transaction.balance_before = balance_before
-        transaction.balance_after = balance_after
-        transaction.amount = credited_kes
-        transaction.status = TransactionStatus.COMPLETED
-        transaction.description = f"Flutterwave Webhook Deposit ({currency_paid} {amount_paid})"
-        transaction.metadata_json = {
-            **meta,
-            "flw_id": data.get("id"),
-            "webhook_payload": data
-        }
-
-        db.add(user)
-        db.add(transaction)
-        await db.commit()
-
-    return {"status": "success", "message": "Webhook processed successfully"}
-
-
-# =========================================================================
-# PAYSTACK ENGINE
+# PAYSTACK PAYMENT ENGINE
 # =========================================================================
 
 @router.post("/paystack/initialize", response_model=PaystackInitResponse)
@@ -489,7 +265,7 @@ async def initialize_paystack_checkout(
 ) -> Any:
     """
     Initialize a Paystack 1-click checkout session.
-    Supports NGN, GHS, KES.
+    Supports NGN, GHS, KES, USD, ZAR.
     """
     curr = req.currency.upper()
     reference = f"PSTK-{uuid.uuid4().hex[:12].upper()}"
@@ -687,4 +463,3 @@ async def paystack_webhook_callback(
     await db.commit()
 
     return {"status": True, "message": "Webhook processed successfully"}
-
