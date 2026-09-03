@@ -26,6 +26,11 @@ async def get_platform_settings(
                 "name": "Delix Gains KE",
                 "api_url": settings.DELIX_API_URL,
                 "has_api_key": bool(settings.DELIX_API_KEY and settings.DELIX_API_KEY != "YOUR_DELIX_API_KEY_HERE"),
+            },
+            "exonums": {
+                "name": "Exonums",
+                "api_url": settings.EXONUMS_API_URL,
+                "has_api_key": bool(settings.EXONUMS_API_KEY),
             }
         },
         "payments": {

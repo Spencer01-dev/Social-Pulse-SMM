@@ -10,7 +10,8 @@ import {
   TrendingUp,
   DollarSign,
   PackageCheck,
-  Clock
+  Clock,
+  Copy
 } from 'lucide-react';
 import { ordersService } from '../../services/orders';
 import { AdminOrder, OrderStatus } from '../../types';
@@ -25,6 +26,7 @@ export const AdminOrdersPage: React.FC = () => {
 
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus | 'all'>('all');
   const [search, setSearch] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Status Override Modal State
   const [overrideOrder, setOverrideOrder] = useState<AdminOrder | null>(null);
@@ -235,7 +237,7 @@ export const AdminOrdersPage: React.FC = () => {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && fetchAdminOrders()}
-                placeholder="Filter by link or provider order ID..."
+                placeholder="Search by Order ID (#e76d3a3b), link, provider ref, user, email..."
                 className="w-full pl-9 pr-4 py-2 bg-slate-950/60 border border-slate-800 rounded-xl text-white placeholder-slate-500 text-xs focus:outline-none focus:border-amber-500"
               />
             </div>
@@ -278,9 +280,30 @@ export const AdminOrdersPage: React.FC = () => {
                 const delivered = isCompleted ? order.quantity : (isPending ? 0 : Math.max(0, order.quantity - order.remains));
                 const progressPct = isCompleted ? 100 : (isPending ? 0 : Math.min(100, Math.round((delivered / (order.quantity || 1)) * 100)));
                 
+                const displayId = order.order_number ? String(order.order_number) : order.id.substring(0, 8);
+                
                 return (
                 <tr key={order.id} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="py-3.5 px-4 font-mono text-slate-400">#{order.id.substring(0, 8)}</td>
+                  <td className="py-3.5 px-4 font-mono text-slate-300">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <span>{displayId}</span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(displayId);
+                          setCopiedId(order.id);
+                          setTimeout(() => setCopiedId(null), 2000);
+                        }}
+                        className="text-slate-500 hover:text-amber-400 transition-colors"
+                        title="Copy Order ID"
+                      >
+                        {copiedId === order.id ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  </td>
                   <td className="py-3.5 px-4">
                     <span className="font-semibold text-white block">{order.username}</span>
                     <span className="text-[10px] text-slate-400">{order.user_email}</span>

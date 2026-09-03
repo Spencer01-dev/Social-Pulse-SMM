@@ -17,12 +17,25 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create child_panel_status_enum type
-    child_panel_status_enum = sa.Enum(
-        'pending', 'active', 'suspended', 'expired', 'terminated',
-        name='child_panel_status_enum'
+    # Create child_panel_status_enum type safely
+    conn = op.get_bind()
+    conn.execute(
+        sa.text("""
+            DO $$ BEGIN
+                CREATE TYPE child_panel_status_enum AS ENUM (
+                    'pending', 'active', 'suspended', 'expired', 'terminated'
+                );
+            EXCEPTION
+                WHEN duplicate_object THEN null;
+            END $$;
+        """)
     )
-    child_panel_status_enum.create(op.get_bind(), checkfirst=True)
+
+    child_panel_status_enum = postgresql.ENUM(
+        'pending', 'active', 'suspended', 'expired', 'terminated',
+        name='child_panel_status_enum',
+        create_type=False
+    )
 
     op.create_table(
         'child_panels',

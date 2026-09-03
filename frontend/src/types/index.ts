@@ -131,6 +131,7 @@ export interface PlatformSummary {
 
 export interface CustomerOrder {
   id: string;
+  order_number?: number;
   service_id: string;
   service_name: string;
   platform: PlatformType;

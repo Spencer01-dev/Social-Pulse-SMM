@@ -59,6 +59,16 @@ export interface PlatformSettings {
       api_url: string;
       has_api_key: boolean;
     };
+    exonums?: {
+      name?: string;
+      api_url: string;
+      has_api_key: boolean;
+    };
+    [key: string]: {
+      name?: string;
+      api_url: string;
+      has_api_key: boolean;
+    } | undefined;
   };
   payments: {
     mpesa: {

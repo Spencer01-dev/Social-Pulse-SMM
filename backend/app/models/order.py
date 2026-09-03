@@ -23,6 +23,9 @@ class Order(TimeStampedUUIDModel):
     service_id = Column(UUID(as_uuid=True), ForeignKey("services.id", ondelete="RESTRICT"), nullable=False, index=True)
     provider_id = Column(UUID(as_uuid=True), ForeignKey("providers.id", ondelete="SET NULL"), nullable=True, index=True)
 
+    # Sequential numeric Order ID (e.g. 29100001)
+    order_number = Column(Integer, unique=True, index=True, nullable=True)
+
     # External Provider reference
     provider_order_id = Column(String(100), nullable=True, index=True)
 

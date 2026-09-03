@@ -2,7 +2,7 @@ import uuid
 from decimal import Decimal
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import desc, select
+from sqlalchemy import cast, desc, select, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -117,6 +117,7 @@ async def create_order(
 
     return CustomerOrderResponse(
         id=order.id,
+        order_number=order.order_number,
         service_id=service.id,
         service_name=service.name,
         platform=service.platform,
@@ -160,9 +161,14 @@ async def list_my_orders(
     if status:
         query = query.where(Order.status == status)
     if search:
-        pattern = f"%{search.lower()}%"
+        search_clean = search.strip().lstrip('#').lower()
+        pattern = f"%{search_clean}%"
+        query = query.join(Order.service, isouter=True)
         query = query.where(
-            (Order.target_link.ilike(pattern))
+            (cast(Order.order_number, String).ilike(pattern)) |
+            (cast(Order.id, String).ilike(pattern)) |
+            (Order.target_link.ilike(pattern)) |
+            (Service.name.ilike(pattern))
         )
 
     result = await db.execute(query)
@@ -171,6 +177,7 @@ async def list_my_orders(
     return [
         CustomerOrderResponse(
             id=o.id,
+            order_number=o.order_number,
             service_id=o.service_id,
             service_name=o.service.name if o.service else "SMM Service",
             platform=o.service.platform if o.service else "instagram",

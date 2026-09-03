@@ -144,9 +144,10 @@ export const AdminServicesPage: React.FC = () => {
                 setSyncProvider(e.target.value);
                 setProviderBalance(null);
               }}
-              className="px-3 py-2 bg-slate-950/80 border border-amber-500/30 rounded-xl text-white text-xs font-semibold focus:outline-none focus:border-amber-500"
+              className="px-3 py-2 bg-slate-950/80 border border-amber-500/30 rounded-xl text-white text-xs font-semibold focus:outline-none focus:border-amber-500 cursor-pointer"
             >
               <option value="delix">Delix Gains KE</option>
+              <option value="exonums">Exonums</option>
             </select>
 
             <Button
@@ -157,7 +158,7 @@ export const AdminServicesPage: React.FC = () => {
               className="flex items-center gap-1.5"
             >
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-              <span>{syncing ? 'Syncing...' : 'Sync from Delix Gains'}</span>
+              <span>{syncing ? 'Syncing...' : `Sync from ${syncProvider === 'exonums' ? 'Exonums' : 'Delix Gains'}`}</span>
             </Button>
           </div>
         </div>
@@ -169,13 +170,13 @@ export const AdminServicesPage: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-                Delix Gains KE Balance
+                {syncProvider === 'exonums' ? 'Exonums' : 'Delix Gains KE'} Balance
               </span>
               <button
                 onClick={async () => {
                   setLoadingBalance(true);
                   try {
-                    const b = await servicesService.getProviderBalance('delix');
+                    const b = await servicesService.getProviderBalance(syncProvider);
                     setProviderBalance(b);
                   } catch (e) {
                     console.error(e);

@@ -17,6 +17,7 @@ class OrderCreate(BaseModel):
 
 class CustomerOrderResponse(BaseModel):
     id: uuid.UUID
+    order_number: Optional[int] = None
     service_id: uuid.UUID
     service_name: str
     platform: Platform
@@ -36,6 +37,7 @@ class CustomerOrderResponse(BaseModel):
 
 class AdminOrderResponse(BaseModel):
     id: uuid.UUID
+    order_number: Optional[int] = None
     user_id: uuid.UUID
     user_email: str
     username: str

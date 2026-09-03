@@ -137,12 +137,17 @@ async def sync_services_from_provider(
         # Enforce platform minimum floor of 100
         platform_min = max(item.min_quantity, 100)
 
+        # Convert provider rate to platform base currency (KES) if provider is in USD
+        effective_rate = item.rate
+        if provider_record.currency == "USD":
+            effective_rate = round(item.rate * Decimal(str(settings.DEFAULT_USD_TO_KES)), 2)
+
         if existing_service:
             # Update provider rates and limits, keep customized selling prices if set to manual
             existing_service.name = item.name
             existing_service.category = category_clean
             existing_service.service_type = item.type
-            existing_service.provider_rate = item.rate
+            existing_service.provider_rate = effective_rate
             existing_service.min_quantity = platform_min
             existing_service.max_quantity = item.max_quantity
             existing_service.refill_available = item.refill
@@ -153,7 +158,7 @@ async def sync_services_from_provider(
 
             if existing_service.markup_type != MarkupType.MANUAL:
                 existing_service.selling_rate = calculate_selling_rate(
-                    provider_rate=item.rate,
+                    provider_rate=effective_rate,
                     markup_type=existing_service.markup_type,
                     markup_value=existing_service.markup_value
                 )
@@ -163,7 +168,7 @@ async def sync_services_from_provider(
         else:
             # Create new service with default markup
             selling_rate = calculate_selling_rate(
-                provider_rate=item.rate,
+                provider_rate=effective_rate,
                 markup_type=MarkupType.PERCENTAGE,
                 markup_value=default_markup_percent
             )
@@ -176,7 +181,7 @@ async def sync_services_from_provider(
                 description=item.description,
                 service_type=item.type,
                 category=category_clean,
-                provider_rate=item.rate,
+                provider_rate=effective_rate,
                 selling_rate=selling_rate,
                 markup_type=MarkupType.PERCENTAGE,
                 markup_value=default_markup_percent,

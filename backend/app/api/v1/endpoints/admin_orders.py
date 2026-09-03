@@ -1,13 +1,14 @@
 import uuid
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import desc, func, select
+from sqlalchemy import cast, desc, func, select, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import require_roles
 from app.core.database import get_db
 from app.models.order import Order, OrderStatus
+from app.models.service import Service
 from app.models.user import User, UserRole
 from app.schemas.order import AdminOrderResponse, OrderStatusUpdate
 from app.workers.order_tasks import sync_active_orders
@@ -42,10 +43,17 @@ async def list_admin_orders(
     if status:
         query = query.where(Order.status == status)
     if search:
-        pattern = f"%{search.lower()}%"
+        search_clean = search.strip().lstrip('#').lower()
+        pattern = f"%{search_clean}%"
+        query = query.join(Order.user, isouter=True).join(Order.service, isouter=True)
         query = query.where(
+            (cast(Order.order_number, String).ilike(pattern)) |
+            (cast(Order.id, String).ilike(pattern)) |
             (Order.target_link.ilike(pattern)) |
-            (Order.provider_order_id.ilike(pattern))
+            (Order.provider_order_id.ilike(pattern)) |
+            (User.email.ilike(pattern)) |
+            (User.username.ilike(pattern)) |
+            (Service.name.ilike(pattern))
         )
 
     result = await db.execute(query)
@@ -54,6 +62,7 @@ async def list_admin_orders(
     return [
         AdminOrderResponse(
             id=o.id,
+            order_number=o.order_number,
             user_id=o.user_id,
             user_email=o.user.email if o.user else "N/A",
             username=o.user.username if o.user else "N/A",

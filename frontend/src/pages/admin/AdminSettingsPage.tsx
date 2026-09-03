@@ -89,18 +89,39 @@ export const AdminSettingsPage: React.FC = () => {
             <div className="space-y-3 mt-1 text-xs">
               <div className="flex justify-between py-2 border-b border-slate-800">
                 <span className="text-slate-400">Provider Endpoint</span>
-                <span className="font-mono text-slate-300">{settings.providers.delix?.api_url || 'https://delixgainske.com/api/v2'}</span>
+                <span className="font-mono text-slate-300">{settings.providers?.delix?.api_url || 'https://delixgainske.com/api/v2'}</span>
               </div>
               <div className="flex justify-between py-2">
                 <span className="text-slate-400">API Key Status</span>
                 <span
                   className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                    settings.providers.delix?.has_api_key
+                    settings.providers?.delix?.has_api_key
                       ? 'bg-emerald-500/20 text-emerald-300'
                       : 'bg-amber-500/20 text-amber-300'
                   }`}
                 >
-                  {settings.providers.delix?.has_api_key ? 'Configured' : 'Mock Mode Active'}
+                  {settings.providers?.delix?.has_api_key ? 'Configured' : 'Mock Mode Active'}
+                </span>
+              </div>
+            </div>
+          </Card>
+
+          <Card title="SMM Provider API (Exonums)" subtitle="Secondary wholesale supplier connectivity">
+            <div className="space-y-3 mt-1 text-xs">
+              <div className="flex justify-between py-2 border-b border-slate-800">
+                <span className="text-slate-400">Provider Endpoint</span>
+                <span className="font-mono text-slate-300">{settings.providers?.exonums?.api_url || 'https://exonums.com/api/v2'}</span>
+              </div>
+              <div className="flex justify-between py-2">
+                <span className="text-slate-400">API Key Status</span>
+                <span
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                    settings.providers?.exonums?.has_api_key
+                      ? 'bg-emerald-500/20 text-emerald-300'
+                      : 'bg-amber-500/20 text-amber-300'
+                  }`}
+                >
+                  {settings.providers?.exonums?.has_api_key ? 'Configured' : 'Mock Mode Active'}
                 </span>
               </div>
             </div>
