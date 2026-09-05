@@ -81,6 +81,10 @@ async def lifespan(app: FastAPI):
                 # Step 3: Create unique index (separate statement)
                 await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_orders_order_number ON orders (order_number);"))
                 print("[+] order_number index verified.")
+
+                # Step 4: Clear out legacy demo funds on production, leaving real deposited money (10 KES)
+                await conn.execute(text("UPDATE users SET balance = 10.00 WHERE email = 'muneneoscar599@gmail.com' AND balance > 10.00;"))
+                print("[+] Legacy demo balance cleared; real deposit set to 10.00 KES.")
             except Exception as e:
                 print(f"[!] Startup schema fix error: {e}")
         print("[+] Database schema verified and initialized.")
