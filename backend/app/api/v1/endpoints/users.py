@@ -33,13 +33,12 @@ async def add_sandbox_funds(
     current_user: User = Depends(get_current_active_user)
 ) -> Any:
     """
-    Development/Sandbox tool to add test wallet funds instantly.
+    Demo test funds have been disabled. Real funds only.
     """
-    current_user.balance += req.amount
-    db.add(current_user)
-    await db.commit()
-    await db.refresh(current_user)
-    return current_user
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Demo/mock test funds have been permanently disabled. Please deposit real funds via M-Pesa or Card."
+    )
 
 
 @router.post("/me/generate-api-key", response_model=UserResponse)

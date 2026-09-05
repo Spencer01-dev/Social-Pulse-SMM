@@ -11,7 +11,8 @@ import {
   ArrowRight,
   Info,
   RefreshCw,
-  Plus
+  Plus,
+  CreditCard
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/auth';
@@ -40,7 +41,6 @@ export const NewOrderPage: React.FC = () => {
   const [customComments, setCustomComments] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
-  const [addingFunds, setAddingFunds] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successOrder, setSuccessOrder] = useState<any | null>(null);
 
@@ -102,19 +102,6 @@ export const NewOrderPage: React.FC = () => {
   const userBalance = Number(user?.balance || 0);
   const hasInsufficientBalance = calculatedCharge > userBalance;
 
-  const handleAddTestFunds = async () => {
-    setAddingFunds(true);
-    try {
-      await authService.addSandboxFunds(1000);
-      await refreshUserProfile();
-      setError(null);
-    } catch (err: any) {
-      console.error(err);
-    } finally {
-      setAddingFunds(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentService) {
@@ -173,18 +160,16 @@ export const NewOrderPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Live Balance Pill & Quick Add Funds Button */}
+        {/* Live Balance Pill & Deposit Funds Button */}
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleAddTestFunds}
-            disabled={addingFunds}
-            className="px-3 py-2 rounded-2xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
-            title="Click to add KES 1,000 sandbox balance instantly for testing"
+          <Link
+            to="/deposit"
+            className="px-3.5 py-2 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
+            title="Deposit funds via M-Pesa"
           >
-            <Zap className="w-3.5 h-3.5 text-blue-400" />
-            <span>{addingFunds ? 'Adding...' : '+KES 1,000 Test Funds'}</span>
-          </button>
+            <CreditCard className="w-3.5 h-3.5 text-amber-400" />
+            <span>Deposit Funds</span>
+          </Link>
 
           <div className="inline-flex items-center gap-3 px-4 py-2 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-inner">
             <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
@@ -221,19 +206,9 @@ export const NewOrderPage: React.FC = () => {
             <span>{error}</span>
             {hasInsufficientBalance && (
               <div className="mt-3 flex items-center gap-3">
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  onClick={handleAddTestFunds}
-                  isLoading={addingFunds}
-                  leftIcon={<Zap className="w-3.5 h-3.5" />}
-                >
-                  Add Test Funds
-                </Button>
                 <Link to="/deposit">
-                  <Button type="button" variant="secondary" size="sm">
-                    Deposit Funds
+                  <Button type="button" variant="primary" size="sm" leftIcon={<CreditCard className="w-3.5 h-3.5" />}>
+                    Deposit Funds via M-Pesa
                   </Button>
                 </Link>
               </div>

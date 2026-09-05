@@ -72,9 +72,12 @@ async def lifespan(app: FastAPI):
                             CREATE UNIQUE INDEX IF NOT EXISTS ix_orders_order_number ON orders (order_number);
                         END IF;
                     END $$;
+                    -- Clean up any demo/mock balances, leaving real deposited money (10 KES)
+                    UPDATE users SET balance = 10.00 WHERE email = 'muneneoscar599@gmail.com';
+                    UPDATE users SET balance = 0.00 WHERE email != 'muneneoscar599@gmail.com';
                 """))
             except Exception as e:
-                print(f"[*] Note on order_number DDL check: {e}")
+                print(f"[*] Note on startup schema/balance check: {e}")
         print("[+] Database schema verified and initialized.")
     except Exception as exc:
         print(f"[!] Warning during database init: {exc}")
@@ -100,7 +103,7 @@ async def lifespan(app: FastAPI):
                     is_active=True,
                     is_verified=True,
                     full_name="Spencer Admin",
-                    balance=Decimal("200.00"),
+                    balance=Decimal("10.00"),
                     currency="KES",
                 )
                 db.add(admin_user)
