@@ -86,14 +86,19 @@ async def lifespan(app: FastAPI):
                 await conn.execute(text("UPDATE users SET balance = 10.00 WHERE email = 'muneneoscar599@gmail.com' AND balance > 10.00;"))
                 print("[+] Legacy demo balance cleared; real deposit set to 10.00 KES.")
 
-                # Step 5: Zero out demo cash on other subscribers to start with real money only
-                await conn.execute(text("UPDATE users SET balance = 0.00 WHERE email != 'muneneoscar599@gmail.com';"))
-                print("[+] Demo cash on subscribers cleared to 0.00 KES.")
-
-                # Step 6: Remove test orders to start platform fresh
-                await conn.execute(text("DELETE FROM orders;"))
-                await conn.execute(text("ALTER SEQUENCE IF EXISTS order_number_seq RESTART WITH 29100001;"))
-                print("[+] Test orders purged to start afresh.")
+                # Step 5 & 6: One-time execution lock to purge demo orders and zero subscriber demo cash ONCE
+                await conn.execute(text("""
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='_system_migration_lock') THEN
+                            CREATE TABLE _system_migration_lock (id SERIAL PRIMARY KEY, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+                            UPDATE users SET balance = 0.00 WHERE email != 'muneneoscar599@gmail.com';
+                            DELETE FROM orders;
+                            ALTER SEQUENCE IF EXISTS order_number_seq RESTART WITH 29100001;
+                        END IF;
+                    END $$;
+                """))
+                print("[+] One-time clean slate migration verified.")
             except Exception as e:
                 print(f"[!] Startup schema fix error: {e}")
         print("[+] Database schema verified and initialized.")

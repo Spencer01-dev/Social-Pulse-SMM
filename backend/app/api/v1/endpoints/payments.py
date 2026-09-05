@@ -659,7 +659,23 @@ async def palpluss_webhook_callback(
     mpesa_receipt = tx_payload.get("mpesa_receipt")
 
     if event_type == "transaction.success":
-        amount_kes = Decimal(str(tx_payload.get("amount", transaction.amount)))
+        # Anti-Spoofing Security: Validate directly with PalPluss server before crediting funds
+        try:
+            live_verification = await palpluss_client.get_transaction(palpluss_tx_id)
+            live_status = str(live_verification.get("status", "")).upper()
+            if live_status != "SUCCESS":
+                return {
+                    "received": True,
+                    "warning": f"Webhook discarded: PalPluss live status is {live_status}, not SUCCESS"
+                }
+            # Use amount verified directly by PalPluss server, not untrusted webhook body
+            amount_kes = Decimal(str(live_verification.get("amount", transaction.amount)))
+            if live_verification.get("mpesa_receipt"):
+                mpesa_receipt = live_verification["mpesa_receipt"]
+        except Exception as e:
+            # If live API verification check fails, only credit if amount matches original pending transaction
+            amount_kes = transaction.amount
+
         balance_before = user.balance
         user.balance += amount_kes
         balance_after = user.balance

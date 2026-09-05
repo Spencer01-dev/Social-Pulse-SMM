@@ -58,16 +58,21 @@ async def create_order(
     provider_cost = round((service.provider_rate * Decimal(order_in.quantity)) / Decimal(1000), 2)
     profit = total_charge - provider_cost
 
-    # 4. Check user wallet balance
-    if current_user.balance < total_charge:
+    # 4. Atomically lock user row to eliminate double-spend / race condition exploits
+    user_lock_query = await db.execute(
+        select(User).where(User.id == current_user.id).with_for_update()
+    )
+    locked_user = user_lock_query.scalars().first()
+    if not locked_user or locked_user.balance < total_charge:
+        current_bal = locked_user.balance if locked_user else Decimal("0.00")
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail=f"Insufficient wallet balance. Total cost: KES {total_charge:,.2f} | Available balance: KES {current_user.balance:,.2f}. Please add funds to proceed."
+            detail=f"Insufficient wallet balance. Total cost: KES {total_charge:,.2f} | Available balance: KES {current_bal:,.2f}. Please add funds to proceed."
         )
 
-    # 5. Deduct funds from user balance
-    current_user.balance -= total_charge
-    db.add(current_user)
+    # 5. Deduct funds from locked user balance
+    locked_user.balance -= total_charge
+    db.add(locked_user)
 
     # 6. Sanitize and canonicalize target URL
     from app.core.link_cleaner import sanitize_and_canonicalize_target_link
