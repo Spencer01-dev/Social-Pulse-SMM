@@ -54,9 +54,27 @@ async def lifespan(app: FastAPI):
         import app.models.transaction
         import app.models.ticket
         import app.models.child_panel
+        from sqlalchemy import text
         from app.core.database import engine
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            # Ensure order_number sequence and column exist on orders table
+            try:
+                await conn.execute(text("CREATE SEQUENCE IF NOT EXISTS order_number_seq START WITH 29100001;"))
+                await conn.execute(text("""
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM information_schema.columns 
+                            WHERE table_name='orders' AND column_name='order_number'
+                        ) THEN
+                            ALTER TABLE orders ADD COLUMN order_number INTEGER DEFAULT nextval('order_number_seq');
+                            CREATE UNIQUE INDEX IF NOT EXISTS ix_orders_order_number ON orders (order_number);
+                        END IF;
+                    END $$;
+                """))
+            except Exception as e:
+                print(f"[*] Note on order_number DDL check: {e}")
         print("[+] Database schema verified and initialized.")
     except Exception as exc:
         print(f"[!] Warning during database init: {exc}")

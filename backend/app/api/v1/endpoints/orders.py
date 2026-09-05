@@ -40,11 +40,12 @@ async def create_order(
             detail="The requested service is currently inactive or unavailable."
         )
 
-    # 2. Validate quantity boundaries
-    if order_in.quantity < service.min_quantity:
+    # 2. Validate quantity boundaries (enforce minimum of 100 across platform)
+    effective_min = max(service.min_quantity or 100, 100)
+    if order_in.quantity < effective_min:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Minimum quantity for this service is {service.min_quantity:,}."
+            detail=f"Minimum order quantity is {effective_min:,} (orders below 100 are not permitted)."
         )
     if order_in.quantity > service.max_quantity:
         raise HTTPException(

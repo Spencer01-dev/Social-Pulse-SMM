@@ -11,7 +11,7 @@ from app.models.service import Platform
 class OrderCreate(BaseModel):
     service_id: uuid.UUID
     target_link: str = Field(..., min_length=5, max_length=500, description="Target post, profile, or video URL")
-    quantity: int = Field(..., gt=0, description="Quantity of units requested")
+    quantity: int = Field(..., ge=100, description="Quantity of units requested. Platform minimum is 100.")
     custom_comments: Optional[str] = None
 
 

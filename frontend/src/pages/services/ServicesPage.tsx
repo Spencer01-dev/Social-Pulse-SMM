@@ -272,7 +272,7 @@ export const ServicesPage: React.FC = () => {
                 <div className="text-right text-xs text-slate-400">
                   <span className="block text-[10px] uppercase font-semibold">Min / Max</span>
                   <span className="font-medium text-slate-300">
-                    {service.min_quantity.toLocaleString()} – {service.max_quantity.toLocaleString()}
+                    {Math.max(service.min_quantity || 100, 100).toLocaleString()} – {service.max_quantity.toLocaleString()}
                   </span>
                 </div>
 

@@ -140,8 +140,9 @@ async def handle_reseller_action(
             return {"error": "Service not found or currently inactive"}
 
         int_qty = int(quantity)
-        if int_qty < svc.min_quantity:
-            return {"error": f"Minimum quantity is {svc.min_quantity}"}
+        effective_min = max(svc.min_quantity or 100, 100)
+        if int_qty < effective_min:
+            return {"error": f"Minimum quantity is {effective_min} (platform minimum is 100)"}
         if int_qty > svc.max_quantity:
             return {"error": f"Maximum quantity is {svc.max_quantity}"}
 

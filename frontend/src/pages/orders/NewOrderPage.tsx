@@ -57,11 +57,11 @@ export const NewOrderPage: React.FC = () => {
           setSelectedPlatform(match.platform);
           setSelectedCategory(match.category);
           setSelectedServiceId(match.id);
-          setQuantity(match.min_quantity);
+          setQuantity(Math.max(match.min_quantity || 100, 100));
         }
       } else if (data.length > 0) {
         setSelectedServiceId(data[0].id);
-        setQuantity(data[0].min_quantity);
+        setQuantity(Math.max(data[0].min_quantity || 100, 100));
       }
     } catch (err) {
       console.error(err);
@@ -125,8 +125,9 @@ export const NewOrderPage: React.FC = () => {
       setError('Please enter a target profile or post link.');
       return;
     }
-    if (!numQuantity || numQuantity < currentService.min_quantity) {
-      setError(`Minimum quantity for this service is ${currentService.min_quantity.toLocaleString()}.`);
+    const effectiveMin = Math.max(currentService.min_quantity || 100, 100);
+    if (!numQuantity || numQuantity < effectiveMin) {
+      setError(`Minimum order quantity is ${effectiveMin.toLocaleString()} (orders below 100 are not permitted).`);
       return;
     }
     if (numQuantity > currentService.max_quantity) {
@@ -154,7 +155,7 @@ export const NewOrderPage: React.FC = () => {
         navigate('/orders');
       }, 2000);
     } catch (err: any) {
-      const msg = err.response?.data?.detail || 'Failed to place order. Please try again.';
+      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to place order. Please try again.';
       setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
     } finally {
       setSubmitting(false);
@@ -259,7 +260,7 @@ export const NewOrderPage: React.FC = () => {
                   );
                   if (firstInCat) {
                     setSelectedServiceId(firstInCat.id);
-                    setQuantity(firstInCat.min_quantity);
+                    setQuantity(Math.max(firstInCat.min_quantity || 100, 100));
                   }
                 }}
                 className="w-full px-4 py-3 bg-slate-950/60 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-blue-500"
@@ -283,7 +284,7 @@ export const NewOrderPage: React.FC = () => {
                 onChange={(e) => {
                   setSelectedServiceId(e.target.value);
                   const matched = services.find((s) => s.id === e.target.value);
-                  if (matched) setQuantity(matched.min_quantity);
+                  if (matched) setQuantity(Math.max(matched.min_quantity || 100, 100));
                 }}
                 className="w-full px-4 py-3 bg-slate-950/60 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-blue-500"
                 required
@@ -308,7 +309,7 @@ export const NewOrderPage: React.FC = () => {
                     Rate: <span className="text-emerald-400 font-bold">KES {Number(currentService.rate).toFixed(2)}</span> per 1,000
                   </span>
                   <span className="text-slate-400">
-                    Min: <strong className="text-white">{currentService.min_quantity.toLocaleString()}</strong> | Max: <strong className="text-white">{currentService.max_quantity.toLocaleString()}</strong>
+                    Min: <strong className="text-white">{Math.max(currentService.min_quantity || 100, 100).toLocaleString()}</strong> | Max: <strong className="text-white">{currentService.max_quantity.toLocaleString()}</strong>
                   </span>
                   <div className="flex items-center gap-1.5">
                     {currentService.refill_available && (
@@ -382,7 +383,7 @@ export const NewOrderPage: React.FC = () => {
                   onChange={(e) => setQuantity(e.target.value === '' ? '' : Number(e.target.value))}
                   placeholder="1000"
                   className="w-full pl-10 pr-4 py-3 bg-slate-950/60 border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-blue-500"
-                  min={currentService?.min_quantity || 10}
+                  min={Math.max(currentService?.min_quantity || 100, 100)}
                   max={currentService?.max_quantity || 100000}
                   required
                 />
