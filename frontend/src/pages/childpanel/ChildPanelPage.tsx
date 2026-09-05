@@ -177,10 +177,11 @@ export const ChildPanelPage: React.FC = () => {
         </Card>
       </div>
 
-      {/* Daily Revenue & Profit Tracking Calendar */}
+      {/* Daily Revenue & Performance Tracker */}
       <DailyRevenueCalendar
         dailyData={dailyRevenue}
         onRefresh={fetchRevenue}
+        title="Revenue & Performance Tracker"
       />
 
       {/* My Active Panels */}

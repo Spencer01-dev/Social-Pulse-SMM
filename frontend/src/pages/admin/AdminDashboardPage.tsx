@@ -211,6 +211,7 @@ export const AdminDashboardPage: React.FC = () => {
             <DailyRevenueCalendar
               dailyData={dailyRevenue}
               onRefresh={fetchDashboardData}
+              defaultExpanded={true}
             />
           ) : (
             <Card

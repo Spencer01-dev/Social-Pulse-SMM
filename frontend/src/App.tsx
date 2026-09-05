@@ -21,7 +21,6 @@ import { AdminSettingsPage } from './pages/admin/AdminSettingsPage';
 import { ApiDocsPage } from './pages/api/ApiDocsPage';
 import { SupportTicketsPage } from './pages/support/SupportTicketsPage';
 import { AdminTicketsPage } from './pages/admin/AdminTicketsPage';
-import { RefillPage } from './pages/orders/RefillPage';
 import { ChildPanelPage } from './pages/childpanel/ChildPanelPage';
 import { AffiliatesPage } from './pages/affiliates/AffiliatesPage';
 import { ServiceUpdatesPage } from './pages/services/ServiceUpdatesPage';
@@ -74,14 +73,7 @@ export const App: React.FC = () => {
                   </ProtectedRoute>
                 }
               />
-              <Route
-                path="refill"
-                element={
-                  <ProtectedRoute>
-                    <RefillPage />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="refill" element={<Navigate to="/orders" replace />} />
               <Route
                 path="child-panel"
                 element={

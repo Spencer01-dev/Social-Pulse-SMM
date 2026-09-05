@@ -14,12 +14,15 @@ import {
   Copy
 } from 'lucide-react';
 import { ordersService } from '../../services/orders';
+import { analyticsService, DailyRevenue } from '../../services/analytics';
 import { AdminOrder, OrderStatus } from '../../types';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
+import { DailyRevenueCalendar } from '../../components/analytics/DailyRevenueCalendar';
 
 export const AdminOrdersPage: React.FC = () => {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [dailyRevenue, setDailyRevenue] = useState<DailyRevenue[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
@@ -50,8 +53,18 @@ export const AdminOrdersPage: React.FC = () => {
     }
   };
 
+  const fetchRevenue = async () => {
+    try {
+      const data = await analyticsService.getDailyRevenue(60);
+      setDailyRevenue(data);
+    } catch {
+      // silent
+    }
+  };
+
   useEffect(() => {
     fetchAdminOrders();
+    fetchRevenue();
 
     // Auto-poll provider status every 8 seconds
     const interval = setInterval(async () => {
@@ -223,6 +236,13 @@ export const AdminOrdersPage: React.FC = () => {
           <span>{syncMessage}</span>
         </div>
       )}
+
+      {/* Orders Daily Revenue Calendar Tracker */}
+      <DailyRevenueCalendar
+        dailyData={dailyRevenue}
+        onRefresh={fetchRevenue}
+        title="Daily Fulfillment & Orders Calendar"
+      />
 
       {/* Orders Table */}
       <Card title="Platform Order Log" subtitle="Real-time fulfillment and manual status control">

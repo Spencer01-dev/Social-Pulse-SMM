@@ -136,8 +136,8 @@ export const DepositPage: React.FC = () => {
       return;
     }
     const numAmount = typeof mpesaAmountKes === 'number' ? mpesaAmountKes : 0;
-    if (!numAmount || numAmount < 10) {
-      setError('Minimum deposit amount is KES 10.00.');
+    if (!numAmount || numAmount < 9) {
+      setError('Minimum deposit amount is KES 9.00.');
       return;
     }
 
@@ -593,8 +593,8 @@ export const DepositPage: React.FC = () => {
                   </label>
                   <input
                     type="number"
-                    min="10"
-                    placeholder="e.g. 10"
+                    min="9"
+                    placeholder="e.g. 9"
                     value={mpesaAmountKes}
                     onChange={(e) => setMpesaAmountKes(e.target.value ? Number(e.target.value) : '')}
                     className="w-full px-4 py-3 bg-[#11141a] border border-[#2b303c] rounded-2xl text-white text-sm font-bold focus:border-amber-400 focus:outline-none transition-colors"
@@ -603,7 +603,7 @@ export const DepositPage: React.FC = () => {
 
                   {/* Presets */}
                   <div className="flex flex-wrap gap-2 mt-3">
-                    {[10, 50, 100, 200, 500, 1000].map((preset) => (
+                    {[9, 15, 50, 100, 200, 500, 1000].map((preset) => (
                       <button
                         key={preset}
                         type="button"

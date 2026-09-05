@@ -732,3 +732,124 @@ async def get_palpluss_service_balance(
         error=bal.get("error")
     )
 
+
+@router.post("/palpluss/sync-uncredited")
+async def sync_uncredited_palpluss_transactions(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """
+    Scans recent successful PalPluss transactions and automatically credits any
+    settlements that were missed due to network timeouts or unreachable callback webhooks.
+    """
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required to trigger payment reconciliation."
+        )
+
+    try:
+        tx_data = await palpluss_client.list_transactions(limit=50)
+        items = tx_data.get("items", [])
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to fetch transactions from PalPluss: {str(e)}"
+        )
+
+    credited = []
+
+    for item in items:
+        if str(item.get("status", "")).upper() != "SUCCESS":
+            continue
+
+        tx_id = item.get("transaction_id")
+        amount = Decimal(str(item.get("amount", 0)))
+        ext_ref = item.get("external_reference") or ""
+        phone = item.get("phone_number") or ""
+        receipt = item.get("provider_checkout_id") or item.get("provider_request_id") or tx_id
+
+        if not tx_id or amount <= 0:
+            continue
+
+        # Check if transaction is already recorded and completed
+        existing_q = await db.execute(
+            select(Transaction)
+            .options(selectinload(Transaction.user))
+            .where(
+                (Transaction.payment_reference == tx_id) |
+                (Transaction.payment_reference == receipt) |
+                (Transaction.metadata_json["palpluss_transaction_id"].astext == tx_id)
+            )
+        )
+        existing_tx = existing_q.scalars().first()
+
+        if existing_tx and existing_tx.status == TransactionStatus.COMPLETED:
+            continue
+
+        user = existing_tx.user if existing_tx else None
+
+        if not user and ext_ref.startswith("SP-"):
+            username_target = ext_ref[3:]
+            user_q = await db.execute(
+                select(User).where(User.username == username_target).with_for_update()
+            )
+            user = user_q.scalars().first()
+
+        if not user:
+            continue
+
+        balance_before = user.balance
+        user.balance += amount
+        balance_after = user.balance
+
+        if existing_tx:
+            existing_tx.balance_before = balance_before
+            existing_tx.balance_after = balance_after
+            existing_tx.amount = amount
+            existing_tx.status = TransactionStatus.COMPLETED
+            existing_tx.payment_reference = receipt
+            existing_tx.description = f"PalPluss M-Pesa Deposit (Receipt: {receipt})"
+            meta = existing_tx.metadata_json or {}
+            existing_tx.metadata_json = {**meta, "synced_from_palpluss": item}
+            db.add(existing_tx)
+        else:
+            new_tx = Transaction(
+                user_id=user.id,
+                type=TransactionType.DEPOSIT,
+                amount=amount,
+                balance_before=balance_before,
+                balance_after=balance_after,
+                currency="KES",
+                payment_method=PaymentMethod.MPESA,
+                payment_reference=receipt,
+                status=TransactionStatus.COMPLETED,
+                description=f"PalPluss M-Pesa Deposit (Receipt: {receipt})",
+                metadata_json={
+                    "gateway": "palpluss",
+                    "palpluss_transaction_id": tx_id,
+                    "phone_number": phone,
+                    "external_reference": ext_ref,
+                    "synced_from_palpluss": item,
+                }
+            )
+            db.add(new_tx)
+
+        db.add(user)
+        await db.commit()
+
+        credited.append({
+            "username": user.username,
+            "amount": float(amount),
+            "transaction_id": tx_id,
+            "receipt": receipt,
+            "new_balance": float(user.balance)
+        })
+
+    return {
+        "success": True,
+        "credited_count": len(credited),
+        "credited": credited,
+        "message": f"Reconciliation finished. {len(credited)} uncredited transaction(s) resolved."
+    }
+

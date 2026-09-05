@@ -108,6 +108,8 @@ class PalPlussGateway:
         """
         norm_phone = normalize_kenyan_phone(phone)
         cb_url = callback_url or settings.PALPLUSS_CALLBACK_URL
+        if "localhost" in cb_url or "127.0.0.1" in cb_url:
+            cb_url = "https://social-pulse-smm.onrender.com/api/v1/payments/palpluss/webhook"
         ch_id = channel_id or settings.PALPLUSS_CHANNEL_ID
 
         # Constraints per PalPluss documentation:

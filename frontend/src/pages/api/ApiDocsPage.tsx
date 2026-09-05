@@ -34,7 +34,10 @@ export const ApiDocsPage: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const apiKey = localKey || user?.api_key || '';
-  const apiEndpoint = 'http://localhost:8000/api/v2';
+  const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const apiEndpoint =
+    import.meta.env.VITE_API_V2_URL ||
+    (isLocal ? 'http://localhost:8000/api/v2' : 'https://social-pulse-smm.onrender.com/api/v2');
 
   const handleGenerateKey = async () => {
     setGeneratingKey(true);

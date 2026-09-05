@@ -46,7 +46,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { name: 'Orders', href: '/orders', icon: ListOrdered },
     { name: 'Services', href: '/services', icon: Layers },
     { name: 'Tickets', href: '/support', icon: LifeBuoy },
-    { name: 'Refill', href: '/refill', icon: RotateCcw },
     { name: 'Api', href: '/api-docs', icon: Code2 },
     { name: 'Child panel', href: '/child-panel', icon: Sparkles },
     { name: 'Refer & Earn', href: '/referrals', icon: Share2 },

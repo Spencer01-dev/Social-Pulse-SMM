@@ -12,8 +12,10 @@ import {
   Key,
   AlertCircle,
   Clock,
-  MoreVertical
+  MoreVertical,
+  RefreshCw,
 } from 'lucide-react';
+import apiClient from '../../services/api';
 import { analyticsService } from '../../services/analytics';
 import { paymentsService } from '../../services/payments';
 import { Role, User } from '../../types';
@@ -25,6 +27,7 @@ export const AdminUsersPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedRole, setSelectedRole] = useState<Role | 'all'>('all');
+  const [syncing, setSyncing] = useState(false);
 
   // Role Edit Modal
   const [editUserRole, setEditUserRole] = useState<User | null>(null);
@@ -133,6 +136,20 @@ export const AdminUsersPage: React.FC = () => {
     }
   };
 
+  const handleSyncPalpluss = async () => {
+    setSyncing(true);
+    try {
+      const res = await apiClient.post('/payments/palpluss/sync-uncredited');
+      const data = res.data;
+      setNotification(data?.message || `Sync completed. ${data?.credited_count || 0} transaction(s) credited.`);
+      await fetchUsers();
+    } catch (err: any) {
+      setNotification(`Sync error: ${err.response?.data?.detail || err.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <div className="space-y-8 animate-fadeIn">
       {/* Header */}
@@ -143,6 +160,16 @@ export const AdminUsersPage: React.FC = () => {
             Manage user roles, grant reseller privileges, adjust wallet credits, and audit accounts
           </p>
         </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleSyncPalpluss}
+          isLoading={syncing}
+          leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+        >
+          Sync Gateway Deposits
+        </Button>
       </div>
 
       {notification && (

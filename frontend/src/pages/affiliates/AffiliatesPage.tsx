@@ -9,7 +9,8 @@ export const AffiliatesPage: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [payoutRequested, setPayoutRequested] = useState(false);
 
-  const referralUrl = `http://localhost:5173/register?ref=${user?.username || 'user'}`;
+  const baseUrl = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://social-pulse-smm.vercel.app';
+  const referralUrl = `${baseUrl}/register?ref=${user?.username || 'user'}`;
 
   const copyRefLink = () => {
     navigator.clipboard.writeText(referralUrl);

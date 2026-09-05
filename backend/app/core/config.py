@@ -88,7 +88,7 @@ class Settings(BaseSettings):
     MPESA_CONSUMER_SECRET: str = ""
     MPESA_SHORTCODE: str = "174379"
     MPESA_PASSKEY: str = ""
-    MPESA_CALLBACK_URL: str = "http://localhost:8000/api/v1/payments/mpesa/callback"
+    MPESA_CALLBACK_URL: str = "https://social-pulse-smm.onrender.com/api/v1/payments/mpesa/callback"
 
     PAYSTACK_PUBLIC_KEY: str = ""
     PAYSTACK_SECRET_KEY: str = ""
@@ -96,7 +96,7 @@ class Settings(BaseSettings):
     # PalPluss M-Pesa Gateway
     PALPLUSS_API_KEY: str = ""
     PALPLUSS_BASE_URL: str = "https://api.palpluss.com/v1"
-    PALPLUSS_CALLBACK_URL: str = "http://localhost:8000/api/v1/payments/palpluss/webhook"
+    PALPLUSS_CALLBACK_URL: str = "https://social-pulse-smm.onrender.com/api/v1/payments/palpluss/webhook"
     PALPLUSS_CHANNEL_ID: Optional[str] = None
     PALPLUSS_ENABLED: bool = True
 
