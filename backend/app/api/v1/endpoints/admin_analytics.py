@@ -109,18 +109,20 @@ async def get_daily_revenue_trends(
     result = await db.execute(query)
     rows = result.all()
 
-    # Map existing days into a dictionary
-    db_map = {row[0].strftime("%b %d"): (row[1], row[2], row[3]) for row in rows if row[0]}
+    # Map existing days into a dictionary keyed by ISO date YYYY-MM-DD
+    db_map = {row[0].strftime("%Y-%m-%d"): (row[1], row[2], row[3]) for row in rows if row[0]}
 
     # Ensure all days in the range have data points (even 0)
     timeline: List[DailyRevenueItem] = []
     for i in range(days - 1, -1, -1):
         d = datetime.now() - timedelta(days=i)
+        iso_str = d.strftime("%Y-%m-%d")
         label = d.strftime("%b %d")
-        rev, prof, count = db_map.get(label, (Decimal("0.00"), Decimal("0.00"), 0))
+        rev, prof, count = db_map.get(iso_str, (Decimal("0.00"), Decimal("0.00"), 0))
         timeline.append(
             DailyRevenueItem(
                 date_label=label,
+                full_date=iso_str,
                 revenue=rev,
                 profit=prof,
                 orders_count=count

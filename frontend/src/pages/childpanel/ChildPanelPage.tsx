@@ -20,6 +20,8 @@ import { Button } from '../../components/common/Button';
 import { useAuth } from '../../context/AuthContext';
 import { useCurrency } from '../../context/CurrencyContext';
 import { childPanelService, ChildPanelData } from '../../services/childPanels';
+import { analyticsService, DailyRevenue } from '../../services/analytics';
+import { DailyRevenueCalendar } from '../../components/analytics/DailyRevenueCalendar';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
   pending: { label: 'Provisioning', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/25' },
@@ -45,6 +47,20 @@ export const ChildPanelPage: React.FC = () => {
   const [renewingId, setRenewingId] = useState<string | null>(null);
   const [copiedNs, setCopiedNs] = useState<string | null>(null);
 
+  const [dailyRevenue, setDailyRevenue] = useState<DailyRevenue[]>([]);
+  const [loadingRevenue, setLoadingRevenue] = useState(true);
+
+  const fetchRevenue = async () => {
+    try {
+      const data = await analyticsService.getDailyRevenue(60);
+      setDailyRevenue(data);
+    } catch {
+      // silent
+    } finally {
+      setLoadingRevenue(false);
+    }
+  };
+
   const fetchPanels = async () => {
     try {
       const data = await childPanelService.getMyPanels();
@@ -58,6 +74,7 @@ export const ChildPanelPage: React.FC = () => {
 
   useEffect(() => {
     fetchPanels();
+    fetchRevenue();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -159,6 +176,12 @@ export const ChildPanelPage: React.FC = () => {
           <span className="text-[10px] text-slate-500">Keep 100% of your markup profits</span>
         </Card>
       </div>
+
+      {/* Daily Revenue & Profit Tracking Calendar */}
+      <DailyRevenueCalendar
+        dailyData={dailyRevenue}
+        onRefresh={fetchRevenue}
+      />
 
       {/* My Active Panels */}
       {!loading && panels.length > 0 && (

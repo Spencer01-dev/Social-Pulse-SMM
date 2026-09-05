@@ -26,6 +26,7 @@ import {
 } from '../../services/analytics';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
+import { DailyRevenueCalendar } from '../../components/analytics/DailyRevenueCalendar';
 
 export const AdminDashboardPage: React.FC = () => {
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
@@ -34,13 +35,14 @@ export const AdminDashboardPage: React.FC = () => {
   const [topServices, setTopServices] = useState<TopService[]>([]);
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [revenueView, setRevenueView] = useState<'calendar' | 'chart'>('calendar');
 
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
       const [over, daily, plat, top, act] = await Promise.all([
         analyticsService.getOverview().catch(() => null),
-        analyticsService.getDailyRevenue(14).catch(() => []),
+        analyticsService.getDailyRevenue(60).catch(() => []),
         analyticsService.getPlatformMetrics().catch(() => []),
         analyticsService.getTopServices(5).catch(() => []),
         analyticsService.getRecentActivity(10).catch(() => []),
@@ -176,61 +178,94 @@ export const AdminDashboardPage: React.FC = () => {
 
       {/* Daily Revenue Chart & Platform Breakdown Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Daily Revenue 14-Day Timeline */}
-        <Card
-          className="lg:col-span-2"
-          title="14-Day Revenue & Profit Trajectory"
-          subtitle="Daily sales performance and gross earnings"
-        >
-          <div className="h-64 flex items-end gap-2 pt-8 pb-2 px-2">
-            {dailyRevenue.map((d, i) => {
-              const rev = Number(d.revenue);
-              const prof = Number(d.profit);
-              const heightPercent = Math.max((rev / maxDailyRevenue) * 100, 6);
-              const profitHeight = Math.max((prof / maxDailyRevenue) * 100, 3);
+        {/* Revenue & Profit Tracking Section (Calendar or Bar Chart) */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 bg-[#11141a] p-1 rounded-2xl border border-[#2b303c]">
+              <button
+                type="button"
+                onClick={() => setRevenueView('calendar')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 ${
+                  revenueView === 'calendar'
+                    ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <span>📅 Daily Calendar View</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRevenueView('chart')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 ${
+                  revenueView === 'chart'
+                    ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <span>📊 14-Day Trajectory Bar</span>
+              </button>
+            </div>
+          </div>
 
-              return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1.5 group relative h-full justify-end">
-                  {/* Tooltip on hover */}
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-12 z-20 bg-slate-950 border border-slate-700 px-2.5 py-1.5 rounded-lg text-[10px] text-white shadow-xl pointer-events-none whitespace-nowrap">
-                    <p className="font-bold">{d.date_label}</p>
-                    <p className="text-blue-400">Rev: KES {rev.toFixed(0)}</p>
-                    <p className="text-emerald-400">Profit: +KES {prof.toFixed(0)}</p>
-                  </div>
+          {revenueView === 'calendar' ? (
+            <DailyRevenueCalendar
+              dailyData={dailyRevenue}
+              onRefresh={fetchDashboardData}
+            />
+          ) : (
+            <Card
+              title="14-Day Revenue & Profit Trajectory"
+              subtitle="Daily sales performance and gross earnings"
+            >
+              <div className="h-64 flex items-end gap-2 pt-8 pb-2 px-2">
+                {dailyRevenue.slice(-14).map((d, i) => {
+                  const rev = Number(d.revenue);
+                  const prof = Number(d.profit);
+                  const heightPercent = Math.max((rev / maxDailyRevenue) * 100, 6);
+                  const profitHeight = Math.max((prof / maxDailyRevenue) * 100, 3);
 
-                  {/* Dual Bar (Revenue + Profit) */}
-                  <div className="w-full flex items-end justify-center gap-0.5 h-full">
-                    {/* Revenue Bar */}
-                    <div
-                      className="w-1/2 bg-blue-600/80 group-hover:bg-blue-500 rounded-t-md transition-all duration-300"
-                      style={{ height: `${heightPercent}%` }}
-                    />
-                    {/* Profit Bar */}
-                    <div
-                      className="w-1/2 bg-emerald-500/80 group-hover:bg-emerald-400 rounded-t-md transition-all duration-300"
-                      style={{ height: `${profitHeight}%` }}
-                    />
-                  </div>
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-1.5 group relative h-full justify-end">
+                      {/* Tooltip on hover */}
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-12 z-20 bg-slate-950 border border-slate-700 px-2.5 py-1.5 rounded-lg text-[10px] text-white shadow-xl pointer-events-none whitespace-nowrap">
+                        <p className="font-bold">{d.date_label}</p>
+                        <p className="text-blue-400">Rev: KES {rev.toFixed(0)}</p>
+                        <p className="text-emerald-400">Profit: +KES {prof.toFixed(0)}</p>
+                      </div>
 
-                  <span className="text-[10px] text-slate-500 transform -rotate-45 truncate origin-top-left mt-1">
-                    {d.date_label.split(' ')[1]}
-                  </span>
+                      {/* Dual Bar (Revenue + Profit) */}
+                      <div className="w-full flex items-end justify-center gap-0.5 h-full">
+                        <div
+                          className="w-1/2 bg-blue-600/80 group-hover:bg-blue-500 rounded-t-md transition-all duration-300"
+                          style={{ height: `${heightPercent}%` }}
+                        />
+                        <div
+                          className="w-1/2 bg-emerald-500/80 group-hover:bg-emerald-400 rounded-t-md transition-all duration-300"
+                          style={{ height: `${profitHeight}%` }}
+                        />
+                      </div>
+
+                      <span className="text-[10px] text-slate-500 transform -rotate-45 truncate origin-top-left mt-1">
+                        {d.date_label.split(' ')[1]}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center justify-center gap-6 pt-4 border-t border-slate-800 text-xs text-slate-400">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded bg-blue-600 inline-block" />
+                  <span>Gross Revenue (KES)</span>
                 </div>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center justify-center gap-6 pt-4 border-t border-slate-800 text-xs text-slate-400">
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded bg-blue-600 inline-block" />
-              <span>Gross Revenue (KES)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded bg-emerald-500 inline-block" />
-              <span>Net Profit (KES)</span>
-            </div>
-          </div>
-        </Card>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded bg-emerald-500 inline-block" />
+                  <span>Net Profit (KES)</span>
+                </div>
+              </div>
+            </Card>
+          )}
+        </div>
 
         {/* Platform Share Distribution */}
         <Card title="Platform Distribution" subtitle="Order volume by social network">

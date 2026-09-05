@@ -22,6 +22,7 @@ class AnalyticsOverviewResponse(BaseModel):
 
 class DailyRevenueItem(BaseModel):
     date_label: str
+    full_date: Optional[str] = None
     revenue: Decimal
     profit: Decimal
     orders_count: int

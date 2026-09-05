@@ -15,6 +15,7 @@ export interface AnalyticsOverview {
 
 export interface DailyRevenue {
   date_label: string;
+  full_date?: string;
   revenue: number;
   profit: number;
   orders_count: number;
