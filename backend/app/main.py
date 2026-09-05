@@ -60,7 +60,11 @@ async def lifespan(app: FastAPI):
             await conn.run_sync(Base.metadata.create_all)
             # Ensure order_number sequence and column exist on orders table
             try:
+                # Step 1: Create sequence if it doesn't exist
                 await conn.execute(text("CREATE SEQUENCE IF NOT EXISTS order_number_seq START WITH 29100001;"))
+                print("[+] order_number_seq sequence ready.")
+
+                # Step 2: Add order_number column if missing
                 await conn.execute(text("""
                     DO $$
                     BEGIN
@@ -69,15 +73,16 @@ async def lifespan(app: FastAPI):
                             WHERE table_name='orders' AND column_name='order_number'
                         ) THEN
                             ALTER TABLE orders ADD COLUMN order_number INTEGER DEFAULT nextval('order_number_seq');
-                            CREATE UNIQUE INDEX IF NOT EXISTS ix_orders_order_number ON orders (order_number);
                         END IF;
                     END $$;
-                    -- Clean up any demo/mock balances, leaving real deposited money (10 KES)
-                    UPDATE users SET balance = 10.00 WHERE email = 'muneneoscar599@gmail.com';
-                    UPDATE users SET balance = 0.00 WHERE email != 'muneneoscar599@gmail.com';
                 """))
+                print("[+] order_number column verified.")
+
+                # Step 3: Create unique index (separate statement)
+                await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_orders_order_number ON orders (order_number);"))
+                print("[+] order_number index verified.")
             except Exception as e:
-                print(f"[*] Note on startup schema/balance check: {e}")
+                print(f"[!] Startup schema fix error: {e}")
         print("[+] Database schema verified and initialized.")
     except Exception as exc:
         print(f"[!] Warning during database init: {exc}")
