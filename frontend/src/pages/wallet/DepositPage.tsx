@@ -560,34 +560,16 @@ export const DepositPage: React.FC = () => {
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-extrabold text-slate-300 uppercase tracking-wider">Gateway Route</span>
                     <span className="text-[10px] text-emerald-400 font-mono font-bold">
-                      {mpesaGateway === 'palpluss' ? 'PalPluss Live API' : 'Direct Daraja'}
+                      PalPluss Live API
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setMpesaGateway('palpluss')}
-                      className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all text-left flex items-center justify-between ${
-                        mpesaGateway === 'palpluss'
-                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
-                          : 'bg-[#181c24] text-slate-400 border-[#2b303c] hover:text-slate-200'
-                      }`}
-                    >
-                      <span>⚡ PalPluss M-Pesa</span>
-                      {mpesaGateway === 'palpluss' && <span className="w-2 h-2 rounded-full bg-amber-400"></span>}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMpesaGateway('daraja')}
-                      className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all text-left flex items-center justify-between ${
-                        mpesaGateway === 'daraja'
-                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
-                          : 'bg-[#181c24] text-slate-400 border-[#2b303c] hover:text-slate-200'
-                      }`}
-                    >
-                      <span>📱 Safaricom Direct</span>
-                      {mpesaGateway === 'daraja' && <span className="w-2 h-2 rounded-full bg-amber-400"></span>}
-                    </button>
+                  <div className="w-full">
+                    <div className="px-3.5 py-2.5 rounded-xl text-xs font-bold border bg-amber-500/15 text-amber-300 border-amber-500/40 flex items-center justify-between">
+                      <span className="flex items-center gap-2">⚡ PalPluss Live Lipa Na M-Pesa</span>
+                      <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono">
+                        Active
+                      </span>
+                    </div>
                   </div>
                 </div>
 

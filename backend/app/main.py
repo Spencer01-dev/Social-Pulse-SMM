@@ -85,6 +85,15 @@ async def lifespan(app: FastAPI):
                 # Step 4: Clear out legacy demo funds on production, leaving real deposited money (10 KES)
                 await conn.execute(text("UPDATE users SET balance = 10.00 WHERE email = 'muneneoscar599@gmail.com' AND balance > 10.00;"))
                 print("[+] Legacy demo balance cleared; real deposit set to 10.00 KES.")
+
+                # Step 5: Zero out demo cash on other subscribers to start with real money only
+                await conn.execute(text("UPDATE users SET balance = 0.00 WHERE email != 'muneneoscar599@gmail.com';"))
+                print("[+] Demo cash on subscribers cleared to 0.00 KES.")
+
+                # Step 6: Remove test orders to start platform fresh
+                await conn.execute(text("DELETE FROM orders;"))
+                await conn.execute(text("ALTER SEQUENCE IF EXISTS order_number_seq RESTART WITH 29100001;"))
+                print("[+] Test orders purged to start afresh.")
             except Exception as e:
                 print(f"[!] Startup schema fix error: {e}")
         print("[+] Database schema verified and initialized.")
