@@ -60,8 +60,8 @@ async def initiate_mpesa_stk_push(
     Initiate Lipa Na M-Pesa STK Push to the user's mobile device.
     Creates a pending transaction ledger entry and returns CheckoutRequestID.
     """
-    if req.amount < 50:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Minimum deposit amount is KES 50.00.")
+    if req.amount < 10:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Minimum deposit amount is KES 10.00.")
 
     try:
         formatted_phone = normalize_phone_number(req.phone_number)
@@ -486,8 +486,8 @@ async def initiate_palpluss_stk_push(
     Trigger Lipa Na M-Pesa STK Push using PalPluss payment infrastructure.
     Sends prompt to customer's mobile phone and registers a pending transaction ledger.
     """
-    if req.amount < 50:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Minimum deposit amount is KES 50.00.")
+    if req.amount < 10:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Minimum deposit amount is KES 10.00.")
 
     try:
         norm_phone = normalize_kenyan_phone(req.phone_number)

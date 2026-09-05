@@ -9,7 +9,7 @@ from app.models.transaction import PaymentMethod, TransactionStatus, Transaction
 
 class MpesaSTKPushRequest(BaseModel):
     phone_number: str = Field(..., min_length=9, max_length=15, description="Kenyan mobile number (e.g. 0712345678)")
-    amount: Decimal = Field(..., ge=50, le=300000, description="Amount in KES to deposit (minimum 50 KES)")
+    amount: Decimal = Field(..., ge=10, le=300000, description="Amount in KES to deposit (minimum 10 KES)")
 
 
 class MpesaSTKPushResponse(BaseModel):
@@ -98,7 +98,7 @@ class AdminBalanceAdjustRequest(BaseModel):
 
 class PalPlussSTKRequest(BaseModel):
     phone_number: str = Field(..., min_length=9, max_length=15, description="Customer phone number (e.g. 0712345678)")
-    amount: Decimal = Field(..., ge=50, le=300000, description="Amount in KES to deposit (minimum 50 KES)")
+    amount: Decimal = Field(..., ge=10, le=300000, description="Amount in KES to deposit (minimum 10 KES)")
     channel_id: Optional[str] = Field(default=None, description="Optional payment channel UUID")
 
 

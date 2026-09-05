@@ -11,15 +11,15 @@ export const FloatingLowBalanceToast: React.FC = () => {
 
   const numBalance = Number(user.balance || 0);
 
-  // Show if balance is below Ksh 50.00
-  if (numBalance >= 50) return null;
+  // Show if balance is below Ksh 10.00
+  if (numBalance >= 10) return null;
 
   return (
     <div className="fixed bottom-5 right-5 z-50 animate-bounce">
       <div className="flex items-center gap-3 bg-[#1e222b] text-white px-4 py-2.5 rounded-2xl border border-amber-500/40 shadow-2xl">
         <div className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
           <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-          <span>Your balance is below <strong className="text-amber-400">Ksh 50.00</strong></span>
+          <span>Your balance is below <strong className="text-amber-400">Ksh 10.00</strong></span>
         </div>
 
         <Link
