@@ -46,11 +46,16 @@ class PalPlussGateway:
         base_url: Optional[str] = None,
         timeout: float = 30.0
     ):
-        self.api_key = api_key or settings.PALPLUSS_API_KEY
+        self.api_key = (api_key or settings.PALPLUSS_API_KEY or "").strip()
         self.base_url = (base_url or settings.PALPLUSS_BASE_URL).rstrip("/")
         self.timeout = timeout
 
     def _get_headers(self) -> Dict[str, str]:
+        if not self.api_key:
+            raise RuntimeError(
+                "PALPLUSS_API_KEY is not set on the server. "
+                "Please add PALPLUSS_API_KEY to your deployment environment variables (e.g. on Render)."
+            )
         token = base64.b64encode(f"{self.api_key}:".encode("utf-8")).decode("utf-8")
         return {
             "Authorization": f"Basic {token}",
@@ -122,18 +127,25 @@ class PalPlussGateway:
             payload["channelId"] = ch_id
 
         url = f"{self.base_url}/payments/stk"
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            resp = await client.post(url, json=payload, headers=self._get_headers())
-            data = resp.json()
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(url, json=payload, headers=self._get_headers())
+                data = resp.json()
 
-            if resp.status_code in (200, 201) and data.get("success"):
-                return data.get("data", {})
+                if resp.status_code in (200, 201) and data.get("success"):
+                    return data.get("data", {})
 
-            error_obj = data.get("error", {})
-            err_code = error_obj.get("code", f"HTTP_{resp.status_code}")
-            err_msg = error_obj.get("message", "PalPluss STK Push failed")
-            logger.error(f"PalPluss STK initiation error [{err_code}]: {err_msg}")
-            raise RuntimeError(f"[{err_code}] {err_msg}")
+                error_obj = data.get("error", {})
+                err_code = error_obj.get("code", f"HTTP_{resp.status_code}")
+                err_msg = error_obj.get("message", "PalPluss STK Push failed")
+                logger.error(f"PalPluss STK initiation error [{err_code}]: {err_msg}")
+                raise RuntimeError(f"[{err_code}] {err_msg}")
+        except httpx.TimeoutException:
+            logger.error("PalPluss API request timed out after 15s")
+            raise RuntimeError("PalPluss API gateway timed out. The upstream server may be temporarily busy.")
+        except httpx.ConnectError:
+            logger.error("Failed to connect to PalPluss API gateway")
+            raise RuntimeError("Unable to reach PalPluss gateway server. Please try again or use the Safaricom Direct route.")
 
     async def get_transaction(self, transaction_id: str) -> Dict[str, Any]:
         """

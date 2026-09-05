@@ -161,7 +161,7 @@ export const DepositPage: React.FC = () => {
       setPollStatus('prompted');
       setCountdown(45);
     } catch (err: any) {
-      const msg = err.response?.data?.detail || 'Failed to initiate M-Pesa STK Push.';
+      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to initiate M-Pesa STK Push.';
       setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
     } finally {
       setSubmittingMpesa(false);
