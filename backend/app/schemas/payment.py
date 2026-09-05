@@ -94,3 +94,27 @@ class AdminBalanceAdjustRequest(BaseModel):
     user_id: uuid.UUID
     amount: Decimal = Field(..., description="Positive to credit, negative to debit")
     reason: str = Field(..., min_length=3, max_length=255)
+
+
+class PalPlussSTKRequest(BaseModel):
+    phone_number: str = Field(..., min_length=9, max_length=15, description="Customer phone number (e.g. 0712345678)")
+    amount: Decimal = Field(..., gt=0, le=300000, description="Amount in KES to deposit")
+    channel_id: Optional[str] = Field(default=None, description="Optional payment channel UUID")
+
+
+class PalPlussSTKResponse(BaseModel):
+    transaction_id: str
+    status: str
+    amount: Decimal
+    phone: str
+    account_reference: str
+    provider_checkout_id: Optional[str] = None
+    message: str
+
+
+class PalPlussBalanceResponse(BaseModel):
+    currency: str = "KES"
+    available_balance: float
+    ledger_balance: float
+    error: Optional[str] = None
+

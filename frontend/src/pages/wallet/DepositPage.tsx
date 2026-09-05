@@ -52,6 +52,7 @@ export const DepositPage: React.FC = () => {
   const [pollStatus, setPollStatus] = useState<'prompted' | 'completed' | 'failed' | null>(null);
   const [receiptNumber, setReceiptNumber] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(45);
+  const [mpesaGateway, setMpesaGateway] = useState<'palpluss' | 'daraja'>('palpluss');
 
   // ==========================================
   // NIGERIA STATE (Paystack NGN)
@@ -143,12 +144,20 @@ export const DepositPage: React.FC = () => {
     setError(null);
     setSubmittingMpesa(true);
     try {
-      const res = await paymentsService.initiateMpesaSTK({
-        phone_number: phoneNumber.trim(),
-        amount: numAmount,
-      });
+      if (mpesaGateway === 'palpluss') {
+        const res = await paymentsService.initiatePalplussSTK({
+          phone_number: phoneNumber.trim(),
+          amount: numAmount,
+        });
+        setCheckoutId(res.transaction_id);
+      } else {
+        const res = await paymentsService.initiateMpesaSTK({
+          phone_number: phoneNumber.trim(),
+          amount: numAmount,
+        });
+        setCheckoutId(res.checkout_request_id);
+      }
 
-      setCheckoutId(res.checkout_request_id);
       setPollStatus('prompted');
       setCountdown(45);
     } catch (err: any) {
@@ -164,7 +173,9 @@ export const DepositPage: React.FC = () => {
     if (checkoutId && pollStatus === 'prompted') {
       interval = setInterval(async () => {
         try {
-          const statusResp = await paymentsService.queryMpesaStatus(checkoutId);
+          const statusResp = mpesaGateway === 'palpluss'
+            ? await paymentsService.queryPalplussStatus(checkoutId)
+            : await paymentsService.queryMpesaStatus(checkoutId);
           if (statusResp.status === 'completed') {
             setPollStatus('completed');
             setReceiptNumber(statusResp.mpesa_receipt || 'Confirmed');
@@ -183,7 +194,7 @@ export const DepositPage: React.FC = () => {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [checkoutId, pollStatus]);
+  }, [checkoutId, pollStatus, mpesaGateway]);
 
   useEffect(() => {
     let timer: any = null;
@@ -545,6 +556,41 @@ export const DepositPage: React.FC = () => {
               </div>
             ) : (
               <form onSubmit={handleInitiateMpesa} className="space-y-5">
+                <div className="p-3 bg-[#11141a] rounded-2xl border border-[#2b303c] space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-extrabold text-slate-300 uppercase tracking-wider">Gateway Route</span>
+                    <span className="text-[10px] text-emerald-400 font-mono font-bold">
+                      {mpesaGateway === 'palpluss' ? 'PalPluss Live API' : 'Direct Daraja'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMpesaGateway('palpluss')}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all text-left flex items-center justify-between ${
+                        mpesaGateway === 'palpluss'
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
+                          : 'bg-[#181c24] text-slate-400 border-[#2b303c] hover:text-slate-200'
+                      }`}
+                    >
+                      <span>⚡ PalPluss M-Pesa</span>
+                      {mpesaGateway === 'palpluss' && <span className="w-2 h-2 rounded-full bg-amber-400"></span>}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMpesaGateway('daraja')}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all text-left flex items-center justify-between ${
+                        mpesaGateway === 'daraja'
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
+                          : 'bg-[#181c24] text-slate-400 border-[#2b303c] hover:text-slate-200'
+                      }`}
+                    >
+                      <span>📱 Safaricom Direct</span>
+                      {mpesaGateway === 'daraja' && <span className="w-2 h-2 rounded-full bg-amber-400"></span>}
+                    </button>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-xs font-extrabold text-slate-300 uppercase tracking-wider mb-2">
                     M-Pesa Mobile Number

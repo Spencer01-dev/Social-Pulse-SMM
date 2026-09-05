@@ -44,6 +44,14 @@ async def get_platform_settings(
                 "has_public_key": bool(settings.PAYSTACK_PUBLIC_KEY),
                 "has_secret_key": bool(settings.PAYSTACK_SECRET_KEY),
                 "supported_currencies": ["NGN", "GHS", "KES", "ZAR", "USD"],
+            },
+            "palpluss": {
+                "name": "PalPluss M-Pesa Infrastructure",
+                "base_url": settings.PALPLUSS_BASE_URL,
+                "has_api_key": bool(settings.PALPLUSS_API_KEY),
+                "channel_id": settings.PALPLUSS_CHANNEL_ID,
+                "callback_url": settings.PALPLUSS_CALLBACK_URL,
+                "enabled": settings.PALPLUSS_ENABLED,
             }
         },
         "exchange_rates": {

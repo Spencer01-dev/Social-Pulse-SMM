@@ -137,6 +137,15 @@ export const AdminSettingsPage: React.FC = () => {
                 </span>
               </div>
               <div className="flex justify-between py-2 border-b border-slate-800">
+                <div>
+                  <span className="text-slate-400 block">PalPluss M-Pesa Infrastructure</span>
+                  <span className="text-[10px] text-slate-500 font-mono">api.palpluss.com/v1</span>
+                </div>
+                <span className={`font-mono text-xs font-bold ${settings.payments.palpluss?.has_api_key ? 'text-emerald-400' : 'text-slate-500'}`}>
+                  {settings.payments.palpluss?.has_api_key ? 'Connected (Live Key Active)' : 'Not Configured'}
+                </span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-slate-800">
                 <span className="text-slate-400">OKX Web3 Multi-Chain</span>
                 <span className="font-mono text-blue-400 font-semibold">
                   TRC20, TON, Polygon (Active)

@@ -202,6 +202,23 @@ export interface MpesaSTKStatusResponse {
   new_balance?: number;
 }
 
+export interface PalPlussSTKResponse {
+  transaction_id: string;
+  status: string;
+  amount: number;
+  phone: string;
+  account_reference: string;
+  provider_checkout_id?: string;
+  message: string;
+}
+
+export interface PalPlussBalanceResponse {
+  currency: string;
+  available_balance: number;
+  ledger_balance: number;
+  error?: string;
+}
+
 export interface AuthTokens {
   access_token: string;
   refresh_token: string;

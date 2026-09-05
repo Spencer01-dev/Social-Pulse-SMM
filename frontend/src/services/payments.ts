@@ -25,6 +25,22 @@ export const paymentsService = {
     return response.data;
   },
 
+  // PalPluss M-Pesa Integration
+  initiatePalplussSTK: async (payload: { phone_number: string; amount: number; channel_id?: string }) => {
+    const response = await apiClient.post('/payments/palpluss/stk-push', payload);
+    return response.data;
+  },
+
+  queryPalplussStatus: async (transactionId: string): Promise<MpesaSTKStatusResponse> => {
+    const response = await apiClient.get<MpesaSTKStatusResponse>(`/payments/palpluss/status/${transactionId}`);
+    return response.data;
+  },
+
+  getPalplussBalance: async () => {
+    const response = await apiClient.get('/payments/palpluss/balance');
+    return response.data;
+  },
+
   // Supported Multi-Currencies & Live Rates
   getCurrencies: async (): Promise<CurrenciesResponse> => {
     const response = await apiClient.get<CurrenciesResponse>('/payments/currencies');

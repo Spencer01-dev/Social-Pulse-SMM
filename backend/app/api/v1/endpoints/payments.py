@@ -17,12 +17,16 @@ from app.models.transaction import (
 from app.models.user import User
 from app.payments.exchange_rate import exchange_rate_service
 from app.payments.mpesa import mpesa_client, normalize_phone_number
+from app.payments.palpluss import palpluss_client, normalize_kenyan_phone
 from app.payments.paystack import paystack_provider
 from app.schemas.payment import (
     CurrenciesResponse,
     MpesaSTKPushRequest,
     MpesaSTKPushResponse,
     MpesaSTKStatusResponse,
+    PalPlussBalanceResponse,
+    PalPlussSTKRequest,
+    PalPlussSTKResponse,
     PaymentVerifyResponse,
     PaystackInitRequest,
     PaystackInitResponse,
@@ -463,3 +467,246 @@ async def paystack_webhook_callback(
     await db.commit()
 
     return {"status": True, "message": "Webhook processed successfully"}
+
+
+# =========================================================================
+# PALPLUSS M-PESA PAYMENT ENGINE (STK PUSH & REAL-TIME WEBHOOKS)
+# =========================================================================
+
+@router.post("/palpluss/stk-push", response_model=PalPlussSTKResponse)
+async def initiate_palpluss_stk_push(
+    req: PalPlussSTKRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """
+    Trigger Lipa Na M-Pesa STK Push using PalPluss payment infrastructure.
+    Sends prompt to customer's mobile phone and registers a pending transaction ledger.
+    """
+    try:
+        norm_phone = normalize_kenyan_phone(req.phone_number)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    account_ref = f"SP-{current_user.username[:8]}"
+    desc = f"Topup {int(req.amount)}"
+
+    try:
+        stk_data = await palpluss_client.initiate_stk_push(
+            phone=norm_phone,
+            amount=req.amount,
+            account_reference=account_ref,
+            transaction_desc=desc,
+            channel_id=req.channel_id,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"PalPluss STK Push failed: {str(exc)}"
+        )
+
+    tx_id = stk_data.get("transactionId") or str(uuid.uuid4())
+    provider_checkout = stk_data.get("providerCheckoutId")
+
+    # Record Pending Transaction in double-entry ledger
+    transaction = Transaction(
+        user_id=current_user.id,
+        type=TransactionType.DEPOSIT,
+        amount=req.amount,
+        balance_before=current_user.balance,
+        balance_after=current_user.balance,
+        currency="KES",
+        payment_method=PaymentMethod.MPESA,
+        payment_reference=tx_id,
+        status=TransactionStatus.PENDING,
+        description=f"PalPluss M-Pesa deposit ({norm_phone})",
+        metadata_json={
+            "gateway": "palpluss",
+            "phone_number": norm_phone,
+            "palpluss_transaction_id": tx_id,
+            "provider_request_id": stk_data.get("providerRequestId"),
+            "provider_checkout_id": provider_checkout,
+            "transaction_fee": stk_data.get("transactionFee", 0),
+        }
+    )
+
+    db.add(transaction)
+    await db.commit()
+
+    return PalPlussSTKResponse(
+        transaction_id=tx_id,
+        status=stk_data.get("status", "PENDING"),
+        amount=Decimal(str(stk_data.get("amount", req.amount))),
+        phone=norm_phone,
+        account_reference=account_ref,
+        provider_checkout_id=provider_checkout,
+        message="STK Push prompt sent to phone. Enter your M-Pesa PIN to complete payment."
+    )
+
+
+@router.get("/palpluss/status/{transaction_id}", response_model=MpesaSTKStatusResponse)
+async def get_palpluss_transaction_status(
+    transaction_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """
+    Poll the current status of a PalPluss M-Pesa deposit transaction.
+    """
+    query = await db.execute(
+        select(Transaction)
+        .where(
+            Transaction.user_id == current_user.id,
+            Transaction.payment_reference == transaction_id
+        )
+    )
+    tx = query.scalars().first()
+    if not tx:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Transaction not found"
+        )
+
+    # If still pending, optionally query PalPluss directly
+    if tx.status == TransactionStatus.PENDING:
+        try:
+            live_data = await palpluss_client.get_transaction(transaction_id)
+            live_status = live_data.get("status", "").upper()
+            if live_status == "SUCCESS":
+                user_q = await db.execute(
+                    select(User).where(User.id == current_user.id).with_for_update()
+                )
+                user = user_q.scalars().first()
+                if user and tx.status == TransactionStatus.PENDING:
+                    user.balance += tx.amount
+                    tx.status = TransactionStatus.COMPLETED
+                    tx.balance_after = user.balance
+                    if live_data.get("mpesa_receipt"):
+                        tx.payment_reference = live_data["mpesa_receipt"]
+                    meta = tx.metadata_json or {}
+                    tx.metadata_json = {**meta, "poll_sync": live_data}
+                    db.add(user)
+                    db.add(tx)
+                    await db.commit()
+                    await db.refresh(user)
+                    await db.refresh(tx)
+            elif live_status in ("FAILED", "CANCELLED", "EXPIRED"):
+                tx.status = TransactionStatus.FAILED
+                db.add(tx)
+                await db.commit()
+                await db.refresh(tx)
+        except Exception:
+            pass  # Fall back to database status
+
+    meta = tx.metadata_json or {}
+    return MpesaSTKStatusResponse(
+        checkout_request_id=transaction_id,
+        status=tx.status,
+        result_code="0" if tx.status == TransactionStatus.COMPLETED else ("1" if tx.status == TransactionStatus.FAILED else None),
+        result_desc="Payment completed successfully" if tx.status == TransactionStatus.COMPLETED else None,
+        mpesa_receipt=meta.get("mpesa_receipt") or (tx.payment_reference if tx.status == TransactionStatus.COMPLETED else None),
+        amount=tx.amount,
+        new_balance=current_user.balance if tx.status == TransactionStatus.COMPLETED else None
+    )
+
+
+@router.post("/palpluss/webhook")
+async def palpluss_webhook_callback(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+) -> Any:
+    """
+    Public Webhook listener for PalPluss transaction settlement events.
+    Handles 'transaction.success', 'transaction.failed', 'transaction.cancelled', 'transaction.expired'.
+    Automatically credits customer balance on confirmed payments.
+    """
+    try:
+        body_json = await request.json()
+    except Exception:
+        return {"received": True, "error": "Invalid JSON"}
+
+    event_type = body_json.get("event_type")
+    tx_payload = body_json.get("transaction", {})
+    palpluss_tx_id = tx_payload.get("id")
+
+    if not palpluss_tx_id:
+        return {"received": True, "error": "Missing transaction id"}
+
+    # Find the matching transaction by PalPluss ID or external reference
+    query = await db.execute(
+        select(Transaction)
+        .options(selectinload(Transaction.user))
+        .where(
+            (Transaction.payment_reference == palpluss_tx_id) |
+            (Transaction.metadata_json["palpluss_transaction_id"].astext == palpluss_tx_id)
+        )
+        .with_for_update()
+    )
+    transaction = query.scalars().first()
+
+    if not transaction or transaction.status != TransactionStatus.PENDING:
+        # Idempotent response per PalPluss webhook requirements
+        return {"received": True, "message": "Transaction already finalized or not found"}
+
+    user = transaction.user
+    meta = transaction.metadata_json or {}
+    mpesa_receipt = tx_payload.get("mpesa_receipt")
+
+    if event_type == "transaction.success":
+        amount_kes = Decimal(str(tx_payload.get("amount", transaction.amount)))
+        balance_before = user.balance
+        user.balance += amount_kes
+        balance_after = user.balance
+
+        transaction.balance_before = balance_before
+        transaction.balance_after = balance_after
+        transaction.amount = amount_kes
+        transaction.status = TransactionStatus.COMPLETED
+        if mpesa_receipt:
+            transaction.payment_reference = mpesa_receipt
+        transaction.description = f"PalPluss M-Pesa Deposit ({mpesa_receipt or palpluss_tx_id})"
+        transaction.metadata_json = {
+            **meta,
+            "mpesa_receipt": mpesa_receipt,
+            "webhook_event": body_json
+        }
+        db.add(user)
+        db.add(transaction)
+        await db.commit()
+        return {"received": True, "status": "credited", "amount": float(amount_kes)}
+
+    elif event_type in ("transaction.failed", "transaction.cancelled", "transaction.expired"):
+        transaction.status = TransactionStatus.FAILED
+        transaction.metadata_json = {
+            **meta,
+            "failed_reason": tx_payload.get("result_desc"),
+            "webhook_event": body_json
+        }
+        db.add(transaction)
+        await db.commit()
+        return {"received": True, "status": "failed"}
+
+    return {"received": True}
+
+
+@router.get("/palpluss/balance", response_model=PalPlussBalanceResponse)
+async def get_palpluss_service_balance(
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """
+    Retrieves the merchant's PalPluss service wallet token balance.
+    Only accessible by superusers / administrators.
+    """
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required"
+        )
+    bal = await palpluss_client.get_service_balance()
+    return PalPlussBalanceResponse(
+        currency=bal.get("currency", "KES"),
+        available_balance=float(bal.get("availableBalance", 0)),
+        ledger_balance=float(bal.get("ledgerBalance", 0)),
+        error=bal.get("error")
+    )
+
