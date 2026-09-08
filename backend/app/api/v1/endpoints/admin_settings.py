@@ -27,10 +27,10 @@ async def get_platform_settings(
                 "api_url": settings.DELIX_API_URL,
                 "has_api_key": bool(settings.DELIX_API_KEY and settings.DELIX_API_KEY != "YOUR_DELIX_API_KEY_HERE"),
             },
-            "exonums": {
-                "name": "Exonums",
-                "api_url": settings.EXONUMS_API_URL,
-                "has_api_key": bool(settings.EXONUMS_API_KEY),
+            "smm_africa": {
+                "name": "SMM Africa",
+                "api_url": settings.SMM_AFRICA_API_URL,
+                "has_api_key": bool(settings.SMM_AFRICA_API_KEY),
             }
         },
         "payments": {

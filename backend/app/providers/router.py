@@ -6,8 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.provider import Provider
 from app.models.service import Service
 from app.providers.base import ProviderInterface, ProviderOrderResponse
-from app.providers.generic_smm import GenericSMMProvider
 from app.providers.delix import DelixGainsProvider
+from app.providers.smm_africa import SMMAfricaProvider
+from app.providers.generic_smm import GenericSMMProvider
 from app.providers.mock import MockProvider
 from app.core.config import settings
 
@@ -79,11 +80,10 @@ class SmartProviderRouter:
                         api_url=provider_record.api_url or settings.DELIX_API_URL,
                         api_key=settings.DELIX_API_KEY
                     )
-                elif provider_record.slug in ["exonums", "exonums.com"]:
-                    client = GenericSMMProvider(
-                        name="Exonums",
-                        api_url=provider_record.api_url or settings.EXONUMS_API_URL,
-                        api_key=settings.EXONUMS_API_KEY
+                elif provider_record.slug in ["smm_africa", "smm-africa", "smm.africa", "smmafrica", "smm"]:
+                    client = SMMAfricaProvider(
+                        api_url=provider_record.api_url or settings.SMM_AFRICA_API_URL,
+                        api_key=settings.SMM_AFRICA_API_KEY
                     )
                 else:
                     client = GenericSMMProvider(

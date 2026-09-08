@@ -2,6 +2,7 @@ from typing import Optional
 from app.core.config import settings
 from app.providers.base import ProviderInterface
 from app.providers.delix import DelixGainsProvider
+from app.providers.smm_africa import SMMAfricaProvider
 from app.providers.generic_smm import GenericSMMProvider
 from app.providers.mock import MockProvider
 
@@ -20,11 +21,10 @@ def get_provider(slug: str = "delix", api_url: Optional[str] = None, api_key: Op
         effective_key = api_key or settings.DELIX_API_KEY
         return DelixGainsProvider(api_url=api_url or settings.DELIX_API_URL, api_key=effective_key)
 
-    if slug_clean in ["exonums", "exonums.com"]:
-        return GenericSMMProvider(
-            name="Exonums",
-            api_url=api_url or settings.EXONUMS_API_URL,
-            api_key=api_key or settings.EXONUMS_API_KEY,
+    if slug_clean in ["smm_africa", "smm-africa", "smm.africa", "smmafrica", "smm"]:
+        return SMMAfricaProvider(
+            api_url=api_url or settings.SMM_AFRICA_API_URL,
+            api_key=api_key or settings.SMM_AFRICA_API_KEY,
         )
 
     # Generic SMM v2 Provider fallback

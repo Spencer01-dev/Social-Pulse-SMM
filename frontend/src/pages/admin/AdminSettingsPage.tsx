@@ -106,22 +106,22 @@ export const AdminSettingsPage: React.FC = () => {
             </div>
           </Card>
 
-          <Card title="SMM Provider API (Exonums)" subtitle="Secondary wholesale supplier connectivity">
+          <Card title="SMM Provider API (SMM Africa)" subtitle="Wholesale supplier connectivity & failover">
             <div className="space-y-3 mt-1 text-xs">
               <div className="flex justify-between py-2 border-b border-slate-800">
                 <span className="text-slate-400">Provider Endpoint</span>
-                <span className="font-mono text-slate-300">{settings.providers?.exonums?.api_url || 'https://exonums.com/api/v2'}</span>
+                <span className="font-mono text-slate-300">{settings.providers?.smm_africa?.api_url || 'https://smm.africa/api/v3'}</span>
               </div>
               <div className="flex justify-between py-2">
                 <span className="text-slate-400">API Key Status</span>
                 <span
                   className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                    settings.providers?.exonums?.has_api_key
+                    settings.providers?.smm_africa?.has_api_key
                       ? 'bg-emerald-500/20 text-emerald-300'
                       : 'bg-amber-500/20 text-amber-300'
                   }`}
                 >
-                  {settings.providers?.exonums?.has_api_key ? 'Configured' : 'Mock Mode Active'}
+                  {settings.providers?.smm_africa?.has_api_key ? 'Configured' : 'Mock Mode Active'}
                 </span>
               </div>
             </div>

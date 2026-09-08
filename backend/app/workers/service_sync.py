@@ -82,9 +82,9 @@ async def sync_services_from_provider(
             p_name = "Delix Gains KE"
             p_url = settings.DELIX_API_URL
             p_currency = "KES"
-        elif provider_slug in ["exonums", "exonums.com"]:
-            p_name = "Exonums"
-            p_url = settings.EXONUMS_API_URL
+        elif provider_slug in ["smm_africa", "smm-africa", "smm.africa", "smmafrica", "smm"]:
+            p_name = "SMM Africa"
+            p_url = settings.SMM_AFRICA_API_URL
             p_currency = "USD"
         else:
             p_name = provider_slug.capitalize()

@@ -60,7 +60,7 @@ export interface PlatformSettings {
       api_url: string;
       has_api_key: boolean;
     };
-    exonums?: {
+    smm_africa?: {
       name?: string;
       api_url: string;
       has_api_key: boolean;

@@ -78,9 +78,9 @@ class Settings(BaseSettings):
     DELIX_API_KEY: str = "EVDcnX9t9VSVJdUveItbi1tbvGuVqyBCUigzGE9pEv5n7Zwa8qmJGrDoeZs3"
     USE_MOCK_PROVIDERS: bool = False
 
-    # Upstream Provider (Exonums)
-    EXONUMS_API_URL: str = "https://exonums.com/api/v2"
-    EXONUMS_API_KEY: str = ""
+    # Upstream Provider (SMM Africa Wholesale)
+    SMM_AFRICA_API_URL: str = "https://smm.africa/api/v3"
+    SMM_AFRICA_API_KEY: str = "09af3fdf9a1290618414f9a1227826231fdcf8633fc55c590611e428bd75a9d9"
 
     # Payments
     MPESA_ENVIRONMENT: str = "sandbox"
