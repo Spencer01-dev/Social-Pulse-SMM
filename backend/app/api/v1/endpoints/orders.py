@@ -40,12 +40,25 @@ async def create_order(
             detail="The requested service is currently inactive or unavailable."
         )
 
-    # 2. Validate quantity boundaries (enforce minimum of 100 across platform)
-    effective_min = max(service.min_quantity or 100, 100)
+    # 2. Validate quantity boundaries & determine package vs per-1000 pricing
+    is_package = (
+        (service.service_type and service.service_type.lower() == "package")
+        or (service.min_quantity == 1 and service.max_quantity == 1)
+        or ("whatsapp" in service.name.lower() and "number" in service.name.lower())
+    )
+    if is_package:
+        effective_min = service.min_quantity or 1
+        total_charge = round(service.selling_rate * Decimal(order_in.quantity), 2)
+        provider_cost = round(service.provider_rate * Decimal(order_in.quantity), 2)
+    else:
+        effective_min = max(service.min_quantity or 100, 100)
+        total_charge = round((service.selling_rate * Decimal(order_in.quantity)) / Decimal(1000), 2)
+        provider_cost = round((service.provider_rate * Decimal(order_in.quantity)) / Decimal(1000), 2)
+
     if order_in.quantity < effective_min:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Minimum order quantity is {effective_min:,} (orders below 100 are not permitted)."
+            detail=f"Minimum order quantity is {effective_min:,}."
         )
     if order_in.quantity > service.max_quantity:
         raise HTTPException(
@@ -53,9 +66,6 @@ async def create_order(
             detail=f"Maximum quantity for this service is {service.max_quantity:,}."
         )
 
-    # 3. Calculate financial metrics (in KES)
-    total_charge = round((service.selling_rate * Decimal(order_in.quantity)) / Decimal(1000), 2)
-    provider_cost = round((service.provider_rate * Decimal(order_in.quantity)) / Decimal(1000), 2)
     profit = total_charge - provider_cost
 
     # 4. Atomically lock user row to eliminate double-spend / race condition exploits

@@ -262,7 +262,9 @@ export const ServicesPage: React.FC = () => {
               <div className="mt-5 pt-4 border-t border-slate-800/80 flex items-center justify-between">
                 <div>
                   <span className="text-[10px] text-slate-400 uppercase font-semibold block">
-                    Rate per 1,000
+                    {service.service_type?.toLowerCase() === 'package' || service.name.toLowerCase().includes('whatsapp number')
+                      ? 'Package Price'
+                      : 'Rate per 1,000'}
                   </span>
                   <span className="text-lg font-extrabold text-amber-400">
                     {formatCurrency(Number(service.rate))}
@@ -272,11 +274,21 @@ export const ServicesPage: React.FC = () => {
                 <div className="text-right text-xs text-slate-400">
                   <span className="block text-[10px] uppercase font-semibold">Min / Max</span>
                   <span className="font-medium text-slate-300">
-                    {Math.max(service.min_quantity || 100, 100).toLocaleString()} – {service.max_quantity.toLocaleString()}
+                    {(service.service_type?.toLowerCase() === 'package' || service.name.toLowerCase().includes('whatsapp number')
+                      ? (service.min_quantity || 1)
+                      : Math.max(service.min_quantity || 100, 100)
+                    ).toLocaleString()} – {service.max_quantity.toLocaleString()}
                   </span>
                 </div>
 
-                <Link to={`/orders/new?service=${service.id}`}>
+                <Link
+                  to={
+                    service.name.toLowerCase().includes('whatsapp number') ||
+                    service.category.toLowerCase().includes('whatsapp number')
+                      ? `/orders/whatsapp?service=${service.id}`
+                      : `/orders/new?service=${service.id}`
+                  }
+                >
                   <Button variant="primary" size="sm">
                     Order
                   </Button>

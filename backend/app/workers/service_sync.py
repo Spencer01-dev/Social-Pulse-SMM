@@ -134,8 +134,9 @@ async def sync_services_from_provider(
 
         category_clean = item.category or f"{platform_detected.value.capitalize()} Services"
 
-        # Enforce platform minimum floor of 100
-        platform_min = max(item.min_quantity, 100)
+        # Enforce platform minimum floor of 100 only for non-package services
+        is_package_service = (item.type and item.type.lower() == "package") or item.max_quantity <= 1 or ("whatsapp" in item.name.lower() and "number" in item.name.lower())
+        platform_min = max(item.min_quantity, 1) if is_package_service else max(item.min_quantity, 100)
 
         # Convert provider rate to platform base currency (KES) if provider is in USD
         effective_rate = item.rate

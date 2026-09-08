@@ -11,6 +11,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { ServicesPage } from './pages/services/ServicesPage';
 import { AdminServicesPage } from './pages/admin/AdminServicesPage';
 import { NewOrderPage } from './pages/orders/NewOrderPage';
+import { WhatsAppOrderPage } from './pages/orders/WhatsAppOrderPage';
 import { OrderListPage } from './pages/orders/OrderListPage';
 import { AdminOrdersPage } from './pages/admin/AdminOrdersPage';
 import { DepositPage } from './pages/wallet/DepositPage';
@@ -72,6 +73,18 @@ export const App: React.FC = () => {
                     <NewOrderPage />
                   </ProtectedRoute>
                 }
+              />
+              <Route
+                path="orders/whatsapp"
+                element={
+                  <ProtectedRoute>
+                    <WhatsAppOrderPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="whatsapp"
+                element={<Navigate to="/orders/whatsapp" replace />}
               />
               <Route path="refill" element={<Navigate to="/orders" replace />} />
               <Route

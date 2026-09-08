@@ -18,6 +18,7 @@ class CustomerServiceResponse(BaseModel):
     description: Optional[str] = None
     service_type: str
     category: str
+    provider_service_id: Optional[str] = None
     rate: Decimal = Field(..., description="Customer selling rate per 1,000 units in KES")
     min_quantity: int
     max_quantity: int

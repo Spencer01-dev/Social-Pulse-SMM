@@ -20,7 +20,8 @@ import {
   Bell,
   ShieldAlert,
   LogOut,
-  Zap
+  Zap,
+  Phone
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -42,6 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
   const customerNav = [
     { name: 'New Order', href: '/orders/new', icon: PlusCircle },
+    { name: 'WhatsApp Numbers', href: '/orders/whatsapp', icon: Phone, badge: '🇺🇸 +1' },
     { name: 'Add Funds', href: '/deposit', icon: CreditCard },
     { name: 'Orders', href: '/orders', icon: ListOrdered },
     { name: 'Services', href: '/services', icon: Layers },

@@ -96,6 +96,7 @@ export interface User {
 
 export interface CustomerService {
   id: string;
+  provider_service_id?: string;
   platform: PlatformType;
   name: string;
   description?: string;

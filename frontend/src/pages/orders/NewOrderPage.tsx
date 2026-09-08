@@ -21,6 +21,7 @@ import { ordersService } from '../../services/orders';
 import { CustomerService, PlatformType } from '../../types';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
+import { WhatsAppOrderPage } from './WhatsAppOrderPage';
 
 export const NewOrderPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -93,14 +94,33 @@ export const NewOrderPage: React.FC = () => {
     return matchesPlatform && matchesCategory;
   });
 
+  // Check if service is package or whatsapp numbers
+  const isPackage = currentService
+    ? currentService.service_type?.toLowerCase() === 'package' ||
+      (currentService.min_quantity === 1 && currentService.max_quantity === 1) ||
+      currentService.name.toLowerCase().includes('whatsapp number')
+    : false;
+
+  const isWhatsApp = currentService && (
+    currentService.provider_service_id === '6048' ||
+    currentService.name.toLowerCase().includes('whatsapp number') ||
+    currentService.category.toLowerCase().includes('whatsapp numbers')
+  );
+
   // Calculate live charge
   const numQuantity = typeof quantity === 'number' ? quantity : 0;
   const calculatedCharge = currentService
-    ? Number(((currentService.rate * numQuantity) / 1000).toFixed(2))
+    ? isPackage
+      ? Number((currentService.rate * numQuantity).toFixed(2))
+      : Number(((currentService.rate * numQuantity) / 1000).toFixed(2))
     : 0;
 
   const userBalance = Number(user?.balance || 0);
   const hasInsufficientBalance = calculatedCharge > userBalance;
+
+  if (isWhatsApp) {
+    return <WhatsAppOrderPage />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,9 +132,9 @@ export const NewOrderPage: React.FC = () => {
       setError('Please enter a target profile or post link.');
       return;
     }
-    const effectiveMin = Math.max(currentService.min_quantity || 100, 100);
+    const effectiveMin = isPackage ? (currentService.min_quantity || 1) : Math.max(currentService.min_quantity || 100, 100);
     if (!numQuantity || numQuantity < effectiveMin) {
-      setError(`Minimum order quantity is ${effectiveMin.toLocaleString()} (orders below 100 are not permitted).`);
+      setError(`Minimum order quantity is ${effectiveMin.toLocaleString()}${!isPackage ? ' (orders below 100 are not permitted)' : ''}.`);
       return;
     }
     if (numQuantity > currentService.max_quantity) {

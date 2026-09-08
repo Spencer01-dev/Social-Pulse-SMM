@@ -47,6 +47,7 @@ async def list_public_services(
     return [
         CustomerServiceResponse(
             id=s.id,
+            provider_service_id=s.provider_service_id,
             platform=s.platform,
             name=s.name,
             description=s.description,
