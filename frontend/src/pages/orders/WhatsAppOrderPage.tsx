@@ -52,7 +52,7 @@ const COUNTRY_PRESETS: CountryPreset[] = [
     name: 'Canada',
     flag: '🇨🇦',
     prefix: '+1',
-    price: 190,
+    price: 285,
     locationName: 'Canada 🇨🇦',
     quality: 'High Quality 💫 | Instant Start ⚡',
     title: '6️⃣ WhatsApp Numbers 🇨🇦 +1 | Canada Numbers | High Quality 💫 | Instant Start ⚡',
@@ -64,7 +64,7 @@ const COUNTRY_PRESETS: CountryPreset[] = [
     name: 'England',
     flag: '🏴',
     prefix: '+44',
-    price: 300,
+    price: 450,
     locationName: 'England 🏴',
     quality: 'Real & Trusted ✅ | Fast Delivery ⚡',
     title: '4️⃣ WhatsApp Numbers 🏴 +44 | England Numbers | Real & Trusted ✅ | Fast Delivery ⚡',
@@ -76,7 +76,7 @@ const COUNTRY_PRESETS: CountryPreset[] = [
     name: 'South Africa',
     flag: '🇿🇦',
     prefix: '+27',
-    price: 190,
+    price: 285,
     locationName: 'South Africa 🇿🇦',
     quality: 'Real Users 🌍 | Instant Delivery 🚀',
     title: '5️⃣ WhatsApp Numbers 🇿🇦 +27 | South Africa Numbers | Real Users 🌍 | Instant Delivery 🚀',
@@ -88,7 +88,7 @@ const COUNTRY_PRESETS: CountryPreset[] = [
     name: 'France',
     flag: '🇫🇷',
     prefix: '+33',
-    price: 700,
+    price: 1050,
     locationName: 'France 🇫🇷',
     quality: 'Premium Quality 🔥 | Instant Delivery ⚡',
     title: '8️⃣ WhatsApp Numbers 🇫🇷 +33 | France Numbers | Premium Quality 🔥 | Instant Delivery ⚡',
@@ -152,23 +152,31 @@ export const WhatsAppOrderPage: React.FC = () => {
     loadServices();
   }, [preselectedService]);
 
-  // Find corresponding active DB service for selected preset
-  const currentDbService = availableServices.find((s) => {
-    if (s.provider_service_id && s.provider_service_id === selectedPreset.providerId) return true;
-    if (s.name.includes(selectedPreset.providerId)) return true;
-    if (s.id === selectedPreset.id) return true;
-    if (
-      s.name.toLowerCase().includes('whatsapp number') &&
-      s.name.toLowerCase().includes(selectedPreset.name.toLowerCase())
-    ) {
-      return true;
-    }
-    return false;
-  });
+  // Helper to dynamically find the live platform selling service & rate
+  const getPresetService = (preset: CountryPreset) => {
+    return availableServices.find((s) => {
+      if (s.provider_service_id && String(s.provider_service_id) === String(preset.providerId)) return true;
+      if (s.name.includes(preset.providerId)) return true;
+      if (s.id === preset.id) return true;
+      if (
+        s.name.toLowerCase().includes('whatsapp number') &&
+        s.name.toLowerCase().includes(preset.name.toLowerCase())
+      ) {
+        return true;
+      }
+      return false;
+    });
+  };
 
-  const priceKsh = currentDbService
-    ? Number(currentDbService.rate)
-    : selectedPreset.price;
+  const getPresetPrice = (preset: CountryPreset): number => {
+    const s = getPresetService(preset);
+    return s ? Number(s.rate) : preset.price;
+  };
+
+  // Find corresponding active DB service for selected preset
+  const currentDbService = getPresetService(selectedPreset);
+
+  const priceKsh = getPresetPrice(selectedPreset);
 
   const userBalance = Number(user?.balance || 0);
   const hasInsufficientBalance = userBalance < priceKsh;
@@ -281,7 +289,7 @@ export const WhatsAppOrderPage: React.FC = () => {
               >
                 <span>{preset.flag}</span>
                 <span>{preset.name}</span>
-                <span className="text-[10px] opacity-75">({preset.price} Ksh)</span>
+                <span className="text-[10px] opacity-75">({getPresetPrice(preset)} Ksh)</span>
               </button>
             );
           })}
