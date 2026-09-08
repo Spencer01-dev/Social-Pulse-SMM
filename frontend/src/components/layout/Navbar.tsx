@@ -51,6 +51,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
 
         {isAuthenticated && user ? (
           <>
+            {/* Quick M-Pesa Top Up Button */}
+            <Link
+              to="/deposit"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 font-extrabold text-xs rounded-xl border border-emerald-500/30 transition-all shrink-0 active:scale-95 shadow-sm"
+              title="Instant Lipa Na M-Pesa STK Push"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>M-Pesa Top-Up</span>
+            </Link>
+
             {/* Golden Balance Pill with active currency */}
             <Link
               to="/deposit"
@@ -82,6 +92,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
           </>
         ) : (
           <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="hidden md:inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              M-Pesa Accepted
+            </span>
             <Link to="/login">
               <button className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 bg-[#222630] hover:bg-[#2b303c] text-slate-200 hover:text-white font-bold text-xs rounded-xl border border-[#2b303c] transition-all active:scale-95">
                 <LogIn className="w-3.5 h-3.5 text-[#f59e0b]" />

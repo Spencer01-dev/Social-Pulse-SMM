@@ -128,33 +128,25 @@ export const AdminSettingsPage: React.FC = () => {
           </Card>
 
           {/* Payment Gateways Config */}
-          <Card title="Payment Gateway Integrations" subtitle="Daraja, OKX, and Binance configurations">
+          <Card title="Payment Gateway Integrations" subtitle="Safaricom M-Pesa & Paystack live configurations">
             <div className="space-y-3 mt-1 text-xs">
               <div className="flex justify-between py-2 border-b border-slate-800">
-                <span className="text-slate-400">Safaricom Daraja (M-Pesa)</span>
-                <span className="font-mono text-emerald-400 font-bold">
-                  Shortcode {settings.payments.mpesa.shortcode} ({settings.payments.mpesa.environment})
+                <div>
+                  <span className="text-slate-300 font-medium block">Safaricom Daraja (M-Pesa STK)</span>
+                  <span className="text-[10px] text-slate-500 font-mono">Shortcode: {settings.payments.mpesa.shortcode}</span>
+                </div>
+                <span className="font-mono text-emerald-400 font-bold flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  {settings.payments.mpesa.environment.toUpperCase()}
                 </span>
               </div>
               <div className="flex justify-between py-2 border-b border-slate-800">
                 <div>
-                  <span className="text-slate-400 block">PalPluss M-Pesa Infrastructure</span>
-                  <span className="text-[10px] text-slate-500 font-mono">api.palpluss.com/v1</span>
+                  <span className="text-slate-300 font-medium block">Paystack Multi-Currency Gateway</span>
+                  <span className="text-[10px] text-slate-500 font-mono">KES, NGN, GHS, ZAR, USD</span>
                 </div>
-                <span className={`font-mono text-xs font-bold ${settings.payments.palpluss?.has_api_key ? 'text-emerald-400' : 'text-slate-500'}`}>
-                  {settings.payments.palpluss?.has_api_key ? 'Connected (Live Key Active)' : 'Not Configured'}
-                </span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-slate-800">
-                <span className="text-slate-400">OKX Web3 Multi-Chain</span>
-                <span className="font-mono text-blue-400 font-semibold">
-                  TRC20, TON, Polygon (Active)
-                </span>
-              </div>
-              <div className="flex justify-between py-2">
-                <span className="text-slate-400">Binance Pay Merchant</span>
-                <span className="font-mono text-amber-400 font-semibold">
-                  {settings.payments.binance.has_api_key ? 'Merchant Configured' : 'Simulation Active'}
+                <span className={`font-mono text-xs font-bold ${settings.payments.paystack?.has_secret_key ? 'text-emerald-400' : 'text-slate-500'}`}>
+                  {settings.payments.paystack?.has_secret_key ? 'Active (API Live)' : 'Configured'}
                 </span>
               </div>
             </div>

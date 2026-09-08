@@ -52,7 +52,6 @@ export const DepositPage: React.FC = () => {
   const [pollStatus, setPollStatus] = useState<'prompted' | 'completed' | 'failed' | null>(null);
   const [receiptNumber, setReceiptNumber] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(45);
-  const [mpesaGateway, setMpesaGateway] = useState<'palpluss' | 'daraja'>('palpluss');
 
   // ==========================================
   // NIGERIA STATE (Paystack NGN)
@@ -136,27 +135,19 @@ export const DepositPage: React.FC = () => {
       return;
     }
     const numAmount = typeof mpesaAmountKes === 'number' ? mpesaAmountKes : 0;
-    if (!numAmount || numAmount < 9) {
-      setError('Minimum deposit amount is KES 9.00.');
+    if (!numAmount || numAmount < 1) {
+      setError('Minimum deposit amount is KES 1.00.');
       return;
     }
 
     setError(null);
     setSubmittingMpesa(true);
     try {
-      if (mpesaGateway === 'palpluss') {
-        const res = await paymentsService.initiatePalplussSTK({
-          phone_number: phoneNumber.trim(),
-          amount: numAmount,
-        });
-        setCheckoutId(res.transaction_id);
-      } else {
-        const res = await paymentsService.initiateMpesaSTK({
-          phone_number: phoneNumber.trim(),
-          amount: numAmount,
-        });
-        setCheckoutId(res.checkout_request_id);
-      }
+      const res = await paymentsService.initiateMpesaSTK({
+        phone_number: phoneNumber.trim(),
+        amount: numAmount,
+      });
+      setCheckoutId(res.checkout_request_id);
 
       setPollStatus('prompted');
       setCountdown(45);
@@ -173,9 +164,7 @@ export const DepositPage: React.FC = () => {
     if (checkoutId && pollStatus === 'prompted') {
       interval = setInterval(async () => {
         try {
-          const statusResp = mpesaGateway === 'palpluss'
-            ? await paymentsService.queryPalplussStatus(checkoutId)
-            : await paymentsService.queryMpesaStatus(checkoutId);
+          const statusResp = await paymentsService.queryMpesaStatus(checkoutId);
           if (statusResp.status === 'completed') {
             setPollStatus('completed');
             setReceiptNumber(statusResp.mpesa_receipt || 'Confirmed');
@@ -194,7 +183,7 @@ export const DepositPage: React.FC = () => {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [checkoutId, pollStatus, mpesaGateway]);
+  }, [checkoutId, pollStatus]);
 
   useEffect(() => {
     let timer: any = null;
@@ -446,12 +435,17 @@ export const DepositPage: React.FC = () => {
           onClick={() => { setActiveTab('ke'); setError(null); }}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-extrabold text-xs whitespace-nowrap transition-all border ${
             activeTab === 'ke'
-              ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/20 scale-[1.02]'
+              ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg shadow-emerald-500/25 scale-[1.02]'
               : 'bg-[#181c24] hover:bg-[#202530] text-slate-300 border-[#2b303c]'
           }`}
         >
           <span className="text-base">🇰🇪</span>
-          <span>Kenya (M-Pesa)</span>
+          <span>Kenya (Lipa Na M-Pesa)</span>
+          <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+            activeTab === 'ke' ? 'bg-slate-950/20 text-slate-950' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+          }`}>
+            Instant STK
+          </span>
         </button>
 
         <button
@@ -556,21 +550,20 @@ export const DepositPage: React.FC = () => {
               </div>
             ) : (
               <form onSubmit={handleInitiateMpesa} className="space-y-5">
-                <div className="p-3 bg-[#11141a] rounded-2xl border border-[#2b303c] space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-extrabold text-slate-300 uppercase tracking-wider">Gateway Route</span>
-                    <span className="text-[10px] text-emerald-400 font-mono font-bold">
-                      PalPluss Live API
-                    </span>
-                  </div>
-                  <div className="w-full">
-                    <div className="px-3.5 py-2.5 rounded-xl text-xs font-bold border bg-amber-500/15 text-amber-300 border-amber-500/40 flex items-center justify-between">
-                      <span className="flex items-center gap-2">⚡ PalPluss Live Lipa Na M-Pesa</span>
-                      <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono">
-                        Active
-                      </span>
+                <div className="p-3.5 bg-[#11141a] rounded-2xl border border-emerald-500/25 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center font-bold text-emerald-400">
+                      <Smartphone className="w-5 h-5 text-emerald-400" />
+                    </div>
+                    <div>
+                      <span className="font-bold text-white text-xs block">Lipa Na M-Pesa Online</span>
+                      <span className="text-[10px] text-slate-400">Direct Safaricom STK Push</span>
                     </div>
                   </div>
+                  <span className="inline-flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold font-mono">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Online
+                  </span>
                 </div>
 
                 <div>
@@ -593,8 +586,8 @@ export const DepositPage: React.FC = () => {
                   </label>
                   <input
                     type="number"
-                    min="9"
-                    placeholder="e.g. 9"
+                    min="1"
+                    placeholder="e.g. 100"
                     value={mpesaAmountKes}
                     onChange={(e) => setMpesaAmountKes(e.target.value ? Number(e.target.value) : '')}
                     className="w-full px-4 py-3 bg-[#11141a] border border-[#2b303c] rounded-2xl text-white text-sm font-bold focus:border-amber-400 focus:outline-none transition-colors"

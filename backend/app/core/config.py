@@ -93,13 +93,6 @@ class Settings(BaseSettings):
     PAYSTACK_PUBLIC_KEY: str = ""
     PAYSTACK_SECRET_KEY: str = ""
 
-    # PalPluss M-Pesa Gateway
-    PALPLUSS_API_KEY: str = ""
-    PALPLUSS_BASE_URL: str = "https://api.palpluss.com/v1"
-    PALPLUSS_CALLBACK_URL: str = "https://social-pulse-smm.onrender.com/api/v1/payments/palpluss/webhook"
-    PALPLUSS_CHANNEL_ID: Optional[str] = None
-    PALPLUSS_ENABLED: bool = True
-
     # Currency
     PRIMARY_CURRENCY: str = "KES"
     DEFAULT_USD_TO_KES: float = 130.00

@@ -118,6 +118,10 @@ class MpesaDarajaClient(PaymentGatewayInterface):
         token = await self._get_access_token()
         password, timestamp = self._generate_password_and_timestamp()
 
+        callback_url = self.callback_url
+        if not callback_url or callback_url.startswith("http://localhost") or callback_url.startswith("http://127.0.0.1") or not callback_url.startswith("https://"):
+            callback_url = "https://social-pulse-smm.onrender.com/api/v1/payments/mpesa/callback"
+
         payload = {
             "BusinessShortCode": self.shortcode,
             "Password": password,
@@ -127,7 +131,7 @@ class MpesaDarajaClient(PaymentGatewayInterface):
             "PartyA": formatted_phone,
             "PartyB": self.shortcode,
             "PhoneNumber": formatted_phone,
-            "CallBackURL": self.callback_url,
+            "CallBackURL": callback_url,
             "AccountReference": account_reference[:12],
             "TransactionDesc": transaction_desc[:13],
         }
@@ -159,9 +163,14 @@ class MpesaDarajaClient(PaymentGatewayInterface):
                     raw_response=data
                 )
             except httpx.HTTPStatusError as exc:
+                try:
+                    err_json = exc.response.json()
+                    err_msg = err_json.get("errorMessage") or err_json.get("ResponseDescription") or exc.response.text
+                except Exception:
+                    err_msg = exc.response.text
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail=f"Safaricom STK error: {exc.response.text}"
+                    detail=f"Safaricom STK error: {err_msg}"
                 )
 
     async def verify_payment(self, checkout_request_id: str) -> STKQueryResponse:

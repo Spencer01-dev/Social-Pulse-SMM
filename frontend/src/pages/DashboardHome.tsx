@@ -46,9 +46,9 @@ export const DashboardHome: React.FC = () => {
       icon: Globe2,
     },
     {
-      title: 'Supported Gateways',
-      value: 'Mpesa and Card',
-      change: 'Instant automated credit',
+      title: 'Payment Gateway',
+      value: 'Lipa Na M-Pesa',
+      change: 'Direct STK Push & Cards',
       icon: ShieldCheck,
     },
   ];
@@ -143,6 +143,37 @@ export const DashboardHome: React.FC = () => {
             </Card>
           );
         })}
+      </div>
+
+      {/* Lipa Na M-Pesa Quick Deposit Banner */}
+      <div className="rounded-2xl bg-gradient-to-r from-emerald-950/40 via-[#181a20] to-[#181a20] border border-emerald-500/30 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-emerald-950/20">
+        <div className="flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+            <span className="text-xl">🇰🇪</span>
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-extrabold text-white">Lipa Na M-Pesa Online (Direct STK Push)</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                Instant Credit
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Enter your Safaricom phone number, enter your M-Pesa PIN on your phone, and get credited automatically within seconds.
+            </p>
+          </div>
+        </div>
+
+        <Link to="/deposit" className="shrink-0">
+          <Button
+            variant="primary"
+            size="sm"
+            className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black border-none shadow-md shadow-emerald-500/20"
+          >
+            Deposit with M-Pesa
+            <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+          </Button>
+        </Link>
       </div>
 
       {/* Featured Growth Categories */}

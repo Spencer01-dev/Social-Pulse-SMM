@@ -136,15 +136,13 @@ export const AdminUsersPage: React.FC = () => {
     }
   };
 
-  const handleSyncPalpluss = async () => {
+  const handleRefreshUsers = async () => {
     setSyncing(true);
     try {
-      const res = await apiClient.post('/payments/palpluss/sync-uncredited');
-      const data = res.data;
-      setNotification(data?.message || `Sync completed. ${data?.credited_count || 0} transaction(s) credited.`);
       await fetchUsers();
+      setNotification('User list refreshed successfully.');
     } catch (err: any) {
-      setNotification(`Sync error: ${err.response?.data?.detail || err.message}`);
+      setNotification(`Refresh error: ${err.message}`);
     } finally {
       setSyncing(false);
     }
@@ -164,11 +162,11 @@ export const AdminUsersPage: React.FC = () => {
         <Button
           variant="outline"
           size="sm"
-          onClick={handleSyncPalpluss}
+          onClick={handleRefreshUsers}
           isLoading={syncing}
           leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
         >
-          Sync Gateway Deposits
+          Refresh Users
         </Button>
       </div>
 

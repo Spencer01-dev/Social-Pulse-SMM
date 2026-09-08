@@ -44,7 +44,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const customerNav = [
     { name: 'New Order', href: '/orders/new', icon: PlusCircle },
     { name: 'WhatsApp Numbers', href: '/orders/whatsapp', icon: Phone, badge: '🇺🇸 +1' },
-    { name: 'Add Funds', href: '/deposit', icon: CreditCard },
+    { name: 'Add Funds', href: '/deposit', icon: CreditCard, badge: 'M-Pesa' },
     { name: 'Orders', href: '/orders', icon: ListOrdered },
     { name: 'Services', href: '/services', icon: Layers },
     { name: 'Tickets', href: '/support', icon: LifeBuoy },
@@ -108,15 +108,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                     to={item.href}
                     onClick={() => onClose()}
                     className={({ isActive }) =>
-                      `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                      `flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                         isActive
                           ? 'bg-[#f59e0b] text-slate-950 shadow-lg shadow-amber-500/20'
                           : 'text-slate-300 hover:text-white hover:bg-[#222630]'
                       }`
                     }
                   >
-                    <Icon className="w-4 h-4" />
-                    <span>{item.name}</span>
+                    <div className="flex items-center gap-3">
+                      <Icon className="w-4 h-4" />
+                      <span>{item.name}</span>
+                    </div>
+                    {item.badge && (
+                      <span
+                        className={`px-1.5 py-0.5 text-[9px] font-black tracking-wide uppercase rounded ${
+                          item.badge === 'M-Pesa'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-[#2b303c] text-amber-300 border border-amber-500/30'
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
                   </NavLink>
                 );
               })}

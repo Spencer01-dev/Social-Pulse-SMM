@@ -78,19 +78,16 @@ export interface PlatformSettings {
       has_consumer_key: boolean;
       callback_url: string;
     };
-    palpluss?: {
-      name: string;
-      base_url: string;
-      has_api_key: boolean;
-      channel_id?: string;
-      callback_url: string;
-      enabled: boolean;
+    paystack?: {
+      has_public_key: boolean;
+      has_secret_key: boolean;
+      supported_currencies: string[];
     };
-    okx: {
+    okx?: {
       has_api_key: boolean;
       supported_chains: string[];
     };
-    binance: {
+    binance?: {
       has_api_key: boolean;
       base_url: string;
     };
