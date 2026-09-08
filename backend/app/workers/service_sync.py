@@ -117,19 +117,20 @@ async def sync_services_from_provider(
 
     created_count = 0
     updated_count = 0
+    disabled_count = 0
     active_provider_ids = set()
+
+    # Pre-fetch all existing services for this provider in a single query (prevents N+1 DB round-trips)
+    existing_query = await db.execute(
+        select(Service).where(Service.provider_id == provider_record.id)
+    )
+    existing_services_map = {
+        svc.provider_service_id: svc for svc in existing_query.scalars().all()
+    }
 
     for item in remote_services:
         active_provider_ids.add(item.service_id)
-
-        # Check if service already exists locally for this provider
-        query = await db.execute(
-            select(Service).where(
-                Service.provider_id == provider_record.id,
-                Service.provider_service_id == item.service_id
-            )
-        )
-        existing_service = query.scalars().first()
+        existing_service = existing_services_map.get(item.service_id)
         platform_detected = detect_platform(item.name, item.category)
 
         category_clean = item.category or f"{platform_detected.value.capitalize()} Services"
@@ -195,16 +196,9 @@ async def sync_services_from_provider(
             db.add(new_service)
             created_count += 1
 
-    # Auto-disable services that no longer exist on Delix Gains
-    disabled_count = 0
-    all_local = await db.execute(
-        select(Service).where(
-            Service.provider_id == provider_record.id,
-            Service.is_active == True
-        )
-    )
-    for svc in all_local.scalars().all():
-        if svc.provider_service_id not in active_provider_ids:
+    # Auto-disable services that no longer exist on provider
+    for svc in existing_services_map.values():
+        if svc.provider_service_id not in active_provider_ids and svc.is_active:
             svc.is_active = False
             db.add(svc)
             disabled_count += 1

@@ -33,6 +33,7 @@ export const servicesService = {
   syncFromProvider: async (providerSlug: string = 'delix', defaultMarkup: number = 80): Promise<{ message: string; total_fetched: number; created: number; updated: number }> => {
     const response = await apiClient.post('/admin/services/sync', null, {
       params: { provider_slug: providerSlug, default_markup: defaultMarkup },
+      timeout: 120000,
     });
     return response.data;
   },
