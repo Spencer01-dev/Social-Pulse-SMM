@@ -111,6 +111,8 @@ export interface CustomerService {
 
 export interface AdminService extends CustomerService {
   provider_id?: string;
+  provider_name?: string;
+  provider_slug?: string;
   provider_service_id: string;
   provider_rate: number;
   selling_rate: number;

@@ -25,7 +25,7 @@ export const servicesService = {
   },
 
   // Admin methods
-  getAdminServices: async (params?: ServiceFilterParams & { is_active?: boolean }): Promise<AdminService[]> => {
+  getAdminServices: async (params?: ServiceFilterParams & { is_active?: boolean; provider_slug?: string }): Promise<AdminService[]> => {
     const response = await apiClient.get<AdminService[]>('/admin/services', { params });
     return response.data;
   },

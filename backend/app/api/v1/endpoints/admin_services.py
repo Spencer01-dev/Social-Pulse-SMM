@@ -3,6 +3,7 @@ from decimal import Decimal
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import desc, select
+from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_roles
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/admin/services", tags=["Admin Services Management"])
 @router.get("", response_model=List[AdminServiceResponse])
 async def list_admin_services(
     platform: Optional[Platform] = None,
+    provider_slug: Optional[str] = None,
     is_active: Optional[bool] = None,
     search: Optional[str] = None,
     skip: int = Query(0, ge=0),
@@ -35,8 +37,10 @@ async def list_admin_services(
     """
     List all services with provider rate, selling rate, and calculated profit margins.
     """
-    query = select(Service).order_by(Service.platform, Service.sort_order).offset(skip).limit(limit)
+    query = select(Service).options(joinedload(Service.provider)).order_by(Service.platform, Service.sort_order).offset(skip).limit(limit)
 
+    if provider_slug:
+        query = query.join(Service.provider).where(Provider.slug == provider_slug)
     if platform:
         query = query.where(Service.platform == platform)
     if is_active is not None:
@@ -56,6 +60,8 @@ async def list_admin_services(
         AdminServiceResponse(
             id=s.id,
             provider_id=s.provider_id,
+            provider_name=s.provider.name if s.provider else None,
+            provider_slug=s.provider.slug if s.provider else None,
             provider_service_id=s.provider_service_id,
             platform=s.platform,
             name=s.name,
@@ -120,7 +126,7 @@ async def update_service(
     """
     Update service details, selling price, active status, or markup rule.
     """
-    result = await db.execute(select(Service).where(Service.id == service_id))
+    result = await db.execute(select(Service).options(joinedload(Service.provider)).where(Service.id == service_id))
     service = result.scalars().first()
     if not service:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service not found")
@@ -163,6 +169,8 @@ async def update_service(
     return AdminServiceResponse(
         id=service.id,
         provider_id=service.provider_id,
+        provider_name=service.provider.name if service.provider else None,
+        provider_slug=service.provider.slug if service.provider else None,
         provider_service_id=service.provider_service_id,
         platform=service.platform,
         name=service.name,

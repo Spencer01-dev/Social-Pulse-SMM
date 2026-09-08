@@ -39,7 +39,7 @@ export const AdminServicesPage: React.FC = () => {
     setLoadingBalance(true);
     try {
       const [servicesData, balanceData] = await Promise.all([
-        servicesService.getAdminServices({ search: search || undefined }),
+        servicesService.getAdminServices({ search: search || undefined, provider_slug: syncProvider }),
         servicesService.getProviderBalance(syncProvider).catch(() => null),
       ]);
       setServices(servicesData);
@@ -261,6 +261,7 @@ export const AdminServicesPage: React.FC = () => {
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-950/60 text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-800">
               <tr>
+                <th className="py-3 px-4">Provider</th>
                 <th className="py-3 px-4">Provider ID</th>
                 <th className="py-3 px-4">Platform</th>
                 <th className="py-3 px-4">Service Name</th>
@@ -274,20 +275,36 @@ export const AdminServicesPage: React.FC = () => {
             <tbody className="divide-y divide-slate-800/60">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-xs text-slate-400">
+                  <td colSpan={9} className="py-8 text-center text-xs text-slate-400">
                     Loading services catalog...
                   </td>
                 </tr>
               ) : services.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-xs text-slate-400">
+                  <td colSpan={9} className="py-8 text-center text-xs text-slate-400">
                     No services found matching query.
                   </td>
                 </tr>
               ) : (
                 services.map((service) => (
                 <tr key={service.id} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="py-3.5 px-4 font-mono text-slate-400">{service.provider_service_id}</td>
+                  <td className="py-3.5 px-4">
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                        service.provider_slug === 'smm_africa'
+                          ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+                          : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          service.provider_slug === 'smm_africa' ? 'bg-cyan-400' : 'bg-amber-400'
+                        }`}
+                      />
+                      {service.provider_name || (service.provider_slug === 'smm_africa' ? 'SMM Africa' : 'Delix Gains')}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4 font-mono text-slate-400">#{service.provider_service_id}</td>
                   <td className="py-3.5 px-4">
                     <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase bg-slate-800 text-slate-300">
                       {service.platform}

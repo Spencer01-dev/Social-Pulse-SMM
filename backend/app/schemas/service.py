@@ -43,6 +43,8 @@ class PlatformSummary(BaseModel):
 class AdminServiceResponse(BaseModel):
     id: uuid.UUID
     provider_id: Optional[uuid.UUID] = None
+    provider_name: Optional[str] = None
+    provider_slug: Optional[str] = None
     provider_service_id: str
     platform: Platform
     name: str
