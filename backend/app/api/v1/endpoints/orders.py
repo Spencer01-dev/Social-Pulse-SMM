@@ -144,6 +144,7 @@ async def create_order(
         charge=order.charge,
         currency=order.currency,
         status=order.status,
+        refill_available=service.refill_available,
         created_at=order.created_at,
         updated_at=order.updated_at
     )
@@ -204,6 +205,7 @@ async def list_my_orders(
             charge=o.charge,
             currency=o.currency,
             status=o.status,
+            refill_available=o.service.refill_available if o.service else False,
             created_at=o.created_at,
             updated_at=o.updated_at
         )
@@ -231,6 +233,7 @@ async def get_order_details(
 
     return CustomerOrderResponse(
         id=order.id,
+        order_number=order.order_number,
         service_id=order.service_id,
         service_name=order.service.name if order.service else "SMM Service",
         platform=order.service.platform if order.service else "instagram",
@@ -241,6 +244,72 @@ async def get_order_details(
         charge=order.charge,
         currency=order.currency,
         status=order.status,
+        refill_available=order.service.refill_available if order.service else False,
         created_at=order.created_at,
         updated_at=order.updated_at
     )
+
+
+@router.post("/{order_id}/refill")
+async def request_order_refill(
+    order_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """
+    Request an automated refill for an order.
+    Contacts upstream provider (Delix Gains KE) via action=refill API.
+    """
+    result = await db.execute(
+        select(Order)
+        .options(
+            selectinload(Order.service),
+            selectinload(Order.provider)
+        )
+        .where(Order.id == order_id, Order.user_id == current_user.id)
+    )
+    order = result.scalars().first()
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    if not order.service or not order.service.refill_available:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Refill is not available for this service. This service does not include a refill guarantee."
+        )
+
+    if not order.provider_order_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This order has not been dispatched to an upstream provider yet."
+        )
+
+    if order.status not in [OrderStatus.COMPLETED, OrderStatus.PARTIAL, OrderStatus.IN_PROGRESS]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Refill can only be requested for active or completed orders (current status: {order.status.value})."
+        )
+
+    provider_slug = order.provider.slug if order.provider else "delix"
+    provider_client = get_provider(slug=provider_slug)
+
+    try:
+        refill_resp = await provider_client.refill_order(str(order.provider_order_id))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Provider connection error: {str(exc)}"
+        )
+
+    if not refill_resp.success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Provider Notice: {refill_resp.error or 'Refill not eligible yet. Please allow 24h between refills.'}"
+        )
+
+    return {
+        "success": True,
+        "refill_id": refill_resp.refill_id,
+        "order_id": str(order.id),
+        "message": f"Refill requested successfully from upstream provider! Refill ID: #{refill_resp.refill_id}"
+    }

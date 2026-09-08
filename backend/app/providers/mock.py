@@ -8,6 +8,7 @@ from app.providers.base import (
     ProviderInterface,
     ProviderOrderResponse,
     ProviderOrderStatus,
+    ProviderRefillResponse,
     ProviderServiceItem,
 )
 
@@ -194,4 +195,12 @@ class MockProvider(ProviderInterface):
             remains=0 if status_chosen == "Completed" else random.randint(10, 500),
             currency="KES",
             raw_response={"order": provider_order_id, "status": status_chosen}
+        )
+
+    async def refill_order(self, provider_order_id: str) -> ProviderRefillResponse:
+        simulated_refill_id = f"MOCK-REFILL-{random.randint(10000, 99999)}"
+        return ProviderRefillResponse(
+            success=True,
+            refill_id=simulated_refill_id,
+            raw_response={"refill": simulated_refill_id, "mock": True}
         )

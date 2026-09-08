@@ -80,6 +80,7 @@ async def list_admin_orders(
             profit=o.profit,
             currency=o.currency,
             status=o.status,
+            refill_available=o.service.refill_available if o.service else False,
             error_message=o.error_message,
             created_at=o.created_at,
             updated_at=o.updated_at
@@ -168,6 +169,7 @@ async def override_order_status(
         profit=order.profit,
         currency=order.currency,
         status=order.status,
+        refill_available=order.service.refill_available if order.service else False,
         error_message=order.error_message,
         created_at=order.created_at,
         updated_at=order.updated_at
@@ -235,6 +237,7 @@ async def retry_order_dispatch(
         profit=order.profit,
         currency=order.currency,
         status=order.status,
+        refill_available=order.service.refill_available if order.service else False,
         error_message=order.error_message,
         created_at=order.created_at,
         updated_at=order.updated_at
@@ -254,4 +257,57 @@ async def trigger_active_orders_sync(
         "message": f"Order synchronization finished. Checked {checked} active orders, updated {updated}.",
         "checked": checked,
         "updated": updated
+    }
+
+
+@router.post("/{order_id}/refill")
+async def admin_refill_order(
+    order_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
+) -> Any:
+    """
+    Admin triggers an automated refill request on the upstream provider (Delix Gains KE) for any order.
+    """
+    result = await db.execute(
+        select(Order)
+        .options(
+            selectinload(Order.service),
+            selectinload(Order.provider)
+        )
+        .where(Order.id == order_id)
+    )
+    order = result.scalars().first()
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    if not order.provider_order_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Order has not been dispatched to an upstream provider or has no provider order ID."
+        )
+
+    provider_slug = order.provider.slug if order.provider else "delix"
+    from app.providers.manager import get_provider
+    provider_client = get_provider(slug=provider_slug)
+
+    try:
+        refill_resp = await provider_client.refill_order(str(order.provider_order_id))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Provider connection error: {str(exc)}"
+        )
+
+    if not refill_resp.success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Provider Notice: {refill_resp.error or 'Refill not eligible yet.'}"
+        )
+
+    return {
+        "success": True,
+        "refill_id": refill_resp.refill_id,
+        "order_id": str(order.id),
+        "message": f"Refill requested on {provider_slug.upper()}! Provider Refill ID: #{refill_resp.refill_id}"
     }

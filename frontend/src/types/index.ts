@@ -143,6 +143,7 @@ export interface CustomerOrder {
   charge: number;
   currency: string;
   status: OrderStatus;
+  refill_available?: boolean;
   created_at: string;
   updated_at: string;
 }

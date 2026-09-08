@@ -49,4 +49,18 @@ export const ordersService = {
     const response = await apiClient.post<AdminOrder>(`/admin/orders/${orderId}/retry`);
     return response.data;
   },
+
+  requestRefill: async (orderId: string): Promise<{ success: boolean; refill_id: string; message: string }> => {
+    const response = await apiClient.post<{ success: boolean; refill_id: string; message: string }>(
+      `/orders/${orderId}/refill`
+    );
+    return response.data;
+  },
+
+  adminRefillOrder: async (orderId: string): Promise<{ success: boolean; refill_id: string; message: string }> => {
+    const response = await apiClient.post<{ success: boolean; refill_id: string; message: string }>(
+      `/admin/orders/${orderId}/refill`
+    );
+    return response.data;
+  },
 };

@@ -8,6 +8,7 @@ from app.providers.base import (
     ProviderInterface,
     ProviderOrderResponse,
     ProviderOrderStatus,
+    ProviderRefillResponse,
     ProviderServiceItem,
 )
 
@@ -174,3 +175,26 @@ class GenericSMMProvider(ProviderInterface):
                         currency=str(details.get("currency", "USD")),
                     )
         return result
+
+    async def refill_order(self, provider_order_id: str) -> ProviderRefillResponse:
+        """Submit a refill request for an order on the provider."""
+        data = await self._post_request({"action": "refill", "order": provider_order_id})
+        if isinstance(data, dict):
+            if "refill" in data and data["refill"]:
+                return ProviderRefillResponse(
+                    success=True,
+                    refill_id=str(data["refill"]),
+                    raw_response=data
+                )
+            elif "error" in data:
+                return ProviderRefillResponse(
+                    success=False,
+                    error=str(data["error"]),
+                    raw_response=data
+                )
+
+        return ProviderRefillResponse(
+            success=False,
+            error=f"Unexpected response from {self.name}: {data}",
+            raw_response=data if isinstance(data, dict) else None
+        )

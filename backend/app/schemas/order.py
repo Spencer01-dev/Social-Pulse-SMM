@@ -28,6 +28,7 @@ class CustomerOrderResponse(BaseModel):
     charge: Decimal
     currency: str
     status: OrderStatus
+    refill_available: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -55,6 +56,7 @@ class AdminOrderResponse(BaseModel):
     profit: Decimal
     currency: str
     status: OrderStatus
+    refill_available: bool = False
     error_message: Optional[str] = None
     created_at: datetime
     updated_at: datetime

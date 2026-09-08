@@ -9,6 +9,7 @@ from app.providers.base import (
     ProviderInterface,
     ProviderOrderResponse,
     ProviderOrderStatus,
+    ProviderRefillResponse,
     ProviderServiceItem,
 )
 
@@ -175,4 +176,35 @@ class DelixGainsProvider(ProviderInterface):
             remains=remains_val,
             currency=currency_val,
             raw_response=data
+        )
+
+    async def refill_order(self, provider_order_id: str) -> ProviderRefillResponse:
+        """
+        Request automated refill on Delix Gains KE for a previously completed order.
+        action=refill&order={provider_order_id}
+        """
+        data = await self._post_request({
+            "action": "refill",
+            "order": provider_order_id
+        })
+
+        # SMM API v2 success response format: {"refill": "123456"} or {"refill": 123456}
+        if isinstance(data, dict):
+            if "refill" in data and data["refill"]:
+                return ProviderRefillResponse(
+                    success=True,
+                    refill_id=str(data["refill"]),
+                    raw_response=data
+                )
+            elif "error" in data:
+                return ProviderRefillResponse(
+                    success=False,
+                    error=str(data["error"]),
+                    raw_response=data
+                )
+
+        return ProviderRefillResponse(
+            success=False,
+            error=f"Unexpected response from Delix Gains: {data}",
+            raw_response=data if isinstance(data, dict) else None
         )

@@ -11,7 +11,8 @@ import {
   DollarSign,
   PackageCheck,
   Clock,
-  Copy
+  Copy,
+  RotateCcw
 } from 'lucide-react';
 import { ordersService } from '../../services/orders';
 import { analyticsService, DailyRevenue } from '../../services/analytics';
@@ -156,6 +157,33 @@ export const AdminOrdersPage: React.FC = () => {
       alert(`Dispatch failed: ${err.response?.data?.detail || err.message}`);
     } finally {
       setSavingOverride(false);
+    }
+  };
+
+  const [refillingAdminOrderId, setRefillingAdminOrderId] = useState<string | null>(null);
+
+  const handleAdminRefill = async (orderToRefill?: AdminOrder) => {
+    const target = orderToRefill || overrideOrder;
+    if (!target) return;
+    if (!target.provider_order_id) {
+      alert('This order has not been dispatched upstream or has no Provider Order ID.');
+      return;
+    }
+    const confirmed = window.confirm(
+      `Dispatch automated refill request to provider for Order #${target.order_number || target.id.substring(0, 8)} (Provider Order ID #${target.provider_order_id})?`
+    );
+    if (!confirmed) return;
+
+    setRefillingAdminOrderId(target.id);
+    try {
+      const res = await ordersService.adminRefillOrder(target.id);
+      alert(res.message || `Refill successfully triggered! Refill ID: #${res.refill_id}`);
+      if (overrideOrder) setOverrideOrder(null);
+      await fetchAdminOrders();
+    } catch (err: any) {
+      alert(`Refill request failed: ${err.response?.data?.detail || err.message}`);
+    } finally {
+      setRefillingAdminOrderId(null);
     }
   };
 
@@ -394,13 +422,25 @@ export const AdminOrdersPage: React.FC = () => {
                     </span>
                   </td>
                   <td className="py-3.5 px-4 text-right">
-                    <button
-                      onClick={() => handleOpenOverride(order)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                      title="Override Status"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center justify-end gap-1">
+                      {order.refill_available && order.provider_order_id && (
+                        <button
+                          onClick={() => handleAdminRefill(order)}
+                          disabled={refillingAdminOrderId === order.id}
+                          className="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/20 transition-colors"
+                          title="Trigger Upstream Refill"
+                        >
+                          <RotateCcw className={`w-3.5 h-3.5 ${refillingAdminOrderId === order.id ? 'animate-spin' : ''}`} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleOpenOverride(order)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                        title="Override Status"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -441,11 +481,11 @@ export const AdminOrdersPage: React.FC = () => {
             )}
 
             {/* Quick Action Buttons */}
-            <div className="grid grid-cols-2 gap-3 p-3 bg-slate-900/60 rounded-2xl border border-slate-800/80">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3 bg-slate-900/60 rounded-2xl border border-slate-800/80">
               <button
                 type="button"
                 onClick={handleRetryDispatch}
-                disabled={savingOverride}
+                disabled={savingOverride || refillingAdminOrderId === overrideOrder.id}
                 className="px-3 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${savingOverride ? 'animate-spin' : ''}`} />
@@ -454,11 +494,21 @@ export const AdminOrdersPage: React.FC = () => {
 
               <button
                 type="button"
+                onClick={() => handleAdminRefill()}
+                disabled={savingOverride || refillingAdminOrderId === overrideOrder.id}
+                className="px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+              >
+                <RotateCcw className={`w-3.5 h-3.5 ${refillingAdminOrderId === overrideOrder.id ? 'animate-spin' : ''}`} />
+                <span>Request Refill</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={handleCancelAndRefund}
-                disabled={savingOverride}
+                disabled={savingOverride || refillingAdminOrderId === overrideOrder.id}
                 className="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
               >
-                <span>Cancel & 100% Refund</span>
+                <span>Cancel & Refund</span>
               </button>
             </div>
 

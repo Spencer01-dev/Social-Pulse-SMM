@@ -67,6 +67,38 @@ export const OrderListPage: React.FC = () => {
   // Multi-selection state
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
 
+  // Refill action state
+  const [refillingOrderId, setRefillingOrderId] = useState<string | null>(null);
+  const [refillFeedback, setRefillFeedback] = useState<{ id: string; success: boolean; message: string } | null>(null);
+
+  const handleRefillClick = async (order: CustomerOrder) => {
+    if (refillingOrderId) return;
+    const confirmRefill = window.confirm(
+      `Request an automated refill for Order #${order.order_number || order.id.substring(0, 8)}?`
+    );
+    if (!confirmRefill) return;
+
+    setRefillingOrderId(order.id);
+    setRefillFeedback(null);
+    try {
+      const res = await ordersService.requestRefill(order.id);
+      setRefillFeedback({
+        id: order.id,
+        success: true,
+        message: res.message || `Refill requested successfully! Refill ID #${res.refill_id}`,
+      });
+    } catch (err: any) {
+      const detail = err.response?.data?.detail || err.message || 'Failed to request refill from provider.';
+      setRefillFeedback({
+        id: order.id,
+        success: false,
+        message: detail,
+      });
+    } finally {
+      setRefillingOrderId(null);
+    }
+  };
+
   const updateTableSetting = (key: keyof TableVisualSettings, value: boolean) => {
     const updated = { ...tableSettings, [key]: value };
     setTableSettings(updated);
@@ -427,6 +459,28 @@ export const OrderListPage: React.FC = () => {
         </button>
       </div>
 
+      {/* Refill Feedback Alert */}
+      {refillFeedback && (
+        <div
+          className={`p-3.5 rounded-2xl border text-xs flex items-center justify-between gap-3 shadow-lg ${
+            refillFeedback.success
+              ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+              : 'bg-rose-950/40 border-rose-500/40 text-rose-300'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            <RotateCcw className={`w-4 h-4 shrink-0 ${refillFeedback.success ? 'text-emerald-400' : 'text-rose-400'}`} />
+            <span className="font-semibold">{refillFeedback.message}</span>
+          </div>
+          <button
+            onClick={() => setRefillFeedback(null)}
+            className="text-slate-400 hover:text-white text-xs px-2 py-1 rounded-lg bg-black/40 hover:bg-black/60 transition-colors"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Orders Table */}
       <Card title="Orders List" subtitle={`Displaying ${orders.length} order entries`}>
         {loading ? (
@@ -571,13 +625,24 @@ export const OrderListPage: React.FC = () => {
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {tableSettings.refillButton && (
-                            <Link
-                              to="/support"
-                              title="Request Refill"
-                              className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
-                            >
-                              <RotateCcw className="w-3.5 h-3.5" />
-                            </Link>
+                            order.refill_available ? (
+                              <button
+                                type="button"
+                                onClick={() => handleRefillClick(order)}
+                                disabled={refillingOrderId === order.id}
+                                title="1-Click Automated Refill"
+                                className="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30 transition-colors disabled:opacity-50"
+                              >
+                                <RotateCcw className={`w-3.5 h-3.5 ${refillingOrderId === order.id ? 'animate-spin' : ''}`} />
+                              </button>
+                            ) : (
+                              <span
+                                title="No Refill Guarantee for this service"
+                                className="p-1.5 rounded-lg text-slate-600 cursor-not-allowed inline-flex items-center"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5 opacity-25" />
+                              </span>
+                            )
                           )}
                           {tableSettings.cancelButton && (
                             <Link

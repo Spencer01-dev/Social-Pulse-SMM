@@ -43,6 +43,14 @@ class ProviderOrderStatus:
     raw_response: Optional[Dict[str, Any]] = None
 
 
+@dataclass
+class ProviderRefillResponse:
+    success: bool
+    refill_id: Optional[str] = None
+    error: Optional[str] = None
+    raw_response: Optional[Dict[str, Any]] = None
+
+
 class ProviderInterface(ABC):
     """
     Abstract interface for SMM Service Providers (Delix Gains, Mock, etc.)
@@ -73,4 +81,9 @@ class ProviderInterface(ABC):
     @abstractmethod
     async def get_order_status(self, provider_order_id: str) -> ProviderOrderStatus:
         """Check the status of an existing order on the provider."""
+        pass
+
+    @abstractmethod
+    async def refill_order(self, provider_order_id: str) -> ProviderRefillResponse:
+        """Submit a refill request for an order on the provider."""
         pass

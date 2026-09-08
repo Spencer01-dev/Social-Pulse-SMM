@@ -252,4 +252,44 @@ async def handle_reseller_action(
         else:
             return {"error": "Parameter 'order' or 'orders' is required"}
 
+    # 5. ACTION: REFILL (For Child Panels & API clients)
+    elif action == "refill":
+        if not order:
+            return {"error": "Parameter 'order' is required"}
+
+        try:
+            order_uuid = uuid.UUID(order)
+        except ValueError:
+            return {"error": "Incorrect order ID format"}
+
+        res = await db.execute(
+            select(Order)
+            .options(
+                selectinload(Order.service),
+                selectinload(Order.provider)
+            )
+            .where(Order.id == order_uuid, Order.user_id == user.id)
+        )
+        ord_item = res.scalars().first()
+        if not ord_item:
+            return {"error": "Order not found"}
+
+        if not ord_item.service or not ord_item.service.refill_available:
+            return {"error": "Refill not available for this service"}
+
+        if not ord_item.provider_order_id:
+            return {"error": "Order not yet processed by upstream provider"}
+
+        provider_slug = ord_item.provider.slug if ord_item.provider else "delix"
+        provider_client = get_provider(slug=provider_slug)
+
+        try:
+            refill_resp = await provider_client.refill_order(str(ord_item.provider_order_id))
+            if refill_resp.success and refill_resp.refill_id:
+                return {"refill": str(refill_resp.refill_id)}
+            else:
+                return {"error": refill_resp.error or "The order is not eligible for refill yet"}
+        except Exception as exc:
+            return {"error": f"Upstream provider error: {str(exc)}"}
+
     return {"error": f"Unsupported action: '{action}'"}
