@@ -37,7 +37,7 @@ async def list_admin_services(
     """
     List all services with provider rate, selling rate, and calculated profit margins.
     """
-    query = select(Service).options(joinedload(Service.provider)).order_by(Service.platform, Service.sort_order).offset(skip).limit(limit)
+    query = select(Service).options(joinedload(Service.provider), joinedload(Service.fallback_provider)).order_by(Service.platform, Service.sort_order).offset(skip).limit(limit)
 
     if provider_slug:
         query = query.join(Service.provider).where(Provider.slug == provider_slug)
@@ -79,6 +79,9 @@ async def list_admin_services(
             cancel_available=s.cancel_available,
             is_active=s.is_active,
             sort_order=s.sort_order,
+            fallback_provider_id=s.fallback_provider_id,
+            fallback_service_id=s.fallback_service_id,
+            fallback_provider_name=s.fallback_provider.name if s.fallback_provider else None,
             created_at=s.created_at,
             updated_at=s.updated_at
         )
@@ -126,7 +129,7 @@ async def update_service(
     """
     Update service details, selling price, active status, or markup rule.
     """
-    result = await db.execute(select(Service).options(joinedload(Service.provider)).where(Service.id == service_id))
+    result = await db.execute(select(Service).options(joinedload(Service.provider), joinedload(Service.fallback_provider)).where(Service.id == service_id))
     service = result.scalars().first()
     if not service:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Service not found")
@@ -162,6 +165,12 @@ async def update_service(
             markup_value=service.markup_value
         )
 
+    # Handle fallback provider mapping
+    if service_in.fallback_provider_id is not None:
+        service.fallback_provider_id = service_in.fallback_provider_id
+    if service_in.fallback_service_id is not None:
+        service.fallback_service_id = service_in.fallback_service_id
+
     db.add(service)
     await db.commit()
     await db.refresh(service)
@@ -188,6 +197,9 @@ async def update_service(
         cancel_available=service.cancel_available,
         is_active=service.is_active,
         sort_order=service.sort_order,
+        fallback_provider_id=service.fallback_provider_id,
+        fallback_service_id=service.fallback_service_id,
+        fallback_provider_name=service.fallback_provider.name if service.fallback_provider else None,
         created_at=service.created_at,
         updated_at=service.updated_at
     )

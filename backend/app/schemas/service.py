@@ -62,6 +62,10 @@ class AdminServiceResponse(BaseModel):
     cancel_available: bool
     is_active: bool
     sort_order: int
+    # Cross-provider failover
+    fallback_provider_id: Optional[uuid.UUID] = None
+    fallback_service_id: Optional[str] = None
+    fallback_provider_name: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -80,6 +84,9 @@ class ServiceUpdate(BaseModel):
     is_active: Optional[bool] = None
     platform: Optional[Platform] = None
     category: Optional[str] = None
+    # Cross-provider failover mapping
+    fallback_provider_id: Optional[uuid.UUID] = None
+    fallback_service_id: Optional[str] = None
 
 
 class BulkMarkupRequest(BaseModel):

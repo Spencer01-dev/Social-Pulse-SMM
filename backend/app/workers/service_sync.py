@@ -18,18 +18,18 @@ def detect_platform(name: str, category: str) -> Platform:
     """
     text = f"{name} {category}".lower()
     
-    if "instagram" in text or "ig " in text:
-        return Platform.INSTAGRAM
-    elif "facebook" in text or "fb " in text:
-        return Platform.FACEBOOK
-    elif "youtube" in text or "yt " in text:
-        return Platform.YOUTUBE
-    elif "tiktok" in text:
+    if "tiktok" in text or "tik tok" in text:
         return Platform.TIKTOK
+    elif "instagram" in text or "ig " in text or "ig:" in text or "reels" in text:
+        return Platform.INSTAGRAM
+    elif "facebook" in text or "fb " in text or "fb:" in text:
+        return Platform.FACEBOOK
+    elif "youtube" in text or "yt " in text or "yt:" in text:
+        return Platform.YOUTUBE
+    elif "telegram" in text or "tg " in text:
+        return Platform.TELEGRAM
     elif "twitter" in text or " x " in text or "tweet" in text:
         return Platform.TWITTER
-    elif "telegram" in text:
-        return Platform.TELEGRAM
     elif "spotify" in text:
         return Platform.SPOTIFY
     elif "discord" in text:
@@ -129,6 +129,10 @@ async def sync_services_from_provider(
     }
 
     for item in remote_services:
+        # Strictly exclude provider-internal / VIP packages so Delix Gains never leaks
+        if "delix" in item.name.lower() or (item.category and "delix" in item.category.lower()):
+            continue
+
         active_provider_ids.add(item.service_id)
         existing_service = existing_services_map.get(item.service_id)
         platform_detected = detect_platform(item.name, item.category)
@@ -145,7 +149,8 @@ async def sync_services_from_provider(
             effective_rate = round(item.rate * Decimal(str(settings.DEFAULT_USD_TO_KES)), 2)
 
         if existing_service:
-            # Update provider rates and limits, keep customized selling prices if set to manual
+            # Update provider rates, limits, and platform
+            existing_service.platform = platform_detected
             existing_service.name = item.name
             existing_service.category = category_clean
             existing_service.service_type = item.type

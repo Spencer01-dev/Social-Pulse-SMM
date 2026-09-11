@@ -19,6 +19,13 @@ export const servicesService = {
     return response.data;
   },
 
+  getCategories: async (platform?: PlatformType | 'all' | string): Promise<string[]> => {
+    const response = await apiClient.get<string[]>('/services/categories', {
+      params: platform && platform !== 'all' ? { platform } : undefined,
+    });
+    return response.data;
+  },
+
   getServiceById: async (serviceId: string): Promise<CustomerService> => {
     const response = await apiClient.get<CustomerService>(`/services/${serviceId}`);
     return response.data;

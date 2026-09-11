@@ -17,7 +17,7 @@ class Provider(TimeStampedUUIDModel):
     description = Column(Text, nullable=True)
 
     # Relationships
-    services = relationship("Service", back_populates="provider", cascade="all, delete-orphan")
+    services = relationship("Service", back_populates="provider", cascade="all, delete-orphan", foreign_keys="[Service.provider_id]")
 
     def __repr__(self):
         return f"<Provider {self.name} ({self.slug})>"

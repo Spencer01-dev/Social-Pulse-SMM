@@ -76,8 +76,13 @@ class Service(TimeStampedUUIDModel):
     is_active = Column(Boolean, default=True, nullable=False, index=True)
     sort_order = Column(Integer, default=0, nullable=False)
 
+    # Cross-provider failover: if primary provider fails, route to this alternate
+    fallback_provider_id = Column(UUID(as_uuid=True), ForeignKey("providers.id", ondelete="SET NULL"), nullable=True)
+    fallback_service_id = Column(String(100), nullable=True)  # Provider-specific service ID on the fallback provider
+
     # Relationships
-    provider = relationship("Provider", back_populates="services")
+    provider = relationship("Provider", back_populates="services", foreign_keys=[provider_id])
+    fallback_provider = relationship("Provider", foreign_keys=[fallback_provider_id])
 
     def __repr__(self):
         return f"<Service {self.name} - {self.platform.value} (KES {self.selling_rate}/1k)>"
