@@ -82,9 +82,25 @@ async def lifespan(app: FastAPI):
                 await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_orders_order_number ON orders (order_number);"))
                 print("[+] order_number index verified.")
 
-                # Step 4: Clear out legacy demo funds on production, leaving real deposited money (10 KES)
-                await conn.execute(text("UPDATE users SET balance = 10.00 WHERE email = 'muneneoscar599@gmail.com' AND balance > 10.00;"))
-                print("[+] Legacy demo balance cleared; real deposit set to 10.00 KES.")
+                # Step 4: Ensure fallback columns exist on services table
+                await conn.execute(text("""
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM information_schema.columns 
+                            WHERE table_name='services' AND column_name='fallback_provider_id'
+                        ) THEN
+                            ALTER TABLE services ADD COLUMN fallback_provider_id UUID REFERENCES providers(id) ON DELETE SET NULL;
+                        END IF;
+                        IF NOT EXISTS (
+                            SELECT 1 FROM information_schema.columns 
+                            WHERE table_name='services' AND column_name='fallback_service_id'
+                        ) THEN
+                            ALTER TABLE services ADD COLUMN fallback_service_id VARCHAR(100);
+                        END IF;
+                    END $$;
+                """))
+                print("[+] fallback provider columns on services verified.")
 
                 # Step 5 & 6: One-time execution lock to purge demo orders and zero subscriber demo cash ONCE
                 await conn.execute(text("""

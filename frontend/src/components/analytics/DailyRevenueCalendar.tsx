@@ -22,6 +22,7 @@ import { Button } from '../common/Button';
 interface DailyRevenueCalendarProps {
   dailyData: DailyRevenue[];
   onRefresh?: () => void;
+  onDateSelect?: (dateStr: string) => void;
   className?: string;
   collapsible?: boolean;
   defaultExpanded?: boolean;
@@ -147,6 +148,7 @@ const NotchedDropdown: React.FC<NotchedDropdownProps> = ({
 export const DailyRevenueCalendar: React.FC<DailyRevenueCalendarProps> = ({
   dailyData,
   onRefresh,
+  onDateSelect,
   className = '',
   title = 'Daily Revenue & Performance',
 }) => {
@@ -234,6 +236,15 @@ export const DailyRevenueCalendar: React.FC<DailyRevenueCalendarProps> = ({
       return formattedDisplayDate;
     }
   }, [currentYear, currentMonth, validDayNumber, formattedDisplayDate]);
+
+  // Notify parent whenever the effective date changes
+  React.useEffect(() => {
+    if (onDateSelect) {
+      const mStr = String(currentMonth + 1).padStart(2, '0');
+      const dStr = String(validDayNumber).padStart(2, '0');
+      onDateSelect(`${currentYear}-${mStr}-${dStr}`);
+    }
+  }, [currentYear, currentMonth, validDayNumber]);
 
   // Reset to today
   const handleGoToday = () => {

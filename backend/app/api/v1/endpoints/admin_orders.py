@@ -1,4 +1,5 @@
 import uuid
+from datetime import date as date_type
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import cast, desc, func, select, String
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/admin/orders", tags=["Admin Orders Monitoring"])
 async def list_admin_orders(
     status: Optional[OrderStatus] = None,
     search: Optional[str] = None,
+    date: Optional[str] = Query(None, description="Filter by date (YYYY-MM-DD)"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
@@ -27,6 +29,7 @@ async def list_admin_orders(
 ) -> Any:
     """
     List all platform orders with financial metrics, profit, user details, and provider status.
+    Optionally filter by a specific date to see that day's activity.
     """
     query = (
         select(Order)
@@ -42,6 +45,13 @@ async def list_admin_orders(
 
     if status:
         query = query.where(Order.status == status)
+    # Filter by specific date (YYYY-MM-DD) when calendar date is selected
+    if date:
+        try:
+            parsed_date = date_type.fromisoformat(date)
+            query = query.where(func.date(Order.created_at) == parsed_date)
+        except ValueError:
+            pass  # Ignore invalid date format, return all orders
     if search:
         search_clean = search.strip().lstrip('#').lower()
         pattern = f"%{search_clean}%"

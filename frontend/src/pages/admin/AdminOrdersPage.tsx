@@ -12,7 +12,8 @@ import {
   PackageCheck,
   Clock,
   Copy,
-  RotateCcw
+  RotateCcw,
+  CalendarDays
 } from 'lucide-react';
 import { ordersService } from '../../services/orders';
 import { analyticsService, DailyRevenue } from '../../services/analytics';
@@ -31,6 +32,7 @@ export const AdminOrdersPage: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus | 'all'>('all');
   const [search, setSearch] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   // Status Override Modal State
   const [overrideOrder, setOverrideOrder] = useState<AdminOrder | null>(null);
@@ -45,6 +47,7 @@ export const AdminOrdersPage: React.FC = () => {
       const data = await ordersService.getAdminOrders({
         status: selectedStatus !== 'all' ? selectedStatus : undefined,
         search: search || undefined,
+        date: selectedDate || undefined,
       });
       setOrders(data);
     } catch (err) {
@@ -73,6 +76,7 @@ export const AdminOrdersPage: React.FC = () => {
         const data = await ordersService.getAdminOrders({
           status: selectedStatus !== 'all' ? selectedStatus : undefined,
           search: search || undefined,
+          date: selectedDate || undefined,
         });
         setOrders(data);
       } catch (e) {
@@ -81,7 +85,7 @@ export const AdminOrdersPage: React.FC = () => {
     }, 8000);
 
     return () => clearInterval(interval);
-  }, [selectedStatus, search]);
+  }, [selectedStatus, search, selectedDate]);
 
   const handleSyncActive = async () => {
     setSyncing(true);
@@ -269,8 +273,26 @@ export const AdminOrdersPage: React.FC = () => {
       <DailyRevenueCalendar
         dailyData={dailyRevenue}
         onRefresh={fetchRevenue}
+        onDateSelect={(dateStr) => setSelectedDate(dateStr)}
         title="Daily Fulfillment & Orders Calendar"
       />
+
+      {/* Active Date Filter Indicator */}
+      {selectedDate && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">
+          <CalendarDays className="w-4 h-4 flex-shrink-0" />
+          <span>
+            Showing orders for <strong className="text-amber-400 font-mono">{selectedDate}</strong>
+          </span>
+          <button
+            onClick={() => setSelectedDate(null)}
+            className="ml-auto px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-semibold transition-colors flex items-center gap-1"
+          >
+            <X className="w-3 h-3" />
+            Show All
+          </button>
+        </div>
+      )}
 
       {/* Orders Table */}
       <Card title="Platform Order Log" subtitle="Real-time fulfillment and manual status control">
