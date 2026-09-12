@@ -51,6 +51,7 @@ backend/.env
 .vscode/
 *.swp
 *.swo
+*pyrightconfig.json
 .agents/
 
 # Docker

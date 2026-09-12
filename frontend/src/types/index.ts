@@ -1,12 +1,13 @@
 export type Role = 'customer' | 'reseller' | 'admin' | 'super_admin';
 
 export type PlatformType =
-  | 'instagram'
-  | 'facebook'
-  | 'youtube'
   | 'tiktok'
-  | 'twitter'
+  | 'facebook'
+  | 'instagram'
+  | 'whatsapp'
   | 'telegram'
+  | 'youtube'
+  | 'twitter'
   | 'spotify'
   | 'discord'
   | 'twitch'

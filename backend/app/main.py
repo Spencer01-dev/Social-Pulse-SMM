@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.gzip import GZipMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -114,7 +115,30 @@ async def lifespan(app: FastAPI):
                         END IF;
                     END $$;
                 """))
-                print("[+] One-time clean slate migration verified.")
+                # Step 7: Ensure whatsapp platform exists and catalog is strictly TikTok, Facebook, Instagram, WhatsApp, Telegram
+                try:
+                    await conn.execute(text("ALTER TYPE platform_enum ADD VALUE IF NOT EXISTS 'whatsapp';"))
+                except Exception:
+                    pass
+                await conn.execute(text("""
+                    UPDATE services 
+                    SET platform = 'whatsapp' 
+                    WHERE (name ILIKE '%whatsapp%' OR category ILIKE '%whatsapp%') 
+                      AND platform != 'whatsapp';
+                """))
+                await conn.execute(text("""
+                    UPDATE services 
+                    SET is_active = false 
+                    WHERE platform NOT IN ('tiktok', 'facebook', 'instagram', 'whatsapp', 'telegram');
+                """))
+                await conn.execute(text("""
+                    UPDATE services 
+                    SET is_active = true 
+                    WHERE platform IN ('tiktok', 'facebook', 'instagram', 'whatsapp', 'telegram')
+                      AND name NOT ILIKE '%delix%' 
+                      AND category NOT ILIKE '%delix%';
+                """))
+                print("[+] Platform restriction verified (TikTok, Facebook, Instagram, WhatsApp, Telegram).")
             except Exception as e:
                 print(f"[!] Startup schema fix error: {e}")
         print("[+] Database schema verified and initialized.")
@@ -209,6 +233,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register GZip Compression (compress JSON payloads > 1000 bytes)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Include API v1 Router (/api/v1/...)
 app.include_router(api_router, prefix=settings.API_V1_STR)

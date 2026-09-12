@@ -50,13 +50,10 @@ interface PlatformOption {
 
 const PLATFORM_OPTIONS: PlatformOption[] = [
   { id: 'tiktok', name: 'TikTok', icon: <Music2 className="w-4 h-4 text-cyan-400" /> },
-  { id: 'instagram', name: 'Instagram', icon: <Instagram className="w-4 h-4 text-pink-400" /> },
   { id: 'facebook', name: 'Facebook', icon: <Facebook className="w-4 h-4 text-blue-400" /> },
-  { id: 'youtube', name: 'YouTube', icon: <Youtube className="w-4 h-4 text-red-400" /> },
-  { id: 'telegram', name: 'Telegram', icon: <Send className="w-4 h-4 text-sky-400" /> },
-  { id: 'twitter', name: 'Twitter', icon: <Twitter className="w-4 h-4 text-sky-300" /> },
+  { id: 'instagram', name: 'Instagram', icon: <Instagram className="w-4 h-4 text-pink-400" /> },
   { id: 'whatsapp', name: 'WhatsApp', icon: <MessageSquare className="w-4 h-4 text-emerald-400" /> },
-  { id: 'spotify', name: 'Spotify', icon: <Headphones className="w-4 h-4 text-green-400" /> },
+  { id: 'telegram', name: 'Telegram', icon: <Send className="w-4 h-4 text-sky-400" /> },
   { id: 'all', name: 'All Platforms', icon: <Globe className="w-4 h-4 text-indigo-400" /> },
 ];
 

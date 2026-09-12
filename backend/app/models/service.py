@@ -13,12 +13,13 @@ class MarkupType(str, enum.Enum):
 
 
 class Platform(str, enum.Enum):
-    INSTAGRAM = "instagram"
-    FACEBOOK = "facebook"
-    YOUTUBE = "youtube"
     TIKTOK = "tiktok"
-    TWITTER = "twitter"
+    FACEBOOK = "facebook"
+    INSTAGRAM = "instagram"
+    WHATSAPP = "whatsapp"
     TELEGRAM = "telegram"
+    YOUTUBE = "youtube"
+    TWITTER = "twitter"
     SPOTIFY = "spotify"
     DISCORD = "discord"
     TWITCH = "twitch"

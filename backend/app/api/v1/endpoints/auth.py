@@ -86,14 +86,12 @@ async def login_json(
     Authenticate with JSON payload (email or username + password). Returns access and refresh tokens.
     """
     identifier = credentials.email_or_username.lower().strip()
-    result = await db.execute(
-        select(User).where(
-            or_(
-                User.email == identifier,
-                User.username == identifier
-            )
-        )
-    )
+    if "@" in identifier:
+        query = select(User).where(User.email == identifier)
+    else:
+        query = select(User).where(User.username == identifier)
+
+    result = await db.execute(query)
     user = result.scalars().first()
 
     if not user or not verify_password(credentials.password, user.hashed_password):

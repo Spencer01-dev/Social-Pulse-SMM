@@ -7,6 +7,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_roles
+from app.core.cache import clear_all_cache
 from app.core.database import get_db
 from app.models.provider import Provider
 from app.models.service import MarkupType, Platform, Service
@@ -105,6 +106,7 @@ async def sync_services(
             provider_slug=provider_slug,
             default_markup_percent=default_markup
         )
+        clear_all_cache()
         return SyncServicesResponse(
             provider_slug=provider_slug,
             total_fetched=total,
@@ -174,6 +176,7 @@ async def update_service(
     db.add(service)
     await db.commit()
     await db.refresh(service)
+    clear_all_cache()
 
     return AdminServiceResponse(
         id=service.id,
@@ -234,6 +237,7 @@ async def apply_bulk_markup(
         db.add(s)
 
     await db.commit()
+    clear_all_cache()
     return {
         "message": f"Successfully updated markup on {len(services)} services",
         "affected_count": len(services),

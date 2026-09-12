@@ -10,6 +10,14 @@ from app.models.provider import Provider
 from app.models.service import MarkupType, Platform, Service
 from app.providers.manager import get_provider
 
+ALLOWED_ACTIVE_PLATFORMS = {
+    Platform.TIKTOK,
+    Platform.FACEBOOK,
+    Platform.INSTAGRAM,
+    Platform.WHATSAPP,
+    Platform.TELEGRAM,
+}
+
 
 def detect_platform(name: str, category: str) -> Platform:
     """
@@ -18,16 +26,18 @@ def detect_platform(name: str, category: str) -> Platform:
     """
     text = f"{name} {category}".lower()
     
-    if "tiktok" in text or "tik tok" in text:
+    if "whatsapp" in text or "wa " in text or "wa:" in text:
+        return Platform.WHATSAPP
+    elif "tiktok" in text or "tik tok" in text:
         return Platform.TIKTOK
     elif "instagram" in text or "ig " in text or "ig:" in text or "reels" in text:
         return Platform.INSTAGRAM
     elif "facebook" in text or "fb " in text or "fb:" in text:
         return Platform.FACEBOOK
-    elif "youtube" in text or "yt " in text or "yt:" in text:
-        return Platform.YOUTUBE
     elif "telegram" in text or "tg " in text:
         return Platform.TELEGRAM
+    elif "youtube" in text or "yt " in text or "yt:" in text:
+        return Platform.YOUTUBE
     elif "twitter" in text or " x " in text or "tweet" in text:
         return Platform.TWITTER
     elif "spotify" in text:
@@ -159,7 +169,8 @@ async def sync_services_from_provider(
             existing_service.max_quantity = item.max_quantity
             existing_service.refill_available = item.refill
             existing_service.cancel_available = item.cancel
-            existing_service.is_active = True  # Re-enable if it came back
+            is_platform_allowed = platform_detected in ALLOWED_ACTIVE_PLATFORMS
+            existing_service.is_active = is_platform_allowed
             if item.description and not existing_service.description:
                 existing_service.description = item.description
 
@@ -180,6 +191,7 @@ async def sync_services_from_provider(
                 markup_value=default_markup_percent
             )
 
+            is_platform_allowed = platform_detected in ALLOWED_ACTIVE_PLATFORMS
             new_service = Service(
                 provider_id=provider_record.id,
                 provider_service_id=item.service_id,
@@ -196,7 +208,7 @@ async def sync_services_from_provider(
                 max_quantity=item.max_quantity,
                 refill_available=item.refill,
                 cancel_available=item.cancel,
-                is_active=True,
+                is_active=is_platform_allowed,
             )
             db.add(new_service)
             created_count += 1
