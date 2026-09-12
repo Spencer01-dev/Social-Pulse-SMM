@@ -115,11 +115,18 @@ async def lifespan(app: FastAPI):
                         END IF;
                     END $$;
                 """))
-                # Step 7: Ensure whatsapp platform exists and catalog is strictly TikTok, Facebook, Instagram, WhatsApp, Telegram
-                try:
-                    await conn.execute(text("ALTER TYPE platform_enum ADD VALUE IF NOT EXISTS 'whatsapp';"))
-                except Exception:
-                    pass
+                # Step 7: Convert platform column to VARCHAR(50) so all platforms work cleanly without enum locks
+                await conn.execute(text("""
+                    DO $$
+                    BEGIN
+                        IF EXISTS (
+                            SELECT 1 FROM information_schema.columns 
+                            WHERE table_name = 'services' AND column_name = 'platform' AND udt_name = 'platform_enum'
+                        ) THEN
+                            ALTER TABLE services ALTER COLUMN platform TYPE VARCHAR(50) USING platform::text;
+                        END IF;
+                    END $$;
+                """))
                 await conn.execute(text("""
                     UPDATE services 
                     SET platform = 'whatsapp' 

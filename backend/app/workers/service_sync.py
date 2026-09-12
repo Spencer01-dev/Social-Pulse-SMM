@@ -160,7 +160,7 @@ async def sync_services_from_provider(
 
         if existing_service:
             # Update provider rates, limits, and platform
-            existing_service.platform = platform_detected
+            existing_service.platform = platform_detected.value if hasattr(platform_detected, 'value') else str(platform_detected)
             existing_service.name = item.name
             existing_service.category = category_clean
             existing_service.service_type = item.type
@@ -195,7 +195,7 @@ async def sync_services_from_provider(
             new_service = Service(
                 provider_id=provider_record.id,
                 provider_service_id=item.service_id,
-                platform=platform_detected,
+                platform=platform_detected.value if hasattr(platform_detected, 'value') else str(platform_detected),
                 name=item.name,
                 description=item.description,
                 service_type=item.type,

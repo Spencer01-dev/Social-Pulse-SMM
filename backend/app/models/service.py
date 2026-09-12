@@ -33,13 +33,8 @@ class Service(TimeStampedUUIDModel):
     provider_service_id = Column(String(100), index=True, nullable=False)  # ID on Delix Gains / external provider
 
     platform = Column(
-        Enum(
-            Platform,
-            name="platform_enum",
-            values_callable=lambda obj: [e.value for e in obj],
-            create_type=False
-        ),
-        default=Platform.INSTAGRAM,
+        String(50),
+        default=Platform.INSTAGRAM.value,
         nullable=False,
         index=True
     )
