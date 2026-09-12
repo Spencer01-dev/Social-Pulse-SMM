@@ -114,9 +114,28 @@ export const NewOrderPage: React.FC = () => {
   const [customComments, setCustomComments] = useState('');
 
   // Form states
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successOrder, setSuccessOrder] = useState<any | null>(null);
+
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOrderModalOpen && !submitting) {
+        setIsOrderModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOrderModalOpen, submitting]);
+
+  // Auto-open modal if service ID is present in URL
+  useEffect(() => {
+    if (preselectedServiceId && services.some((s) => s.id === preselectedServiceId)) {
+      setIsOrderModalOpen(true);
+    }
+  }, [preselectedServiceId, services]);
 
   // Refs for click outside handling
   const platformRef = useRef<HTMLDivElement>(null);
@@ -352,15 +371,12 @@ export const NewOrderPage: React.FC = () => {
   const userBalance = Number(user?.balance || 0);
   const hasInsufficientBalance = calculatedCharge > userBalance;
 
-  // Handle service card click
+  // Handle service card click - directly opens the Order Details modal without scrolling downwards
   const handleSelectService = (service: CustomerService) => {
     setSelectedServiceId(service.id);
     setQuantity(Math.max(service.min_quantity || 100, 100));
     setError(null);
-    // Smooth scroll to order configuration section if desired
-    if (orderDetailsRef.current) {
-      orderDetailsRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
+    setIsOrderModalOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -906,22 +922,36 @@ export const NewOrderPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Card Bottom Meta Grid (Estimated start, Delivery rate, Service ID) */}
-                  <div className="mt-4 pt-3 border-t border-slate-800/80 grid grid-cols-3 gap-2 text-[11px] text-slate-400">
-                    <div>
-                      <span className="block text-[10px] text-slate-500 leading-tight">Estimated start</span>
-                      <span className="text-slate-300 font-medium">1 min</span>
+                  {/* Card Bottom Meta Grid (Estimated start, Delivery rate, Service ID & Order Action) */}
+                  <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <span className="block text-[10px] text-slate-500 leading-tight">Start</span>
+                        <span className="text-slate-300 font-medium">1 min</span>
+                      </div>
+                      <div className="hidden sm:block">
+                        <span className="block text-[10px] text-slate-500 leading-tight">Delivery</span>
+                        <span className="text-slate-300 font-medium">Fast</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-slate-500 leading-tight">ID</span>
+                        <span className="text-slate-300 font-mono font-bold">
+                          #{service.provider_service_id || service.id.substring(0, 6)}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="block text-[10px] text-slate-500 leading-tight">Delivery rate</span>
-                      <span className="text-slate-300 font-medium">Not provided</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="block text-[10px] text-slate-500 leading-tight">Service ID</span>
-                      <span className="text-slate-300 font-mono font-bold">
-                        #{service.provider_service_id || service.id.substring(0, 6)}
-                      </span>
-                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectService(service);
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center gap-1.5 transition-all shadow-md shadow-emerald-500/20 hover:scale-105"
+                    >
+                      <span>Order</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
               );
@@ -930,155 +960,277 @@ export const NewOrderPage: React.FC = () => {
         )}
       </div>
 
-      {/* ORDER CONFIGURATION FORM SECTION */}
-      <form onSubmit={handleSubmit} className="space-y-6" ref={orderDetailsRef}>
-        <Card
-          title="Order Details"
-          subtitle={
-            currentService
-              ? `Configuring: ${currentService.name}`
-              : 'Choose a service from above to configure your order'
-          }
-        >
-          <div className="space-y-4">
-            {/* Active Service Banner */}
-            {currentService && (
-              <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0">
-                    <Zap className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h5 className="text-xs font-bold text-white line-clamp-1">{currentService.name}</h5>
-                    <p className="text-[11px] text-slate-400">
-                      Rate: <span className="text-emerald-400 font-bold">KES {Number(currentService.rate).toFixed(4)}</span> / 1k • Min: {Math.max(currentService.min_quantity || 100, 100).toLocaleString()} • Max: {currentService.max_quantity.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-                {currentService.refill_available && (
-                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 self-start sm:self-auto">
-                    Refill Guarantee
-                  </span>
-                )}
-              </div>
-            )}
+      {/* FLOATING BOTTOM DOCK: Shows currently selected service & direct button to re-open details */}
+      {!isOrderModalOpen && currentService && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[94%] max-w-2xl bg-[#0b111e]/95 border border-emerald-500/50 rounded-2xl shadow-2xl shadow-emerald-950/70 p-3 sm:p-3.5 backdrop-blur-xl flex items-center justify-between gap-3 animate-fadeIn">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0 border border-emerald-500/30">
+              {selectedPlatformObj.icon}
+            </div>
+            <div className="min-w-0">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400 block truncate">
+                Ready to Order • #{currentService.provider_service_id || currentService.id.slice(0, 6)}
+              </span>
+              <h5 className="text-xs sm:text-sm font-bold text-white truncate">
+                {currentService.name.replace(/delix gains/gi, 'Social Pulse').replace(/delix/gi, 'Social Pulse')}
+              </h5>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsOrderModalOpen(true)}
+            className="px-4 sm:px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs sm:text-sm font-extrabold flex items-center gap-1.5 transition-all flex-shrink-0 shadow-lg shadow-emerald-500/30 hover:scale-105"
+          >
+            <span>Order Details</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
-            {/* Target Link */}
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                Target Link / URL *
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                  <LinkIcon className="w-4 h-4" />
+      {/* DIRECT ORDER DETAILS MODAL */}
+      {isOrderModalOpen && currentService && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          {/* Dark Glass Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/80 backdrop-blur-md transition-opacity"
+            onClick={() => !submitting && setIsOrderModalOpen(false)}
+          />
+
+          {/* Modal Container */}
+          <div
+            className="relative w-full max-w-xl bg-[#0b111e] border border-slate-800 rounded-2xl shadow-2xl shadow-emerald-950/40 overflow-hidden my-auto z-10 animate-fadeIn"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-5 py-3.5 border-b border-slate-800/90 flex items-center justify-between bg-[#0e1626]/90">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+                  {selectedPlatformObj.icon}
                 </div>
-                <input
-                  type="text"
-                  value={targetLink}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    const urlMatch = raw.match(/https?:\/\/[^\s<>"]+|www\.[^\s<>"]+/);
-                    if (urlMatch) {
-                      let clean = urlMatch[0];
-                      if (
-                        clean.includes('tiktok.com') ||
-                        clean.includes('instagram.com') ||
-                        clean.includes('facebook.com')
-                      ) {
-                        clean = clean.split('?')[0];
-                      }
-                      setTargetLink(clean);
-                    } else {
-                      setTargetLink(raw);
-                    }
-                  }}
-                  placeholder="Paste your profile or post link (e.g. https://www.tiktok.com/@username/video/...)"
-                  className="w-full pl-10 pr-4 py-3 bg-[#0d1424] border border-slate-800 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500 font-mono text-xs"
-                  required
-                />
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>Order Details</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-slate-800 text-slate-300">
+                      #{currentService.provider_service_id || currentService.id.slice(0, 6)}
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Configure parameters & instant delivery</p>
+                </div>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">
-                Make sure the account or post privacy is set to Public before placing the order.
-              </p>
+              <button
+                type="button"
+                onClick={() => !submitting && setIsOrderModalOpen(false)}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            {/* Quantity Input */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300">
-                  Quantity *
+            {/* Service Summary Card */}
+            <div className="px-5 pt-4 pb-1">
+              <div className="p-3 rounded-xl bg-[#0e172a] border border-slate-800 space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <h4 className="text-xs sm:text-sm font-bold text-white leading-snug">
+                    {currentService.name.replace(/delix gains/gi, 'Social Pulse').replace(/delix/gi, 'Social Pulse')}
+                  </h4>
+                  {currentService.refill_available && (
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1 flex-shrink-0">
+                      <ShieldCheck className="w-3 h-3" /> 30d Refill
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400 pt-0.5">
+                  <div>
+                    Rate: <span className="text-emerald-400 font-extrabold">KES {Number(currentService.rate).toFixed(4)}</span> / 1k
+                  </div>
+                  <div>•</div>
+                  <div>
+                    Min: <span className="text-slate-200 font-semibold">{Math.max(currentService.min_quantity || 100, 100).toLocaleString()}</span>
+                  </div>
+                  <div>•</div>
+                  <div>
+                    Max: <span className="text-slate-200 font-semibold">{currentService.max_quantity.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Order Form */}
+            <form onSubmit={handleSubmit} className="px-5 py-3 space-y-3.5">
+              {error && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* Target Link */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                  Target Link / URL <span className="text-emerald-400">*</span>
                 </label>
-                {currentService && (
-                  <span className="text-[11px] text-slate-400">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <LinkIcon className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <input
+                    type="text"
+                    autoFocus
+                    value={targetLink}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const urlMatch = raw.match(/https?:\/\/[^\s<>"]+|www\.[^\s<>"]+/);
+                      if (urlMatch) {
+                        let clean = urlMatch[0];
+                        if (
+                          clean.includes('tiktok.com') ||
+                          clean.includes('instagram.com') ||
+                          clean.includes('facebook.com')
+                        ) {
+                          clean = clean.split('?')[0];
+                        }
+                        setTargetLink(clean);
+                      } else {
+                        setTargetLink(raw);
+                      }
+                    }}
+                    placeholder={`Paste ${selectedPlatformObj.name} profile or post URL...`}
+                    className="w-full pl-9 pr-3 py-2.5 bg-[#0e172a] border border-slate-800 rounded-xl text-white placeholder-slate-500 text-xs focus:outline-none focus:border-emerald-500 font-mono transition-colors"
+                    required
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Ensure account or post privacy is public for automated fulfillment.
+                </p>
+              </div>
+
+              {/* Quantity */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                    Quantity <span className="text-emerald-400">*</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400">
                     Min: {Math.max(currentService.min_quantity || 100, 100).toLocaleString()} • Max: {currentService.max_quantity.toLocaleString()}
                   </span>
+                </div>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <Hash className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <input
+                    type="number"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="1000"
+                    className="w-full pl-9 pr-3 py-2.5 bg-[#0e172a] border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500 transition-colors font-mono"
+                    min={Math.max(currentService.min_quantity || 100, 100)}
+                    max={currentService.max_quantity}
+                    required
+                  />
+                </div>
+
+                {/* Quick-Pick Quantity Buttons */}
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {[
+                    Math.max(currentService.min_quantity || 100, 100),
+                    500,
+                    1000,
+                    2500,
+                    5000,
+                    10000,
+                  ]
+                    .filter(
+                      (val) =>
+                        val >= (currentService.min_quantity || 100) &&
+                        val <= currentService.max_quantity
+                    )
+                    .filter((val, idx, arr) => arr.indexOf(val) === idx)
+                    .map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setQuantity(val)}
+                        className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border transition-all ${
+                          quantity === val
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm'
+                            : 'bg-slate-800/60 text-slate-300 border-slate-700/60 hover:bg-slate-800 hover:text-white'
+                        }`}
+                      >
+                        +{val.toLocaleString()}
+                      </button>
+                    ))}
+                </div>
+              </div>
+
+              {/* Custom Comments */}
+              {currentService?.service_type.toLowerCase().includes('comment') && (
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
+                    Custom Comments (1 per line)
+                  </label>
+                  <textarea
+                    value={customComments}
+                    onChange={(e) => setCustomComments(e.target.value)}
+                    placeholder="Great post!🔥&#10;Love this picture! ❤️&#10;Keep it up! 👏"
+                    rows={3}
+                    className="w-full px-3 py-2 bg-[#0e172a] border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500 font-mono"
+                  />
+                </div>
+              )}
+
+              {/* Financial Breakdown & Balance Status */}
+              <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-400 font-medium">Total Order Charge:</span>
+                  <span className="text-lg font-black text-emerald-400">
+                    KES {calculatedCharge.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800/80">
+                  <span className="text-slate-400">Available Balance:</span>
+                  <span className={`font-bold ${hasInsufficientBalance ? 'text-rose-400' : 'text-slate-200'}`}>
+                    KES {userBalance.toFixed(2)}
+                  </span>
+                </div>
+                {hasInsufficientBalance && (
+                  <div className="pt-2 flex items-center justify-between text-xs text-rose-400 bg-rose-500/10 p-2 rounded-lg border border-rose-500/20">
+                    <span>Insufficient funds for this order</span>
+                    <Link
+                      to="/deposit"
+                      className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded text-[10px] transition-colors"
+                    >
+                      Top Up Now
+                    </Link>
+                  </div>
                 )}
               </div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                  <Hash className="w-4 h-4" />
-                </div>
-                <input
-                  type="number"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="1000"
-                  className="w-full pl-10 pr-4 py-3 bg-[#0d1424] border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500"
-                  min={currentService ? Math.max(currentService.min_quantity || 100, 100) : 100}
-                  max={currentService?.max_quantity || 100000}
-                  required
-                />
+
+              {/* Submit / Cancel Buttons */}
+              <div className="pt-1 flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsOrderModalOpen(false)}
+                  disabled={submitting}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  className="flex-[2] py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold shadow-lg shadow-emerald-500/25 border-none text-xs"
+                  isLoading={submitting}
+                  rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
+                >
+                  Confirm & Place Order
+                </Button>
               </div>
-            </div>
-
-            {/* Custom comments if applicable */}
-            {currentService?.service_type.toLowerCase().includes('comment') && (
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                  Custom Comments (1 per line)
-                </label>
-                <textarea
-                  value={customComments}
-                  onChange={(e) => setCustomComments(e.target.value)}
-                  placeholder="Great post!🔥&#10;Love this picture! ❤️&#10;Keep it up! 👏"
-                  rows={4}
-                  className="w-full px-4 py-3 bg-[#0d1424] border border-slate-800 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-            )}
-          </div>
-        </Card>
-
-        {/* Price Summary & Submit Box */}
-        <div className="p-6 bg-[#0b111e]/90 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-6 shadow-2xl backdrop-blur-md">
-          <div>
-            <span className="text-xs uppercase font-bold tracking-wider text-slate-400 block">
-              Total Order Charge
-            </span>
-            <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-3xl font-extrabold text-emerald-400">
-                KES {calculatedCharge.toFixed(2)}
-              </span>
-              <span className="text-xs text-slate-400">
-                ({numQuantity.toLocaleString()} units @ KES {currentService?.rate || 0}/1k)
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              className="px-8 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold shadow-lg shadow-emerald-500/20 border-none"
-              isLoading={submitting}
-              rightIcon={<ArrowRight className="w-4 h-4" />}
-            >
-              Confirm & Submit Order
-            </Button>
+            </form>
           </div>
         </div>
-      </form>
+      )}
     </div>
   );
 };
