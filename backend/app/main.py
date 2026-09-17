@@ -146,6 +146,42 @@ async def lifespan(app: FastAPI):
                       AND category NOT ILIKE '%delix%';
                 """))
                 print("[+] Platform restriction verified (TikTok, Facebook, Instagram, WhatsApp, Telegram).")
+
+                # Step 8: Multi-Tenancy & Child Panel Provisioning Schema Migration
+                await conn.execute(text("""
+                    DO $$
+                    BEGIN
+                        -- Child panels new columns
+                        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='child_panels' AND column_name='provisioning_step') THEN
+                            ALTER TABLE child_panels ADD COLUMN provisioning_step VARCHAR(50) DEFAULT 'pending';
+                        END IF;
+                        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='child_panels' AND column_name='last_error') THEN
+                            ALTER TABLE child_panels ADD COLUMN last_error TEXT;
+                        END IF;
+                        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='child_panels' AND column_name='branding_json') THEN
+                            ALTER TABLE child_panels ADD COLUMN branding_json JSONB;
+                        END IF;
+                        -- Convert status from enum to VARCHAR(50) if necessary
+                        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='child_panels' AND column_name='status' AND udt_name='child_panel_status_enum') THEN
+                            ALTER TABLE child_panels ALTER COLUMN status TYPE VARCHAR(50) USING status::text;
+                        END IF;
+
+                        -- Add tenant_id to users, orders, transactions, tickets
+                        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='tenant_id') THEN
+                            ALTER TABLE users ADD COLUMN tenant_id UUID REFERENCES child_panels(id) ON DELETE SET NULL;
+                        END IF;
+                        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='tenant_id') THEN
+                            ALTER TABLE orders ADD COLUMN tenant_id UUID REFERENCES child_panels(id) ON DELETE SET NULL;
+                        END IF;
+                        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='transactions' AND column_name='tenant_id') THEN
+                            ALTER TABLE transactions ADD COLUMN tenant_id UUID REFERENCES child_panels(id) ON DELETE SET NULL;
+                        END IF;
+                        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tickets' AND column_name='tenant_id') THEN
+                            ALTER TABLE tickets ADD COLUMN tenant_id UUID REFERENCES child_panels(id) ON DELETE SET NULL;
+                        END IF;
+                    END $$;
+                """))
+                print("[+] Multi-Tenancy & Child Panel Provisioning columns verified.")
             except Exception as e:
                 print(f"[!] Startup schema fix error: {e}")
         print("[+] Database schema verified and initialized.")

@@ -1,0 +1,9 @@
+# SocialPulse SMM
+
+> SocialPulse is a high-speed wholesale Social Media Marketing (SMM) reseller platform and child panel SaaS provider.
+
+## Key Resources
+- [Services & Pricing](https://www.socialpulsesmm.com/services): Complete live catalog of social media marketing services with real-time wholesale rates.
+- [Child Panels SaaS](https://www.socialpulsesmm.com/child-panels): Turnkey child panel deployment for launching branded reseller portals on custom domains.
+- [API Documentation](https://www.socialpulsesmm.com/api): REST API documentation for automated order dispatching, balance inquiries, and status polling.
+- [Platform Login](https://www.socialpulsesmm.com/login): Customer portal authentication and dashboard access.

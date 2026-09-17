@@ -23,6 +23,7 @@ import {
 import { servicesService } from '../../services/services';
 import { CustomerService, PlatformSummary, PlatformType } from '../../types';
 import { useCurrency } from '../../context/CurrencyContext';
+import { useTenant } from '../../context/TenantContext';
 import { Button } from '../../components/common/Button';
 
 // Fast client-side session cache to eliminate re-fetching latency
@@ -31,6 +32,7 @@ let platformsMemoryCache: PlatformSummary[] | null = null;
 
 export const ServicesPage: React.FC = () => {
   const { formatCurrency } = useCurrency();
+  const { isTenantMode, calculateMarkedUpPrice, tenant } = useTenant();
   const [services, setServices] = useState<CustomerService[]>(() => {
     return catalogMemoryCache.get('all') || [];
   });
@@ -366,7 +368,7 @@ export const ServicesPage: React.FC = () => {
                         : 'Rate per 1,000'}
                     </span>
                     <span className="text-lg font-extrabold text-amber-400">
-                      {formatCurrency(Number(service.rate))}
+                      {formatCurrency(isTenantMode ? calculateMarkedUpPrice(Number(service.rate)) : Number(service.rate))}
                     </span>
                   </div>
 

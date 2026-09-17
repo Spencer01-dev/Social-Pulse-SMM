@@ -2,6 +2,8 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { CurrencyProvider } from './context/CurrencyContext';
+import { TenantProvider } from './context/TenantContext';
+import { TenantSimulationBanner } from './components/common/TenantSimulationBanner';
 import { MainLayout } from './components/layout/MainLayout';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { DashboardHome } from './pages/DashboardHome';
@@ -31,9 +33,11 @@ export const App: React.FC = () => {
   return (
     <AuthProvider>
       <CurrencyProvider>
-        <BrowserRouter>
-          <WhatsAppChannelPopup />
-          <Routes>
+        <TenantProvider>
+          <BrowserRouter>
+            <TenantSimulationBanner />
+            <WhatsAppChannelPopup />
+            <Routes>
             {/* Public Auth Routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
@@ -191,6 +195,7 @@ export const App: React.FC = () => {
           </Route>
         </Routes>
       </BrowserRouter>
+        </TenantProvider>
       </CurrencyProvider>
     </AuthProvider>
   );

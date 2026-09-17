@@ -9,11 +9,14 @@ from app.models.transaction import (
     TransactionStatus,
     TransactionType,
 )
+from app.models.child_panel import ChildPanel, ChildPanelStatus
 from app.models.user import User, UserRole
 
 __all__ = [
     "User",
     "UserRole",
+    "ChildPanel",
+    "ChildPanelStatus",
     "Provider",
     "Service",
     "Platform",
@@ -29,3 +32,4 @@ __all__ = [
     "TicketPriority",
     "TicketStatus",
 ]
+

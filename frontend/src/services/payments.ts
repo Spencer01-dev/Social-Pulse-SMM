@@ -27,7 +27,9 @@ export const paymentsService = {
 
   // Supported Multi-Currencies & Live Rates
   getCurrencies: async (): Promise<CurrenciesResponse> => {
-    const response = await apiClient.get<CurrenciesResponse>('/payments/currencies');
+    const response = await apiClient.get<CurrenciesResponse>('/payments/currencies', {
+      timeout: 4000,
+    });
     return response.data;
   },
 

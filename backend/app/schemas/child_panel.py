@@ -22,7 +22,10 @@ class ChildPanelResponse(BaseModel):
     admin_username: str
     currency: str
     price_per_month: Decimal
-    status: ChildPanelStatus
+    status: str
+    provisioning_step: Optional[str] = "pending"
+    last_error: Optional[str] = None
+    branding_json: Optional[dict] = None
     nameserver1: str
     nameserver2: str
     expires_at: datetime
@@ -35,5 +38,5 @@ class ChildPanelResponse(BaseModel):
 
 
 class ChildPanelStatusUpdate(BaseModel):
-    status: ChildPanelStatus
+    status: str
     notes: Optional[str] = None

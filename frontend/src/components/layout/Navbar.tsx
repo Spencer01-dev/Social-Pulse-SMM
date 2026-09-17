@@ -5,6 +5,7 @@ import { Button } from '../common/Button';
 import { CurrencySwitcher } from '../common/CurrencySwitcher';
 import { useAuth } from '../../context/AuthContext';
 import { useCurrency } from '../../context/CurrencyContext';
+import { useTenant } from '../../context/TenantContext';
 
 interface NavbarProps {
   onToggleSidebar?: () => void;
@@ -13,12 +14,16 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
   const { user, isAuthenticated, logout } = useAuth();
   const { formatCurrency } = useCurrency();
+  const { isTenantMode, tenant } = useTenant();
   const navigate = useNavigate();
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
+
+  const accentColor = isTenantMode && tenant ? tenant.theme_color || '#f59e0b' : '#f59e0b';
+  const brandTitle = isTenantMode && tenant ? tenant.site_name : 'SocialPulse';
 
   return (
     <header className="sticky top-0 z-40 h-14 sm:h-16 glass-header px-3 sm:px-6 flex items-center justify-between border-b border-[#2b303c] w-full">
@@ -33,12 +38,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
 
         {/* Brand Logo */}
         <Link to="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#f59e0b] text-slate-950 flex items-center justify-center font-black shadow-lg shadow-amber-500/20 shrink-0">
+          <div
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-slate-950 flex items-center justify-center font-black shadow-lg shrink-0 transition-colors"
+            style={{ backgroundColor: accentColor }}
+          >
             <Zap className="w-4 h-4 sm:w-4.5 sm:h-4.5 fill-slate-950 text-slate-950" />
           </div>
           <div>
             <span className="text-base sm:text-lg font-extrabold tracking-tight text-white flex items-center gap-1">
-              Social<span className="text-[#f59e0b]">Pulse</span>
+              {isTenantMode && tenant ? (
+                <span>{brandTitle}</span>
+              ) : (
+                <>
+                  Social<span className="text-[#f59e0b]">Pulse</span>
+                </>
+              )}
             </span>
           </div>
         </Link>

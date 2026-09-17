@@ -176,6 +176,83 @@ export const AdminDashboardPage: React.FC = () => {
         </Card>
       </div>
 
+      {/* Today's Provider Economics & SaaS Panel Metrics */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Today's Economics */}
+        <Card className="bg-[#181a20] border-[#2b303c] space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/25 flex items-center justify-center">
+              <DollarSign className="w-4 h-4 text-amber-400" />
+            </div>
+            <div>
+              <h3 className="text-xs font-black uppercase text-slate-200 tracking-wider">Today's Economics</h3>
+              <p className="text-[10px] text-slate-500">Real-time daily provider cost vs earnings</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <div className="p-2.5 rounded-xl bg-[#121418] border border-[#2b303c]">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Revenue</span>
+              <span className="text-sm font-black text-white">KES {overview?.today ? Number(overview.today.revenue).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'}</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-[#121418] border border-[#2b303c]">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Provider Cost</span>
+              <span className="text-sm font-black text-rose-400">KES {overview?.today ? Number(overview.today.provider_cost).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'}</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-[#121418] border border-[#2b303c]">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Gross Profit</span>
+              <span className="text-sm font-black text-emerald-400">KES {overview?.today ? Number(overview.today.gross_profit).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'}</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-[#121418] border border-[#2b303c]">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Refunds</span>
+              <span className="text-sm font-black text-amber-400">KES {overview?.today ? Number(overview.today.refunds).toFixed(2) : '0.00'}</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-[#121418] border border-emerald-500/25">
+              <span className="text-[10px] uppercase font-bold text-emerald-400 block">Net Profit</span>
+              <span className="text-sm font-black text-emerald-300">KES {overview?.today ? Number(overview.today.net_profit).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'}</span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-[#121418] border border-[#2b303c]">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Orders</span>
+              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                <span className="text-[10px] font-bold text-emerald-400">{overview?.today?.orders_completed ?? 0} ✓</span>
+                <span className="text-[10px] font-bold text-amber-400">{overview?.today?.orders_processing ?? 0} ⏳</span>
+                <span className="text-[10px] font-bold text-rose-400">{overview?.today?.orders_failed ?? 0} ✗</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* SaaS Child Panel KPIs */}
+        <Card className="bg-[#181a20] border-[#2b303c] space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-7 h-7 rounded-lg bg-purple-500/15 border border-purple-500/25 flex items-center justify-center">
+              <PackageCheck className="w-4 h-4 text-purple-400" />
+            </div>
+            <div>
+              <h3 className="text-xs font-black uppercase text-slate-200 tracking-wider">SaaS Child Panel Metrics</h3>
+              <p className="text-[10px] text-slate-500">Recurring revenue & panel lifecycle</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3.5 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-center">
+              <span className="text-[10px] uppercase font-bold text-emerald-400 block tracking-wider">Active Panels</span>
+              <span className="text-3xl font-black text-emerald-300 block mt-1">{overview?.saas?.active_panels ?? 0}</span>
+            </div>
+            <div className="p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/20 text-center">
+              <span className="text-[10px] uppercase font-bold text-amber-400 block tracking-wider">Monthly Recurring</span>
+              <span className="text-2xl font-black text-amber-300 block mt-1">KES {overview?.saas ? Number(overview.saas.monthly_recurring_revenue).toLocaleString() : '0'}</span>
+            </div>
+            <div className="p-3 rounded-xl bg-[#121418] border border-[#2b303c] text-center">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Expired</span>
+              <span className="text-xl font-black text-slate-300 block mt-0.5">{overview?.saas?.expired_panels ?? 0}</span>
+            </div>
+            <div className="p-3 rounded-xl bg-[#121418] border border-[#2b303c] text-center">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">Provisioning</span>
+              <span className="text-xl font-black text-sky-300 block mt-0.5">{overview?.saas?.provisioning_panels ?? 0}</span>
+            </div>
+          </div>
+        </Card>
+      </div>
+
       {/* Daily Revenue Chart & Platform Breakdown Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Revenue & Profit Tracking Section (Calendar or Bar Chart) */}

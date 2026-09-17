@@ -41,3 +41,52 @@
     @apply bg-[#f59e0b] hover:bg-[#fbbf24] text-slate-950 font-bold shadow-lg shadow-amber-500/20;
   }
 }
+
+/* =========================================================
+   DYNAMIC TENANT ACCENT THEMING (CHILD PANEL WHITELABEL)
+   Activated when [data-tenant-active="true"] is set on <html>
+   ========================================================= */
+html[data-tenant-active="true"] {
+  --theme-accent: var(--tenant-accent, #f59e0b);
+}
+
+/* Primary Backgrounds */
+html[data-tenant-active="true"] .bg-\[\#f59e0b\],
+html[data-tenant-active="true"] .bg-amber-500,
+html[data-tenant-active="true"] .bg-amber-400,
+html[data-tenant-active="true"] .btn-amber-active {
+  background-color: var(--tenant-accent, #f59e0b) !important;
+}
+
+html[data-tenant-active="true"] .hover\:bg-\[\#fbbf24\]:hover,
+html[data-tenant-active="true"] .hover\:bg-amber-400:hover,
+html[data-tenant-active="true"] .hover\:bg-amber-500\/30:hover {
+  filter: brightness(1.15) !important;
+}
+
+/* Primary Text & Icons */
+html[data-tenant-active="true"] .text-\[\#f59e0b\],
+html[data-tenant-active="true"] .text-amber-400,
+html[data-tenant-active="true"] .text-amber-500,
+html[data-tenant-active="true"] .text-amber-300 {
+  color: var(--tenant-accent, #f59e0b) !important;
+}
+
+/* Borders & Accents */
+html[data-tenant-active="true"] .border-\[\#f59e0b\],
+html[data-tenant-active="true"] .border-amber-500,
+html[data-tenant-active="true"] .border-amber-500\/30,
+html[data-tenant-active="true"] .border-amber-500\/40 {
+  border-color: var(--tenant-accent, #f59e0b) !important;
+}
+
+/* Shadows and Glows */
+html[data-tenant-active="true"] .shadow-amber-500\/25,
+html[data-tenant-active="true"] .shadow-amber-500\/20 {
+  box-shadow: 0 10px 15px -3px rgba(var(--tenant-accent-rgb, 245, 158, 11), 0.35) !important;
+}
+
+/* Focus Rings */
+html[data-tenant-active="true"] .focus\:ring-amber-500:focus {
+  --tw-ring-color: var(--tenant-accent, #f59e0b) !important;
+}

@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCurrency } from '../../context/CurrencyContext';
+import { useTenant } from '../../context/TenantContext';
 import { servicesService } from '../../services/services';
 import { ordersService } from '../../services/orders';
 import { CustomerService, PlatformType } from '../../types';
@@ -66,6 +67,7 @@ export const NewOrderPage: React.FC = () => {
 
   const { user, refreshUserProfile } = useAuth();
   const { formatCurrency } = useCurrency();
+  const { isTenantMode, calculateMarkedUpPrice, tenant } = useTenant();
   const navigate = useNavigate();
 
   // Selection states
@@ -359,10 +361,13 @@ export const NewOrderPage: React.FC = () => {
 
   // Calculate live charge
   const numQuantity = typeof quantity === 'number' ? quantity : 0;
+  const effectiveRate = currentService
+    ? (isTenantMode ? calculateMarkedUpPrice(currentService.rate) : currentService.rate)
+    : 0;
   const calculatedCharge = currentService
     ? isPackage
-      ? Number((currentService.rate * numQuantity).toFixed(2))
-      : Number(((currentService.rate * numQuantity) / 1000).toFixed(2))
+      ? Number((effectiveRate * numQuantity).toFixed(2))
+      : Number(((effectiveRate * numQuantity) / 1000).toFixed(2))
     : 0;
 
   const userBalance = Number(user?.balance || 0);
@@ -896,7 +901,9 @@ export const NewOrderPage: React.FC = () => {
                     {/* Price Line */}
                     <div className="mt-2 flex items-baseline gap-1.5">
                       <span className="text-base font-extrabold text-white">
-                        {Number(service.rate).toFixed(4)} KES
+                        {isTenantMode
+                          ? calculateMarkedUpPrice(service.rate).toFixed(4)
+                          : Number(service.rate).toFixed(4)} KES
                       </span>
                       <span className="text-xs text-slate-400">
                         {service.service_type?.toLowerCase() === 'package' ? 'per package' : 'per 1,000 likes'}
@@ -1038,7 +1045,7 @@ export const NewOrderPage: React.FC = () => {
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400 pt-0.5">
                   <div>
-                    Rate: <span className="text-emerald-400 font-extrabold">KES {Number(currentService.rate).toFixed(4)}</span> / 1k
+                    Rate: <span className="text-emerald-400 font-extrabold">KES {effectiveRate.toFixed(4)}</span> / 1k
                   </div>
                   <div>•</div>
                   <div>
@@ -1184,6 +1191,12 @@ export const NewOrderPage: React.FC = () => {
                     KES {calculatedCharge.toFixed(2)}
                   </span>
                 </div>
+                {isTenantMode && tenant && (
+                  <div className="text-[10px] text-amber-400/90 flex items-center justify-between">
+                    <span>Retail Price ({tenant.site_name || tenant.domain})</span>
+                    <span>+{tenant.default_markup_percent}% markup applied</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800/80">
                   <span className="text-slate-400">Available Balance:</span>
                   <span className={`font-bold ${hasInsufficientBalance ? 'text-rose-400' : 'text-slate-200'}`}>

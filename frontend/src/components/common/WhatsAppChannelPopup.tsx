@@ -85,18 +85,26 @@ export const WhatsAppChannelPopup: React.FC = () => {
           }}
         >
           {/* Green accent bar */}
-          <div
-            style={{
-              height: '4px',
-              background: 'linear-gradient(90deg, #25D366, #128C7E, #25D366)',
-              backgroundSize: '200% 100%',
-              animation: 'shimmer 2s linear infinite',
-            }}
-          />
+          <div style={{ height: '4px', position: 'relative', overflow: 'hidden', background: '#128C7E' }}>
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                background: 'linear-gradient(90deg, transparent, #25D366, transparent)',
+                animation: 'shimmer 2.5s ease-in-out infinite',
+                willChange: 'transform',
+              }}
+            />
+          </div>
 
           {/* Close button */}
           <button
             onClick={handleDismiss}
+            aria-label="Close notification"
+            title="Close"
             style={{
               position: 'absolute',
               top: '14px',
@@ -138,8 +146,9 @@ export const WhatsAppChannelPopup: React.FC = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 18px',
-                boxShadow: '0 8px 24px rgba(37, 211, 102, 0.3)',
-                animation: 'pulse-glow 2s ease-in-out infinite',
+                boxShadow: '0 8px 24px rgba(37, 211, 102, 0.35)',
+                animation: 'pulse-glow 2.5s ease-in-out infinite',
+                willChange: 'transform',
               }}
             >
               <MessageCircle size={30} color="#fff" strokeWidth={2.2} />
@@ -281,15 +290,15 @@ export const WhatsAppChannelPopup: React.FC = () => {
         </div>
       </div>
 
-      {/* Keyframe animations */}
+      {/* Keyframe animations (GPU composited) */}
       <style>{`
         @keyframes shimmer {
-          0% { background-position: -200% 0; }
-          100% { background-position: 200% 0; }
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
         }
         @keyframes pulse-glow {
-          0%, 100% { box-shadow: 0 8px 24px rgba(37, 211, 102, 0.3); }
-          50% { box-shadow: 0 8px 32px rgba(37, 211, 102, 0.5); }
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.04); }
         }
       `}</style>
     </>

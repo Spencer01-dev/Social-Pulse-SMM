@@ -94,6 +94,11 @@ async def order_child_panel(
 
     await db.commit()
     await db.refresh(panel)
+
+    # 6. Trigger automated provisioning pipeline
+    from app.services.provisioning import ChildPanelProvisioningService
+    panel = await ChildPanelProvisioningService.run_provisioning_pipeline(db, panel)
+
     return panel
 
 
@@ -208,6 +213,90 @@ async def update_child_panel_status_admin(
     panel.status = payload.status
     if payload.notes:
         panel.notes = payload.notes
+    db.add(panel)
+    await db.commit()
+    await db.refresh(panel)
+    return panel
+
+
+@router.post("/{panel_id}/verify-dns")
+async def verify_child_panel_dns(
+    panel_id: uuid.UUID,
+    force: bool = False,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """
+    Check if nameservers or CNAME for this child panel have propagated.
+    Transitions panel to ACTIVE if verified or forced for testing.
+    """
+    query = await db.execute(
+        select(ChildPanel).where(ChildPanel.id == panel_id)
+    )
+    panel = query.scalars().first()
+    if not panel:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Child panel not found.")
+
+    # Only owner or admin can trigger verification
+    if panel.user_id != current_user.id and current_user.role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+
+    from app.services.provisioning import ChildPanelProvisioningService
+    result = await ChildPanelProvisioningService.verify_dns_and_activate(db, panel, force_activate=force)
+    return result
+
+
+@router.post("/{panel_id}/retry", response_model=ChildPanelResponse)
+async def retry_child_panel_provisioning(
+    panel_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """
+    Retry provisioning pipeline if stuck or failed.
+    """
+    query = await db.execute(
+        select(ChildPanel).where(ChildPanel.id == panel_id)
+    )
+    panel = query.scalars().first()
+    if not panel:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Child panel not found.")
+
+    if panel.user_id != current_user.id and current_user.role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+
+    from app.services.provisioning import ChildPanelProvisioningService
+    panel = await ChildPanelProvisioningService.run_provisioning_pipeline(db, panel)
+    return panel
+
+
+@router.patch("/{panel_id}/branding", response_model=ChildPanelResponse)
+async def update_child_panel_branding(
+    panel_id: uuid.UUID,
+    branding: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """
+    Update tenant branding, site name, logo, theme, and default markup.
+    """
+    query = await db.execute(
+        select(ChildPanel).where(ChildPanel.id == panel_id)
+    )
+    panel = query.scalars().first()
+    if not panel:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Child panel not found.")
+
+    if panel.user_id != current_user.id and current_user.role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+
+    from sqlalchemy.orm.attributes import flag_modified
+
+    existing_branding = dict(panel.branding_json or {})
+    existing_branding.update(branding)
+    panel.branding_json = existing_branding
+    flag_modified(panel, "branding_json")
+
     db.add(panel)
     await db.commit()
     await db.refresh(panel)

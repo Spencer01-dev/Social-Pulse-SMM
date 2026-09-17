@@ -1,5 +1,6 @@
 import enum
-from sqlalchemy import Boolean, Column, Enum, Numeric, String
+from sqlalchemy import Boolean, Column, Enum, ForeignKey, Numeric, String
+from sqlalchemy.dialects.postgresql import UUID
 from app.models.base import TimeStampedUUIDModel
 
 
@@ -12,6 +13,8 @@ class UserRole(str, enum.Enum):
 
 class User(TimeStampedUUIDModel):
     __tablename__ = "users"
+
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("child_panels.id", ondelete="SET NULL"), nullable=True, index=True)
 
     email = Column(String(255), unique=True, index=True, nullable=False)
     username = Column(String(100), unique=True, index=True, nullable=False)

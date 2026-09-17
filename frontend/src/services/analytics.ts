@@ -1,6 +1,25 @@
 import apiClient from './api';
 import { Role, User } from '../types';
 
+export interface TodayEconomics {
+  revenue: number;
+  provider_cost: number;
+  gross_profit: number;
+  refunds: number;
+  net_profit: number;
+  orders_total: number;
+  orders_completed: number;
+  orders_processing: number;
+  orders_failed: number;
+}
+
+export interface SaasPanelMetrics {
+  active_panels: number;
+  monthly_recurring_revenue: number;
+  expired_panels: number;
+  provisioning_panels: number;
+}
+
 export interface AnalyticsOverview {
   total_revenue: number;
   total_provider_cost: number;
@@ -11,7 +30,10 @@ export interface AnalyticsOverview {
   total_active_users: number;
   total_deposits_volume: number;
   currency: string;
+  today?: TodayEconomics;
+  saas?: SaasPanelMetrics;
 }
+
 
 export interface DailyRevenue {
   date_label: string;

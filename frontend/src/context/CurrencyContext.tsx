@@ -90,8 +90,8 @@ export const CurrencyProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (res && res.currencies) {
         setCurrencies(res.currencies);
       }
-    } catch (err) {
-      console.warn('Using default currency rates due to fetch failure', err);
+    } catch {
+      // Gracefully fall back to pre-configured DEFAULT_CURRENCIES without blocking UI or logging network errors
     } finally {
       setIsLoading(false);
     }

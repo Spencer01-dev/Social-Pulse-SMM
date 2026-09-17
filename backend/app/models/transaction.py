@@ -37,6 +37,7 @@ class Transaction(TimeStampedUUIDModel):
 
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     order_id = Column(UUID(as_uuid=True), ForeignKey("orders.id", ondelete="SET NULL"), nullable=True, index=True)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("child_panels.id", ondelete="SET NULL"), nullable=True, index=True)
 
     type = Column(
         Enum(

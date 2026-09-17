@@ -1,13 +1,14 @@
 import uuid
 from decimal import Decimal
 from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from sqlalchemy import cast, desc, select, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_active_user
 from app.core.database import get_db
+from app.models.child_panel import ChildPanel
 from app.models.order import Order, OrderStatus
 from app.models.service import Service
 from app.models.user import User, UserRole
@@ -20,6 +21,8 @@ router = APIRouter(prefix="/orders", tags=["Orders"])
 @router.post("", response_model=CustomerOrderResponse, status_code=status.HTTP_201_CREATED)
 async def create_order(
     order_in: OrderCreate,
+    request: Request,
+    x_tenant_domain: Optional[str] = Header(None, alias="X-Tenant-Domain"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ) -> Any:
@@ -108,9 +111,31 @@ async def create_order(
         error_msg = f"Provider failover exhausted: {str(exc)}"
         initial_status = OrderStatus.PENDING
 
-    # 7. Persist order record in database
+    # 8. Resolve tenant context for child-panel attribution
+    tenant_id = None
+    raw_domain = x_tenant_domain or request.headers.get("x-tenant-domain") or request.headers.get("X-Tenant-Domain")
+    if raw_domain:
+        clean_tenant_domain = (
+            raw_domain.split(":")[0]
+            .strip()
+            .lower()
+            .replace("https://", "")
+            .replace("http://", "")
+            .rstrip("/")
+        )
+        tenant_q = await db.execute(
+            select(ChildPanel).where(ChildPanel.domain == clean_tenant_domain)
+        )
+        panel = tenant_q.scalars().first()
+        if panel:
+            tenant_id = panel.id
+    if not tenant_id and current_user.tenant_id:
+        tenant_id = current_user.tenant_id
+
+    # 9. Persist order record in database
     order = Order(
         user_id=current_user.id,
+        tenant_id=tenant_id,
         service_id=service.id,
         provider_id=service.provider_id,
         provider_order_id=provider_order_id,
@@ -134,6 +159,7 @@ async def create_order(
     return CustomerOrderResponse(
         id=order.id,
         order_number=order.order_number,
+        tenant_id=order.tenant_id,
         service_id=service.id,
         service_name=service.name,
         platform=service.platform,

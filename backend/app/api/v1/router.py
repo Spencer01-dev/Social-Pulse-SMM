@@ -15,12 +15,16 @@ from app.api.v1.endpoints import (
     tickets,
     users,
     wallet,
+    tenant,
 )
 
 api_router = APIRouter()
 
 # Health check route
 api_router.include_router(health.router)
+
+# Tenant Domain Resolution Route
+api_router.include_router(tenant.router)
 
 # Authentication & Registration
 api_router.include_router(auth.router)

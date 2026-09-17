@@ -24,6 +24,7 @@ import {
   Phone
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useTenant } from '../../context/TenantContext';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -32,8 +33,12 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { user, isAuthenticated, logout } = useAuth();
+  const { isTenantMode, tenant } = useTenant();
   const navigate = useNavigate();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+
+  const accentColor = isTenantMode && tenant ? tenant.theme_color || '#f59e0b' : '#f59e0b';
+  const brandTitle = isTenantMode && tenant ? tenant.site_name : 'SocialPulse';
 
   const handleLogout = () => {
     logout();
@@ -49,7 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { name: 'Services', href: '/services', icon: Layers },
     { name: 'Tickets', href: '/support', icon: LifeBuoy },
     { name: 'Api', href: '/api-docs', icon: Code2 },
-    { name: 'Child panel', href: '/child-panel', icon: Sparkles },
+    ...(!isTenantMode ? [{ name: 'Child panel', href: '/child-panel', icon: Sparkles }] : []),
     { name: 'Refer & Earn', href: '/referrals', icon: Share2 },
     { name: 'Updates', href: '/updates', icon: Bell },
   ];
@@ -82,10 +87,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         {/* Mobile Header with Close Button */}
         <div className="flex items-center justify-between p-4 border-b border-[#2b303c] lg:hidden">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-[#f59e0b] text-slate-950 flex items-center justify-center font-black">
+            <div
+              className="w-8 h-8 rounded-xl text-slate-950 flex items-center justify-center font-black transition-colors"
+              style={{ backgroundColor: accentColor }}
+            >
               <Zap className="w-4 h-4 fill-slate-950 text-slate-950" />
             </div>
-            <span className="font-extrabold text-white">SocialPulse</span>
+            <span className="font-extrabold text-white">{brandTitle}</span>
           </div>
           <button
             onClick={onClose}
@@ -110,9 +118,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                     className={({ isActive }) =>
                       `flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                         isActive
-                          ? 'bg-[#f59e0b] text-slate-950 shadow-lg shadow-amber-500/20'
+                          ? 'text-slate-950 shadow-lg'
                           : 'text-slate-300 hover:text-white hover:bg-[#222630]'
                       }`
+                    }
+                    style={({ isActive }) =>
+                      isActive
+                        ? {
+                            backgroundColor: accentColor,
+                            boxShadow: `0 10px 15px -3px ${accentColor}40`,
+                          }
+                        : {}
                     }
                   >
                     <div className="flex items-center gap-3">
@@ -136,7 +152,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             </nav>
           </div>
 
-          {isAdmin && (
+          {isAdmin && !isTenantMode && (
             <div className="pt-2 border-t border-[#2b303c]">
               <span className="px-3 text-[10px] font-black uppercase tracking-wider text-[#f59e0b] block mb-2">
                 Staff Control

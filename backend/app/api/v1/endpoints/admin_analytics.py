@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, List
 from fastapi import APIRouter, Depends
@@ -18,6 +18,8 @@ from app.schemas.analytics import (
     PlatformMetricItem,
     RecentActivityItem,
     TopServiceItem,
+    TodayEconomics,
+    SaasPanelMetrics,
 )
 
 router = APIRouter(prefix="/admin/analytics", tags=["Admin Analytics & Telemetry"])
@@ -68,6 +70,99 @@ async def get_analytics_overview(
     if total_rev > 0:
         profit_margin = round((total_profit / total_rev) * Decimal("100.00"), 1)
 
+    # 5. Today's Provider Economics
+    from app.models.child_panel import ChildPanel, ChildPanelStatus
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_agg = await db.execute(
+        select(
+            func.coalesce(func.sum(Order.charge), Decimal("0.00")),
+            func.coalesce(func.sum(Order.provider_cost), Decimal("0.00")),
+            func.coalesce(func.sum(Order.profit), Decimal("0.00")),
+            func.count(Order.id)
+        ).where(active_order_filter, Order.created_at >= today_start)
+    )
+    t_rev, t_cost, t_gross, t_orders = today_agg.first()
+
+    today_ref_res = await db.execute(
+        select(func.coalesce(func.sum(Transaction.amount), Decimal("0.00")))
+        .where(Transaction.type == TransactionType.ORDER_REFUND, Transaction.created_at >= today_start)
+    )
+    t_refunds = abs(today_ref_res.scalar() or Decimal("0.00"))
+    t_net = max(Decimal("0.00"), t_gross - t_refunds)
+
+    t_completed_res = await db.execute(
+        select(func.count(Order.id)).where(Order.status == OrderStatus.COMPLETED, Order.created_at >= today_start)
+    )
+    t_completed = t_completed_res.scalar() or 0
+
+    t_proc_res = await db.execute(
+        select(func.count(Order.id)).where(
+            Order.status.in_([OrderStatus.PENDING, OrderStatus.PROCESSING, OrderStatus.IN_PROGRESS]),
+            Order.created_at >= today_start
+        )
+    )
+    t_processing = t_proc_res.scalar() or 0
+
+    t_failed_res = await db.execute(
+        select(func.count(Order.id)).where(
+            Order.status.in_([OrderStatus.FAILED, OrderStatus.CANCELED]),
+            Order.created_at >= today_start
+        )
+    )
+    t_failed = t_failed_res.scalar() or 0
+
+    # 6. Child Panel SaaS Recurring Telemetry
+    active_panels_res = await db.execute(
+        select(func.count(ChildPanel.id)).where(ChildPanel.status == ChildPanelStatus.ACTIVE.value)
+    )
+    active_panels = active_panels_res.scalar() or 0
+
+    expired_panels_res = await db.execute(
+        select(func.count(ChildPanel.id)).where(ChildPanel.status == ChildPanelStatus.EXPIRED.value)
+    )
+    expired_panels = expired_panels_res.scalar() or 0
+
+    prov_panels_res = await db.execute(
+        select(func.count(ChildPanel.id)).where(
+            ChildPanel.status.in_([
+                ChildPanelStatus.PENDING.value,
+                ChildPanelStatus.PAYMENT_CONFIRMED.value,
+                ChildPanelStatus.CREATING_TENANT.value,
+                ChildPanelStatus.CONFIGURING_DATABASE.value,
+                ChildPanelStatus.CONFIGURING_DOMAIN.value,
+                ChildPanelStatus.CONFIGURING_BRANDING.value,
+                ChildPanelStatus.CONFIGURING_API.value,
+                ChildPanelStatus.SSL_PENDING.value,
+            ])
+        )
+    )
+    prov_panels = prov_panels_res.scalar() or 0
+
+    mrr_res = await db.execute(
+        select(func.coalesce(func.sum(ChildPanel.price_per_month), Decimal("0.00")))
+        .where(ChildPanel.status == ChildPanelStatus.ACTIVE.value)
+    )
+    mrr = mrr_res.scalar() or Decimal("0.00")
+
+    today_economics = TodayEconomics(
+        revenue=t_rev,
+        provider_cost=t_cost,
+        gross_profit=t_gross,
+        refunds=t_refunds,
+        net_profit=t_net,
+        orders_total=t_orders,
+        orders_completed=t_completed,
+        orders_processing=t_processing,
+        orders_failed=t_failed
+    )
+
+    saas_metrics = SaasPanelMetrics(
+        active_panels=active_panels,
+        monthly_recurring_revenue=mrr,
+        expired_panels=expired_panels,
+        provisioning_panels=prov_panels
+    )
+
     return AnalyticsOverviewResponse(
         total_revenue=total_rev,
         total_provider_cost=total_cost,
@@ -77,7 +172,9 @@ async def get_analytics_overview(
         total_completed_orders=total_completed,
         total_active_users=total_active_users,
         total_deposits_volume=total_deposits,
-        currency="KES"
+        currency="KES",
+        today=today_economics,
+        saas=saas_metrics
     )
 
 

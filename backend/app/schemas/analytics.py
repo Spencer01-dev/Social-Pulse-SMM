@@ -8,6 +8,25 @@ from app.models.service import Platform
 from app.models.user import UserRole
 
 
+class TodayEconomics(BaseModel):
+    revenue: Decimal = Decimal("0.00")
+    provider_cost: Decimal = Decimal("0.00")
+    gross_profit: Decimal = Decimal("0.00")
+    refunds: Decimal = Decimal("0.00")
+    net_profit: Decimal = Decimal("0.00")
+    orders_total: int = 0
+    orders_completed: int = 0
+    orders_processing: int = 0
+    orders_failed: int = 0
+
+
+class SaasPanelMetrics(BaseModel):
+    active_panels: int = 0
+    monthly_recurring_revenue: Decimal = Decimal("0.00")
+    expired_panels: int = 0
+    provisioning_panels: int = 0
+
+
 class AnalyticsOverviewResponse(BaseModel):
     total_revenue: Decimal
     total_provider_cost: Decimal
@@ -18,6 +37,8 @@ class AnalyticsOverviewResponse(BaseModel):
     total_active_users: int
     total_deposits_volume: Decimal
     currency: str = "KES"
+    today: Optional[TodayEconomics] = None
+    saas: Optional[SaasPanelMetrics] = None
 
 
 class DailyRevenueItem(BaseModel):

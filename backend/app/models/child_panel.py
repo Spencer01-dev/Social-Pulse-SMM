@@ -9,7 +9,15 @@ from app.models.base import TimeStampedUUIDModel
 
 class ChildPanelStatus(str, enum.Enum):
     PENDING = "pending"
+    PAYMENT_CONFIRMED = "payment_confirmed"
+    CREATING_TENANT = "creating_tenant"
+    CONFIGURING_DATABASE = "configuring_database"
+    CONFIGURING_DOMAIN = "configuring_domain"
+    CONFIGURING_BRANDING = "configuring_branding"
+    CONFIGURING_API = "configuring_api"
+    SSL_PENDING = "ssl_pending"
     ACTIVE = "active"
+    PROVISIONING_FAILED = "provisioning_failed"
     SUSPENDED = "suspended"
     EXPIRED = "expired"
     TERMINATED = "terminated"
@@ -32,16 +40,15 @@ class ChildPanel(TimeStampedUUIDModel):
     price_per_month = Column(Numeric(12, 2), default=1500.00, nullable=False)
 
     status = Column(
-        Enum(
-            ChildPanelStatus,
-            name="child_panel_status_enum",
-            values_callable=lambda obj: [e.value for e in obj],
-            create_type=False
-        ),
-        default=ChildPanelStatus.PENDING,
+        String(50),
+        default=ChildPanelStatus.PENDING.value,
         nullable=False,
         index=True
     )
+
+    provisioning_step = Column(String(50), default="pending", nullable=True)
+    last_error = Column(Text, nullable=True)
+    branding_json = Column(JSONB, nullable=True)
 
     nameserver1 = Column(String(255), default="ns1.socialpulse.io", nullable=False)
     nameserver2 = Column(String(255), default="ns2.socialpulse.io", nullable=False)
@@ -53,7 +60,8 @@ class ChildPanel(TimeStampedUUIDModel):
     metadata_json = Column(JSONB, nullable=True)
 
     # Relationships
-    user = relationship("User", backref="child_panels")
+    user = relationship("User", backref="child_panels", foreign_keys=[user_id])
 
     def __repr__(self):
-        return f"<ChildPanel {self.domain} ({self.status.value}) - User {self.user_id}>"
+        return f"<ChildPanel {self.domain} ({self.status}) - User {self.user_id}>"
+

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Sparkles,
   Globe,
@@ -13,19 +14,31 @@ import {
   EyeOff,
   Zap,
   Clock,
-  XCircle
+  XCircle,
+  Sliders,
+  ExternalLink
 } from 'lucide-react';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { useAuth } from '../../context/AuthContext';
 import { useCurrency } from '../../context/CurrencyContext';
+import { useTenant } from '../../context/TenantContext';
 import { childPanelService, ChildPanelData } from '../../services/childPanels';
 import { analyticsService, DailyRevenue } from '../../services/analytics';
 import { DailyRevenueCalendar } from '../../components/analytics/DailyRevenueCalendar';
+import { ChildPanelBrandingModal } from './ChildPanelBrandingModal';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  pending: { label: 'Provisioning', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/25' },
+  pending: { label: 'Pending Provisioning', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/25' },
+  payment_confirmed: { label: 'Payment Confirmed', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/25' },
+  creating_tenant: { label: 'Creating Tenant', color: 'text-sky-400', bg: 'bg-sky-500/10', border: 'border-sky-500/25' },
+  configuring_database: { label: 'Configuring DB', color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/25' },
+  configuring_domain: { label: 'DNS Verification Pending', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/25' },
+  configuring_branding: { label: 'Setting Up Branding', color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/25' },
+  configuring_api: { label: 'Connecting Wholesale API', color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/25' },
+  ssl_pending: { label: 'SSL Pending', color: 'text-teal-400', bg: 'bg-teal-500/10', border: 'border-teal-500/25' },
   active: { label: 'Active', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/25' },
+  provisioning_failed: { label: 'Provisioning Failed', color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/25' },
   suspended: { label: 'Suspended', color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/25' },
   expired: { label: 'Expired', color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/25' },
   terminated: { label: 'Terminated', color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/25' },
@@ -34,6 +47,8 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
 export const ChildPanelPage: React.FC = () => {
   const { user } = useAuth();
   const { formatCurrency } = useCurrency();
+  const { enterTenantMode } = useTenant();
+  const navigate = useNavigate();
   const [panels, setPanels] = useState<ChildPanelData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -44,8 +59,17 @@ export const ChildPanelPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [renewingId, setRenewingId] = useState<string | null>(null);
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
   const [copiedNs, setCopiedNs] = useState<string | null>(null);
+  const [brandingModalPanel, setBrandingModalPanel] = useState<ChildPanelData | null>(null);
+
+  const handleOpenLocalhost = async (p: ChildPanelData) => {
+    await enterTenantMode(p.domain);
+    navigate('/services');
+  };
 
   const [dailyRevenue, setDailyRevenue] = useState<DailyRevenue[]>([]);
   const [loadingRevenue, setLoadingRevenue] = useState(true);
@@ -116,6 +140,41 @@ export const ChildPanelPage: React.FC = () => {
     }
   };
 
+  const handleVerifyDns = async (panelId: string, force: boolean = false) => {
+    setVerifyingId(panelId);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      const res = await childPanelService.verifyDns(panelId, force);
+      if (res.success) {
+        setSuccessMsg(res.message);
+      } else {
+        setError(res.message);
+      }
+      await fetchPanels();
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || 'DNS verification request failed.';
+      setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    } finally {
+      setVerifyingId(null);
+    }
+  };
+
+  const handleRetry = async (panelId: string) => {
+    setRetryingId(panelId);
+    setError(null);
+    try {
+      const updated = await childPanelService.retryProvisioning(panelId);
+      setPanels((prev) => prev.map((p) => (p.id === panelId ? updated : p)));
+      setSuccessMsg(`Provisioning re-triggered for ${updated.domain}.`);
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || 'Retry failed.';
+      setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    } finally {
+      setRetryingId(null);
+    }
+  };
+
   const handleCopyNs = (ns: string) => {
     navigator.clipboard.writeText(ns);
     setCopiedNs(ns);
@@ -125,6 +184,24 @@ export const ChildPanelPage: React.FC = () => {
   const daysUntil = (dateStr: string) => {
     const diff = new Date(dateStr).getTime() - Date.now();
     return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  };
+
+  const PROVISIONING_STEPS = [
+    { key: 'payment_confirmed', label: 'Payment Confirmed' },
+    { key: 'creating_tenant', label: 'Tenant Created' },
+    { key: 'configuring_database', label: 'Database Ready' },
+    { key: 'configuring_domain', label: 'DNS & Domain' },
+    { key: 'configuring_branding', label: 'Branding & API' },
+    { key: 'ssl_pending', label: 'SSL Certificate' },
+    { key: 'active', label: 'Live & Active' },
+  ];
+
+  const getStepIndex = (status: string) => {
+    const idx = PROVISIONING_STEPS.findIndex((s) => s.key === status);
+    if (idx !== -1) return idx;
+    if (status === 'pending') return 0;
+    if (status === 'active') return PROVISIONING_STEPS.length - 1;
+    return 3;
   };
 
   return (
@@ -196,6 +273,8 @@ export const ChildPanelPage: React.FC = () => {
               const statusCfg = STATUS_CONFIG[panel.status] || STATUS_CONFIG.pending;
               const remaining = daysUntil(panel.expires_at);
               const isExpiringSoon = remaining <= 5 && panel.status === 'active';
+              const isProvisioning = !['active', 'expired', 'suspended', 'terminated'].includes(panel.status);
+              const currentStepIdx = getStepIndex(panel.status);
 
               return (
                 <Card
@@ -208,18 +287,18 @@ export const ChildPanelPage: React.FC = () => {
                     <div className="flex-1 min-w-0 space-y-1.5">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-black text-white truncate">{panel.domain}</span>
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusCfg.bg} ${statusCfg.color} ${statusCfg.border} border`}>
-                          {statusCfg.label}
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusCfg.bg} ${statusCfg.color} ${statusCfg.border} border`}>
+                          {panel.status === 'active' ? `ACTIVE — ${remaining} days remaining` : statusCfg.label}
                         </span>
                       </div>
 
                       <div className="flex items-center gap-4 text-[11px] text-slate-400 flex-wrap">
                         <span className="flex items-center gap-1">
-                          <ShieldCheck className="w-3 h-3 text-slate-500" />
+                          <ShieldCheck className="w-3.5 h-3.5 text-slate-500" />
                           Admin: <strong className="text-slate-300">{panel.admin_username}</strong>
                         </span>
                         <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-slate-500" />
+                          <Clock className="w-3.5 h-3.5 text-slate-500" />
                           {remaining > 0 ? `${remaining} days left` : 'Expired'}
                         </span>
                         <span className="text-slate-500 font-mono text-[10px]">
@@ -228,7 +307,75 @@ export const ChildPanelPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      {panel.status === 'active' && (
+                        <>
+                          <button
+                            onClick={() => handleOpenLocalhost(panel)}
+                            className="px-3 py-1.5 rounded-lg bg-amber-500 text-slate-950 text-xs font-black hover:bg-amber-400 transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95 cursor-pointer"
+                            title="Open and simulate this child panel on localhost"
+                          >
+                            <Zap className="w-3.5 h-3.5 fill-slate-950" />
+                            Open Localhost Panel
+                          </button>
+
+                          <button
+                            onClick={() => setBrandingModalPanel(panel)}
+                            className="px-3 py-1.5 rounded-lg bg-[#222630] border border-[#2b303c] text-slate-200 hover:text-white hover:border-amber-500/40 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                            title="Customize Site Name, Logo, Theme Color, and Retail Markup %"
+                          >
+                            <Sliders className="w-3.5 h-3.5 text-amber-400" />
+                            Branding & Markup
+                          </button>
+
+                          <a
+                            href={`https://${panel.domain}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2.5 py-1.5 rounded-lg bg-[#181a20] border border-[#2b303c] text-slate-400 text-[11px] font-medium hover:text-slate-200 transition-colors flex items-center gap-1"
+                            title="Open registered domain on public DNS (opens actual external domain if registered)"
+                          >
+                            <Globe className="w-3.5 h-3.5" />
+                            Live Domain
+                            <ExternalLink className="w-3 h-3 text-slate-500" />
+                          </a>
+                        </>
+                      )}
+
+                      {isProvisioning && (
+                        <>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleVerifyDns(panel.id, false)}
+                            isLoading={verifyingId === panel.id}
+                            leftIcon={<RefreshCcw className="w-3.5 h-3.5" />}
+                          >
+                            Verify DNS & Activate
+                          </Button>
+                          <button
+                            onClick={() => handleVerifyDns(panel.id, true)}
+                            disabled={verifyingId === panel.id}
+                            className="px-2.5 py-1.5 rounded-lg bg-[#222630] border border-[#2b303c] text-slate-300 text-[11px] font-bold hover:text-amber-400 hover:border-amber-500/30 transition-colors"
+                            title="Bypass DNS lookup for local / testing domains"
+                          >
+                            Activate (Dev)
+                          </button>
+                        </>
+                      )}
+
+                      {panel.status === 'provisioning_failed' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRetry(panel.id)}
+                          isLoading={retryingId === panel.id}
+                          leftIcon={<RefreshCcw className="w-3.5 h-3.5" />}
+                        >
+                          Retry Provisioning
+                        </Button>
+                      )}
+
                       {(panel.status === 'active' || panel.status === 'expired') && (
                         <Button
                           variant={panel.status === 'expired' ? 'primary' : 'outline'}
@@ -243,6 +390,97 @@ export const ChildPanelPage: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Provisioning Stepper Widget */}
+                  {isProvisioning && (
+                    <div className="mt-4 p-3.5 rounded-xl bg-[#121418] border border-[#2b303c] space-y-3">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+                        <span className="flex items-center gap-1.5 text-amber-400">
+                          <Sparkles className="w-3.5 h-3.5" />
+                          Automated Provisioning Pipeline
+                        </span>
+                        <span className="text-[10px] text-slate-500 uppercase tracking-wider">
+                          Step {Math.min(currentStepIdx + 1, PROVISIONING_STEPS.length)} of {PROVISIONING_STEPS.length}
+                        </span>
+                      </div>
+
+                      {/* Stepper bubbles */}
+                      <div className="grid grid-cols-2 sm:grid-cols-7 gap-1.5 pt-1">
+                        {PROVISIONING_STEPS.map((step, idx) => {
+                          const isDone = idx < currentStepIdx;
+                          const isCurrent = idx === currentStepIdx;
+                          return (
+                            <div
+                              key={step.key}
+                              className={`p-2 rounded-lg border text-center transition-all ${
+                                isDone
+                                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                  : isCurrent
+                                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 animate-pulse'
+                                  : 'bg-[#181a20] border-[#2b303c] text-slate-500'
+                              }`}
+                            >
+                              <div className="text-[9px] font-mono uppercase font-bold tracking-wider">
+                                {isDone ? 'Done' : isCurrent ? 'Active' : `Step ${idx + 1}`}
+                              </div>
+                              <div className="text-[10px] font-bold truncate mt-0.5">{step.label}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* DNS / Nameserver Helper Box */}
+                      <div className="p-3 rounded-lg bg-[#181a20] border border-amber-500/20 text-xs space-y-2">
+                        <div className="flex items-center gap-2 text-amber-400 font-bold text-[11px]">
+                          <Globe className="w-3.5 h-3.5 shrink-0" />
+                          <span>Point Your Domain to Complete Activation:</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                          <div className="p-2 rounded bg-[#121418] border border-[#2b303c]">
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Option A: Nameservers</span>
+                            <div className="font-mono text-emerald-400 text-[10px] space-y-0.5">
+                              <div>ns1.socialpulse.io</div>
+                              <div>ns2.socialpulse.io</div>
+                            </div>
+                          </div>
+                          <div className="p-2 rounded bg-[#121418] border border-[#2b303c]">
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Option B: Fast CNAME</span>
+                            <div className="font-mono text-emerald-400 text-[10px]">
+                              CNAME <span className="text-white">panel</span> → <span className="text-amber-300">cname.socialpulse.io</span>
+                            </div>
+                          </div>
+                        </div>
+                        {panel.last_error && (
+                          <div className="text-[10px] text-rose-400 bg-rose-500/10 p-2 rounded border border-rose-500/20">
+                            {panel.last_error}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {panel.status === 'active' && (
+                    <div className="mt-3 p-3 rounded-xl bg-[#121418] border border-amber-500/25 flex items-start gap-2.5 text-xs text-slate-300">
+                      <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <div className="font-bold text-white flex items-center gap-1.5">
+                          <span>Localhost Simulation Ready</span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-mono">Dev Mode</span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                          Since <span className="font-mono text-amber-300 font-bold">{panel.domain}</span> is an external domain not mapped to your machine, click{' '}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenLocalhost(panel)}
+                            className="text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer"
+                          >
+                            Open Localhost Panel
+                          </button>{' '}
+                          above to test the complete end-to-end customer workflow (marked-up services catalog, custom branding, and tenant ordering) right in your browser!
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {isExpiringSoon && (
                     <div className="mt-3 p-2.5 rounded-xl bg-amber-500/5 border border-amber-500/15 text-[11px] text-amber-400 flex items-center gap-2">
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
@@ -252,7 +490,21 @@ export const ChildPanelPage: React.FC = () => {
                 </Card>
               );
             })}
+
           </div>
+        </div>
+      )}
+
+      {/* Success Notification Banner */}
+      {successMsg && (
+        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm flex items-start gap-3">
+          <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5 text-emerald-400" />
+          <div className="flex-1">
+            <span>{successMsg}</span>
+          </div>
+          <button onClick={() => setSuccessMsg(null)} className="text-emerald-400 hover:text-emerald-300">
+            <XCircle className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -398,6 +650,19 @@ export const ChildPanelPage: React.FC = () => {
           })}
         </div>
       </div>
+
+      {/* Child Panel Branding & Markup Customization Modal */}
+      {brandingModalPanel && (
+        <ChildPanelBrandingModal
+          panel={brandingModalPanel}
+          isOpen={Boolean(brandingModalPanel)}
+          onClose={() => setBrandingModalPanel(null)}
+          onUpdated={(updated) => {
+            setPanels((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+            setBrandingModalPanel(null);
+          }}
+        />
+      )}
     </div>
   );
 };
