@@ -19,26 +19,29 @@ ALLOWED_ACTIVE_PLATFORMS = {
 }
 
 
+import re
+
+
 def detect_platform(name: str, category: str) -> Platform:
     """
     Intelligently infer social media platform from service name or category string.
-    Ensures extensibility without hardcoded application logic.
+    Uses regex word boundaries to prevent false positives (e.g. 'big base' matching 'ig ').
     """
     text = f"{name} {category}".lower()
     
-    if "whatsapp" in text or "wa " in text or "wa:" in text:
+    if re.search(r'\b(whatsapp|wa)\b', text):
         return Platform.WHATSAPP
-    elif "tiktok" in text or "tik tok" in text:
+    elif re.search(r'\b(tiktok|tik tok)\b', text):
         return Platform.TIKTOK
-    elif "instagram" in text or "ig " in text or "ig:" in text or "reels" in text:
-        return Platform.INSTAGRAM
-    elif "facebook" in text or "fb " in text or "fb:" in text:
+    elif re.search(r'\b(facebook|fb)\b', text):
         return Platform.FACEBOOK
-    elif "telegram" in text or "tg " in text:
+    elif re.search(r'\b(instagram|ig)\b', text) or "reel" in text:
+        return Platform.INSTAGRAM
+    elif re.search(r'\b(telegram|tg)\b', text):
         return Platform.TELEGRAM
-    elif "youtube" in text or "yt " in text or "yt:" in text:
+    elif re.search(r'\b(youtube|yt)\b', text):
         return Platform.YOUTUBE
-    elif "twitter" in text or " x " in text or "tweet" in text:
+    elif re.search(r'\b(twitter|tweet|threads)\b', text) or " x " in text:
         return Platform.TWITTER
     elif "spotify" in text:
         return Platform.SPOTIFY
@@ -92,9 +95,13 @@ async def sync_services_from_provider(
             p_name = "Delix Gains KE"
             p_url = settings.DELIX_API_URL
             p_currency = "KES"
-        elif provider_slug in ["smm_africa", "smm-africa", "smm.africa", "smmafrica", "smm"]:
-            p_name = "SMM Africa"
-            p_url = settings.SMM_AFRICA_API_URL
+        elif provider_slug in ["jap", "justanotherpanel", "just_another_panel", "just-another-panel"]:
+            p_name = "JustAnotherPanel"
+            p_url = settings.JAP_API_URL
+            p_currency = "USD"
+        elif provider_slug in ["secsers", "secsers.com", "secser"]:
+            p_name = "Secsers"
+            p_url = settings.SECSERS_API_URL
             p_currency = "USD"
         else:
             p_name = provider_slug.capitalize()

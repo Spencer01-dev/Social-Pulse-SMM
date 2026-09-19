@@ -82,7 +82,12 @@ export interface PlatformSettings {
       api_url: string;
       has_api_key: boolean;
     };
-    smm_africa?: {
+    jap?: {
+      name?: string;
+      api_url: string;
+      has_api_key: boolean;
+    };
+    secsers?: {
       name?: string;
       api_url: string;
       has_api_key: boolean;

@@ -147,7 +147,8 @@ export const AdminServicesPage: React.FC = () => {
               className="px-3 py-2 bg-slate-950/80 border border-amber-500/30 rounded-xl text-white text-xs font-semibold focus:outline-none focus:border-amber-500 cursor-pointer"
             >
               <option value="delix">Delix Gains KE</option>
-              <option value="smm_africa">SMM Africa</option>
+              <option value="jap">JustAnotherPanel</option>
+              <option value="secsers">Secsers</option>
             </select>
 
             <Button
@@ -158,11 +159,40 @@ export const AdminServicesPage: React.FC = () => {
               className="flex items-center gap-1.5"
             >
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-              <span>{syncing ? 'Syncing...' : `Sync from ${syncProvider === 'smm_africa' ? 'SMM Africa' : 'Delix Gains'}`}</span>
+              <span>
+                {syncing
+                  ? 'Syncing...'
+                  : `Sync from ${
+                      syncProvider === 'jap'
+                        ? 'JustAnotherPanel'
+                        : syncProvider === 'secsers'
+                        ? 'Secsers'
+                        : 'Delix Gains'
+                    }`}
+              </span>
             </Button>
           </div>
         </div>
       </div>
+
+      {syncResult && (
+        <div
+          className={`p-4 rounded-xl border flex items-center justify-between text-sm animate-fadeIn ${
+            syncResult.toLowerCase().includes('error')
+              ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+              : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+          }`}
+        >
+          <span className="font-medium">{syncResult}</span>
+          <button
+            type="button"
+            onClick={() => setSyncResult(null)}
+            className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Provider Balance & Sync Status */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -170,7 +200,12 @@ export const AdminServicesPage: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-                {syncProvider === 'smm_africa' ? 'SMM Africa' : 'Delix Gains KE'} Balance
+                {syncProvider === 'jap'
+                  ? 'JustAnotherPanel'
+                  : syncProvider === 'secsers'
+                  ? 'Secsers'
+                  : 'Delix Gains KE'}{' '}
+                Balance
               </span>
               <button
                 onClick={async () => {
@@ -291,17 +326,28 @@ export const AdminServicesPage: React.FC = () => {
                   <td className="py-3.5 px-4">
                     <span
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                        service.provider_slug === 'smm_africa'
+                        service.provider_slug === 'jap'
                           ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+                          : service.provider_slug === 'secsers'
+                          ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30'
                           : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
                       }`}
                     >
                       <span
                         className={`w-1.5 h-1.5 rounded-full ${
-                          service.provider_slug === 'smm_africa' ? 'bg-cyan-400' : 'bg-amber-400'
+                          service.provider_slug === 'jap'
+                            ? 'bg-cyan-400'
+                            : service.provider_slug === 'secsers'
+                            ? 'bg-indigo-400'
+                            : 'bg-amber-400'
                         }`}
                       />
-                      {service.provider_name || (service.provider_slug === 'smm_africa' ? 'SMM Africa' : 'Delix Gains')}
+                      {service.provider_name ||
+                        (service.provider_slug === 'jap'
+                          ? 'JustAnotherPanel'
+                          : service.provider_slug === 'secsers'
+                          ? 'Secsers'
+                          : 'Delix Gains')}
                     </span>
                   </td>
                   <td className="py-3.5 px-4 font-mono text-slate-400">#{service.provider_service_id}</td>

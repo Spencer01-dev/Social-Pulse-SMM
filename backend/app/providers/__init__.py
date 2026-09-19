@@ -7,7 +7,8 @@ from app.providers.base import (
     ProviderServiceItem,
 )
 from app.providers.delix import DelixGainsProvider
-from app.providers.smm_africa import SMMAfricaProvider
+from app.providers.jap import JustAnotherPanelProvider
+from app.providers.secsers import SecsersProvider
 from app.providers.manager import get_provider
 from app.providers.mock import MockProvider
 
@@ -18,7 +19,8 @@ __all__ = [
     "ProviderOrderResponse",
     "ProviderOrderStatus",
     "DelixGainsProvider",
-    "SMMAfricaProvider",
+    "JustAnotherPanelProvider",
+    "SecsersProvider",
     "MockProvider",
     "get_provider",
 ]

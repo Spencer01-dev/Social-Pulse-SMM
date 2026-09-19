@@ -272,3 +272,40 @@ async def get_provider_live_balance(
             "status": "offline",
             "error": str(e)
         }
+
+
+@router.get("/providers-summary")
+async def get_all_providers_summary(
+    admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
+) -> Any:
+    """
+    Query live status, balance, and configuration across all registered SMM providers:
+    Delix Gains KE, JustAnotherPanel, and Secsers.
+    """
+    from app.core.config import settings
+
+    providers_list = [
+        {"name": "Delix Gains KE", "slug": "delix", "api_url": settings.DELIX_API_URL, "currency": "KES"},
+        {"name": "JustAnotherPanel", "slug": "jap", "api_url": settings.JAP_API_URL, "currency": "USD"},
+        {"name": "Secsers", "slug": "secsers", "api_url": settings.SECSERS_API_URL, "currency": "USD"},
+    ]
+    results = []
+    for p in providers_list:
+        try:
+            client = get_provider(slug=p["slug"])
+            balance = await client.get_balance()
+            results.append({
+                **p,
+                "status": "connected",
+                "balance": float(balance.balance),
+                "currency": balance.currency,
+                "error": None
+            })
+        except Exception as exc:
+            results.append({
+                **p,
+                "status": "offline",
+                "balance": 0.0,
+                "error": str(exc)
+            })
+    return results

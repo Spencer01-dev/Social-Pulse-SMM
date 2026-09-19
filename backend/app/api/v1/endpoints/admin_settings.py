@@ -27,11 +27,16 @@ async def get_platform_settings(
                 "api_url": settings.DELIX_API_URL,
                 "has_api_key": bool(settings.DELIX_API_KEY and settings.DELIX_API_KEY != "YOUR_DELIX_API_KEY_HERE"),
             },
-            "smm_africa": {
-                "name": "SMM Africa",
-                "api_url": settings.SMM_AFRICA_API_URL,
-                "has_api_key": bool(settings.SMM_AFRICA_API_KEY),
-            }
+            "jap": {
+                "name": "JustAnotherPanel",
+                "api_url": settings.JAP_API_URL,
+                "has_api_key": bool(settings.JAP_API_KEY),
+            },
+            "secsers": {
+                "name": "Secsers",
+                "api_url": settings.SECSERS_API_URL,
+                "has_api_key": bool(settings.SECSERS_API_KEY),
+            },
         },
         "payments": {
             "mpesa": {

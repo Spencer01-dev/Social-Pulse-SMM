@@ -78,9 +78,13 @@ class Settings(BaseSettings):
     DELIX_API_KEY: str = "EVDcnX9t9VSVJdUveItbi1tbvGuVqyBCUigzGE9pEv5n7Zwa8qmJGrDoeZs3"
     USE_MOCK_PROVIDERS: bool = False
 
-    # Upstream Provider (SMM Africa Wholesale)
-    SMM_AFRICA_API_URL: str = "https://smm.africa/api/v3"
-    SMM_AFRICA_API_KEY: str = "09af3fdf9a1290618414f9a1227826231fdcf8633fc55c590611e428bd75a9d9"
+    # Upstream Provider (JustAnotherPanel - JAP)
+    JAP_API_URL: str = "https://justanotherpanel.com/api/v2"
+    JAP_API_KEY: str = "ab911e2dcb2c1d8bb3c08a025f943fc7"
+
+    # Upstream Provider (Secsers)
+    SECSERS_API_URL: str = "https://secsers.com/api/v2"
+    SECSERS_API_KEY: str = "9fa5f5dea3e45ce91a8cf69f7d6a0605"
 
     # Payments
     MPESA_ENVIRONMENT: str = "sandbox"
