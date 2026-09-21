@@ -20,6 +20,7 @@ class CustomerServiceResponse(BaseModel):
     category: str
     provider_service_id: Optional[str] = None
     rate: Decimal = Field(..., description="Customer selling rate per 1,000 units in KES")
+    wholesale_rate: Optional[Decimal] = Field(None, description="Reseller & Child Panel wholesale buy rate per 1,000 units in KES")
     min_quantity: int
     max_quantity: int
     refill_available: bool
@@ -52,6 +53,7 @@ class AdminServiceResponse(BaseModel):
     service_type: str
     category: str
     provider_rate: Decimal
+    wholesale_rate: Optional[Decimal] = None
     selling_rate: Decimal
     profit_margin: Decimal
     markup_type: MarkupType
@@ -76,6 +78,7 @@ class AdminServiceResponse(BaseModel):
 class ServiceUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    wholesale_rate: Optional[Decimal] = None
     selling_rate: Optional[Decimal] = None
     markup_type: Optional[MarkupType] = None
     markup_value: Optional[Decimal] = None

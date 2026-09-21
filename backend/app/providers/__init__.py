@@ -6,7 +6,6 @@ from app.providers.base import (
     ProviderOrderStatus,
     ProviderServiceItem,
 )
-from app.providers.delix import DelixGainsProvider
 from app.providers.jap import JustAnotherPanelProvider
 from app.providers.secsers import SecsersProvider
 from app.providers.manager import get_provider
@@ -18,7 +17,6 @@ __all__ = [
     "ProviderBalance",
     "ProviderOrderResponse",
     "ProviderOrderStatus",
-    "DelixGainsProvider",
     "JustAnotherPanelProvider",
     "SecsersProvider",
     "MockProvider",

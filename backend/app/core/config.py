@@ -73,12 +73,10 @@ class Settings(BaseSettings):
         "*"
     ]
 
-    # Upstream Provider (Delix Gains KE)
-    DELIX_API_URL: str = "https://delixgainske.com/api/v2"
-    DELIX_API_KEY: str = "EVDcnX9t9VSVJdUveItbi1tbvGuVqyBCUigzGE9pEv5n7Zwa8qmJGrDoeZs3"
+    # Upstream Providers
     USE_MOCK_PROVIDERS: bool = False
 
-    # Upstream Provider (JustAnotherPanel - JAP)
+    # Primary Provider (JustAnotherPanel - JAP)
     JAP_API_URL: str = "https://justanotherpanel.com/api/v2"
     JAP_API_KEY: str = "ab911e2dcb2c1d8bb3c08a025f943fc7"
 

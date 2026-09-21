@@ -8,7 +8,7 @@
 ## 🌟 Platform Highlights & Completed Features
 
 - 🔐 **Enterprise Auth & RBAC**: JWT Access & Refresh Token rotation, Super Admin, Admin, Reseller, and Customer roles.
-- 📦 **Dynamic Services & Provider Engine**: Multi-provider architecture with **Delix Gains KE API v2** sync, category mapping, and automatic price markup algorithms.
+- 📦 **Dynamic Services & Provider Engine**: Multi-provider architecture with **JustAnotherPanel (JAP)** and **Secsers** API v2 sync, category mapping, and automatic price markup algorithms.
 - ⚡ **Order Fulfillment & Polling Engine**: Instant automated order dispatch with background status tracking and automatic prorated refunds.
 - 💳 **Triple Payment Gateway Suite**:
   - **Safaricom Daraja 2.0 Lipa Na M-Pesa STK Push** with live handset countdown modal & row-level locking.

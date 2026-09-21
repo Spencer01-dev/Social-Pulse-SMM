@@ -43,7 +43,19 @@ async def create_order(
             detail="The requested service is currently inactive or unavailable."
         )
 
-    # 2. Validate quantity boundaries & determine package vs per-1000 pricing
+    # 2. Determine tiered wholesale vs retail pricing
+    is_reseller = (
+        current_user.role in [UserRole.RESELLER, UserRole.ADMIN, UserRole.SUPER_ADMIN]
+        or current_user.tenant_id is not None
+        or (x_tenant_domain is not None and current_user.role == UserRole.RESELLER)
+    )
+    charge_rate = (
+        service.wholesale_rate
+        if (is_reseller and service.wholesale_rate is not None and service.wholesale_rate > 0)
+        else service.selling_rate
+    )
+
+    # 3. Validate quantity boundaries & determine package vs per-1000 pricing
     is_package = (
         (service.service_type and service.service_type.lower() == "package")
         or (service.min_quantity == 1 and service.max_quantity == 1)
@@ -51,11 +63,11 @@ async def create_order(
     )
     if is_package:
         effective_min = service.min_quantity or 1
-        total_charge = round(service.selling_rate * Decimal(order_in.quantity), 2)
+        total_charge = round(charge_rate * Decimal(order_in.quantity), 2)
         provider_cost = round(service.provider_rate * Decimal(order_in.quantity), 2)
     else:
         effective_min = max(service.min_quantity or 100, 100)
-        total_charge = round((service.selling_rate * Decimal(order_in.quantity)) / Decimal(1000), 2)
+        total_charge = round((charge_rate * Decimal(order_in.quantity)) / Decimal(1000), 2)
         provider_cost = round((service.provider_rate * Decimal(order_in.quantity)) / Decimal(1000), 2)
 
     if order_in.quantity < effective_min:
@@ -284,7 +296,7 @@ async def request_order_refill(
 ) -> Any:
     """
     Request an automated refill for an order.
-    Contacts upstream provider (Delix Gains KE) via action=refill API.
+    Contacts upstream provider via action=refill API.
     """
     result = await db.execute(
         select(Order)
@@ -316,7 +328,7 @@ async def request_order_refill(
             detail=f"Refill can only be requested for active or completed orders (current status: {order.status.value})."
         )
 
-    provider_slug = order.provider.slug if order.provider else "delix"
+    provider_slug = order.provider.slug if order.provider else "jap"
     provider_client = get_provider(slug=provider_slug)
 
     try:

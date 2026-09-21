@@ -23,17 +23,17 @@ logger = logging.getLogger("socialpulse.order_poller")
 
 async def order_status_poller_loop():
     """
-    Automated background worker that polls Delix Gains KE for live order status updates
+    Automated background worker that polls upstream providers for live order status updates
     every 15 seconds. Transitions orders (Pending -> Processing -> In Progress -> Completed/Partial/Canceled)
     and executes auto-refunds in real-time.
     """
-    logger.info("[*] Automated Delix Gains real-time order poller started.")
+    logger.info("[*] Automated real-time order poller started.")
     while True:
         try:
             async with AsyncSessionLocal() as session:
                 checked, updated = await sync_active_orders(session)
                 if updated > 0:
-                    logger.info(f"[+] Real-time status update: {updated}/{checked} active orders updated from Delix Gains.")
+                    logger.info(f"[+] Real-time status update: {updated}/{checked} active orders updated from upstream provider.")
         except Exception as e:
             logger.error(f"[!] Error in automated order status poller: {e}")
 
@@ -141,9 +141,7 @@ async def lifespan(app: FastAPI):
                 await conn.execute(text("""
                     UPDATE services 
                     SET is_active = true 
-                    WHERE platform IN ('tiktok', 'facebook', 'instagram', 'whatsapp', 'telegram')
-                      AND name NOT ILIKE '%delix%' 
-                      AND category NOT ILIKE '%delix%';
+                    WHERE platform IN ('tiktok', 'facebook', 'instagram', 'whatsapp', 'telegram');
                 """))
                 print("[+] Platform restriction verified (TikTok, Facebook, Instagram, WhatsApp, Telegram).")
 
@@ -220,12 +218,12 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         print(f"[!] Warning during admin bootstrap: {exc}")
 
-    # Auto-sync services from Delix Gains on startup
+    # Auto-sync services from JustAnotherPanel on startup
     try:
         from app.workers.service_sync import sync_services_from_provider
 
         async with AsyncSessionLocal() as db:
-            total, created, updated = await sync_services_from_provider(db, provider_slug="delix")
+            total, created, updated = await sync_services_from_provider(db, provider_slug="jap")
             print(f"[+] Service sync complete: {total} fetched, {created} created, {updated} updated.")
     except Exception as exc:
         print(f"[!] Warning during service sync: {exc}")

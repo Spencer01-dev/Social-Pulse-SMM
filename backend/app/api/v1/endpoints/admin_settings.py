@@ -22,11 +22,6 @@ async def get_platform_settings(
         "debug_mode": settings.DEBUG,
         "use_mock_providers": settings.USE_MOCK_PROVIDERS,
         "providers": {
-            "delix": {
-                "name": "Delix Gains KE",
-                "api_url": settings.DELIX_API_URL,
-                "has_api_key": bool(settings.DELIX_API_KEY and settings.DELIX_API_KEY != "YOUR_DELIX_API_KEY_HERE"),
-            },
             "jap": {
                 "name": "JustAnotherPanel",
                 "api_url": settings.JAP_API_URL,

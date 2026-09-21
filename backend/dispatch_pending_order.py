@@ -22,22 +22,22 @@ async def dispatch_order():
         print(f"    Quantity: {order.quantity}")
 
         real_service_id = str(order.service.provider_service_id) if order.service else "1"
-        print(f"[*] Submitting to Delix Gains Live Service ID: {real_service_id}...")
+        print(f"[*] Submitting to JustAnotherPanel Live Service ID: {real_service_id}...")
 
-        delix = get_provider(slug="delix")
-        provider_resp = await delix.create_order(
+        provider = get_provider(slug="jap")
+        provider_resp = await provider.create_order(
             service_id=real_service_id,
             target=order.target_link,
             quantity=order.quantity
         )
 
-        print(f"[+] Delix Gains Live API Success! Provider Order ID = {provider_resp.provider_order_id}")
+        print(f"[+] JustAnotherPanel Live API Success! Provider Order ID = {provider_resp.provider_order_id}")
 
         # Update order in DB
         order.provider_order_id = str(provider_resp.provider_order_id)
         order.status = OrderStatus.IN_PROGRESS
         await session.commit()
-        print(f"[+] Successfully dispatched to Delix Gains! Status is now IN_PROGRESS with Provider ID #{order.provider_order_id}.")
+        print(f"[+] Successfully dispatched to JustAnotherPanel! Status is now IN_PROGRESS with Provider ID #{order.provider_order_id}.")
 
 
 if __name__ == "__main__":

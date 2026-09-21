@@ -78,7 +78,7 @@ def calculate_selling_rate(
 
 async def sync_services_from_provider(
     db: AsyncSession,
-    provider_slug: str = "delix",
+    provider_slug: str = "jap",
     default_markup_percent: Decimal = Decimal("80.00")
 ) -> Tuple[int, int, int]:
     """
@@ -91,11 +91,7 @@ async def sync_services_from_provider(
 
     if not provider_record:
         # Determine provider metadata based on slug
-        if provider_slug in ["delix", "delixgains"]:
-            p_name = "Delix Gains KE"
-            p_url = settings.DELIX_API_URL
-            p_currency = "KES"
-        elif provider_slug in ["jap", "justanotherpanel", "just_another_panel", "just-another-panel"]:
+        if provider_slug in ["jap", "justanotherpanel", "just_another_panel", "just-another-panel"]:
             p_name = "JustAnotherPanel"
             p_url = settings.JAP_API_URL
             p_currency = "USD"
@@ -105,7 +101,7 @@ async def sync_services_from_provider(
             p_currency = "USD"
         else:
             p_name = provider_slug.capitalize()
-            p_url = settings.DELIX_API_URL
+            p_url = settings.JAP_API_URL
             p_currency = "USD"
 
         provider_record = Provider(
@@ -146,9 +142,6 @@ async def sync_services_from_provider(
     }
 
     for item in remote_services:
-        # Strictly exclude provider-internal / VIP packages so Delix Gains never leaks
-        if "delix" in item.name.lower() or (item.category and "delix" in item.category.lower()):
-            continue
 
         active_provider_ids.add(item.service_id)
         existing_service = existing_services_map.get(item.service_id)

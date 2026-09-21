@@ -194,13 +194,11 @@ export const NewOrderPage: React.FC = () => {
       try {
         const platformArg = selectedPlatform === 'whatsapp' ? 'other' : selectedPlatform;
         const catList = await servicesService.getCategories(platformArg);
-          // Filter out any delix categories just in case
-          const cleanCats = catList.filter((c) => !c.toLowerCase().includes('delix'));
-          setCategories(cleanCats);
-          if (cleanCats.length > 0) {
+          setCategories(catList);
+          if (catList.length > 0) {
             // Pick first category or keep current if valid and belongs to current platform
-            if (!cleanCats.includes(selectedCategory) || selectedCategory.toLowerCase().includes('delix')) {
-              setSelectedCategory(cleanCats[0]);
+            if (!catList.includes(selectedCategory)) {
+              setSelectedCategory(catList[0]);
             }
           } else {
             setSelectedCategory('');
@@ -280,12 +278,7 @@ export const NewOrderPage: React.FC = () => {
 
   // Filtered and sorted services
   const filteredAndSortedServices = useMemo(() => {
-    // 1. Strictly filter out any provider internal / delix branding
-    let list = services.filter((s) => {
-      const name = (s.name || '').toLowerCase();
-      const cat = (s.category || '').toLowerCase();
-      return !name.includes('delix') && !cat.includes('delix');
-    });
+    let list = services;
 
     // 2. Search query filter
     if (serviceSearchQuery.trim()) {
@@ -355,14 +348,17 @@ export const NewOrderPage: React.FC = () => {
   // Check if service is package
   const isPackage = currentService
     ? currentService.service_type?.toLowerCase() === 'package' ||
-      (currentService.min_quantity === 1 && currentService.max_quantity === 1) ||
-      currentService.name.toLowerCase().includes('whatsapp number')
+      (Number(currentService.min_quantity) === 1 && Number(currentService.max_quantity) === 1) ||
+      (currentService.name || '').toLowerCase().includes('whatsapp number')
     : false;
 
   // Calculate live charge
   const numQuantity = typeof quantity === 'number' ? quantity : 0;
+  const isResellerUser = user?.role === 'reseller' || user?.role === 'admin' || user?.role === 'super_admin';
   const effectiveRate = currentService
-    ? (isTenantMode ? calculateMarkedUpPrice(currentService.rate) : currentService.rate)
+    ? (isResellerUser && currentService.wholesale_rate && Number(currentService.wholesale_rate) > 0
+        ? Number(currentService.wholesale_rate)
+        : (isTenantMode ? calculateMarkedUpPrice(Number(currentService.rate), Number(currentService.wholesale_rate)) : Number(currentService.rate)))
     : 0;
   const calculatedCharge = currentService
     ? isPackage
@@ -391,13 +387,14 @@ export const NewOrderPage: React.FC = () => {
       setError('Please enter a target profile or post link.');
       return;
     }
-    const effectiveMin = isPackage ? (currentService.min_quantity || 1) : Math.max(currentService.min_quantity || 100, 100);
+    const effectiveMin = isPackage ? (Number(currentService.min_quantity) || 1) : Math.max(Number(currentService.min_quantity) || 100, 100);
+    const effectiveMax = Number(currentService.max_quantity) || 100000;
     if (!numQuantity || numQuantity < effectiveMin) {
       setError(`Minimum order quantity is ${effectiveMin.toLocaleString()}${!isPackage ? ' (orders below 100 are not permitted)' : ''}.`);
       return;
     }
-    if (numQuantity > currentService.max_quantity) {
-      setError(`Maximum quantity for this service is ${currentService.max_quantity.toLocaleString()}.`);
+    if (numQuantity > effectiveMax) {
+      setError(`Maximum quantity for this service is ${effectiveMax.toLocaleString()}.`);
       return;
     }
     if (hasInsufficientBalance) {
@@ -879,7 +876,7 @@ export const NewOrderPage: React.FC = () => {
                           </span>
                         )}
                         <h4 className="text-sm font-bold text-white leading-snug line-clamp-2">
-                          {service.name.replace(/delix gains/gi, 'Social Pulse').replace(/delix/gi, 'Social Pulse')}
+                          {service.name}
                         </h4>
                       </div>
 
@@ -902,9 +899,16 @@ export const NewOrderPage: React.FC = () => {
                     <div className="mt-2 flex items-baseline gap-1.5">
                       <span className="text-base font-extrabold text-white">
                         {isTenantMode
-                          ? calculateMarkedUpPrice(service.rate).toFixed(4)
-                          : Number(service.rate).toFixed(4)} KES
+                          ? calculateMarkedUpPrice(Number(service.rate), Number(service.wholesale_rate)).toFixed(4)
+                          : (isResellerUser && service.wholesale_rate && Number(service.wholesale_rate) > 0
+                              ? Number(service.wholesale_rate).toFixed(4)
+                              : Number(service.rate).toFixed(4))} KES
                       </span>
+                      {isResellerUser && service.wholesale_rate && Number(service.wholesale_rate) > 0 && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase">
+                          Wholesale
+                        </span>
+                      )}
                       <span className="text-xs text-slate-400">
                         {service.service_type?.toLowerCase() === 'package' ? 'per package' : 'per 1,000 likes'}
                       </span>
@@ -912,8 +916,8 @@ export const NewOrderPage: React.FC = () => {
 
                     {/* Min, Max, Refill Details */}
                     <div className="mt-1 text-[11px] text-slate-400 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                      <span>Min: <strong className="text-slate-200">{service.min_quantity.toLocaleString()}</strong></span>
-                      <span>Max: <strong className="text-slate-200">{service.max_quantity.toLocaleString()}</strong></span>
+                      <span>Min: <strong className="text-slate-200">{(Number(service.min_quantity) || 100).toLocaleString()}</strong></span>
+                      <span>Max: <strong className="text-slate-200">{(Number(service.max_quantity) || 100000).toLocaleString()}</strong></span>
                       <span>
                         {service.refill_available ? (
                           <span className="text-emerald-400 font-semibold flex items-center gap-1 inline-flex">
@@ -976,7 +980,7 @@ export const NewOrderPage: React.FC = () => {
                 Ready to Order • #{currentService.provider_service_id || currentService.id.slice(0, 6)}
               </span>
               <h5 className="text-xs sm:text-sm font-bold text-white truncate">
-                {currentService.name.replace(/delix gains/gi, 'Social Pulse').replace(/delix/gi, 'Social Pulse')}
+                {currentService.name}
               </h5>
             </div>
           </div>
@@ -1035,7 +1039,7 @@ export const NewOrderPage: React.FC = () => {
               <div className="p-3 rounded-xl bg-[#0e172a] border border-slate-800 space-y-2">
                 <div className="flex items-start justify-between gap-3">
                   <h4 className="text-xs sm:text-sm font-bold text-white leading-snug">
-                    {currentService.name.replace(/delix gains/gi, 'Social Pulse').replace(/delix/gi, 'Social Pulse')}
+                    {currentService.name}
                   </h4>
                   {currentService.refill_available && (
                     <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1 flex-shrink-0">
@@ -1045,15 +1049,20 @@ export const NewOrderPage: React.FC = () => {
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400 pt-0.5">
                   <div>
-                    Rate: <span className="text-emerald-400 font-extrabold">KES {effectiveRate.toFixed(4)}</span> / 1k
+                    Rate: <span className="text-emerald-400 font-extrabold">KES {Number(effectiveRate).toFixed(4)}</span> / 1k
+                    {isResellerUser && currentService.wholesale_rate && Number(currentService.wholesale_rate) > 0 && (
+                      <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase">
+                        Wholesale
+                      </span>
+                    )}
                   </div>
                   <div>•</div>
                   <div>
-                    Min: <span className="text-slate-200 font-semibold">{Math.max(currentService.min_quantity || 100, 100).toLocaleString()}</span>
+                    Min: <span className="text-slate-200 font-semibold">{Math.max(Number(currentService.min_quantity) || 100, 100).toLocaleString()}</span>
                   </div>
                   <div>•</div>
                   <div>
-                    Max: <span className="text-slate-200 font-semibold">{currentService.max_quantity.toLocaleString()}</span>
+                    Max: <span className="text-slate-200 font-semibold">{(Number(currentService.max_quantity) || 100000).toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -1115,7 +1124,7 @@ export const NewOrderPage: React.FC = () => {
                     Quantity <span className="text-emerald-400">*</span>
                   </label>
                   <span className="text-[10px] text-slate-400">
-                    Min: {Math.max(currentService.min_quantity || 100, 100).toLocaleString()} • Max: {currentService.max_quantity.toLocaleString()}
+                    Min: {Math.max(Number(currentService.min_quantity) || 100, 100).toLocaleString()} • Max: {(Number(currentService.max_quantity) || 100000).toLocaleString()}
                   </span>
                 </div>
                 <div className="relative">
@@ -1128,8 +1137,8 @@ export const NewOrderPage: React.FC = () => {
                     onChange={(e) => setQuantity(e.target.value === '' ? '' : Number(e.target.value))}
                     placeholder="1000"
                     className="w-full pl-9 pr-3 py-2.5 bg-[#0e172a] border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500 transition-colors font-mono"
-                    min={Math.max(currentService.min_quantity || 100, 100)}
-                    max={currentService.max_quantity}
+                    min={Math.max(Number(currentService.min_quantity) || 100, 100)}
+                    max={Number(currentService.max_quantity) || 100000}
                     required
                   />
                 </div>
@@ -1137,7 +1146,7 @@ export const NewOrderPage: React.FC = () => {
                 {/* Quick-Pick Quantity Buttons */}
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {[
-                    Math.max(currentService.min_quantity || 100, 100),
+                    Math.max(Number(currentService.min_quantity) || 100, 100),
                     500,
                     1000,
                     2500,
@@ -1146,8 +1155,8 @@ export const NewOrderPage: React.FC = () => {
                   ]
                     .filter(
                       (val) =>
-                        val >= (currentService.min_quantity || 100) &&
-                        val <= currentService.max_quantity
+                        val >= (Number(currentService.min_quantity) || 100) &&
+                        val <= (Number(currentService.max_quantity) || 100000)
                     )
                     .filter((val, idx, arr) => arr.indexOf(val) === idx)
                     .map((val) => (
@@ -1168,7 +1177,7 @@ export const NewOrderPage: React.FC = () => {
               </div>
 
               {/* Custom Comments */}
-              {currentService?.service_type.toLowerCase().includes('comment') && (
+              {currentService?.service_type?.toLowerCase().includes('comment') && (
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">
                     Custom Comments (1 per line)

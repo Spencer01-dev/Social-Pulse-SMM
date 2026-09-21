@@ -27,7 +27,7 @@ interface TenantContextType {
   isLoading: boolean;
   enterTenantMode: (domain: string) => Promise<boolean>;
   exitTenantMode: () => void;
-  calculateMarkedUpPrice: (wholesalePrice: number) => number;
+  calculateMarkedUpPrice: (retailPrice: number, wholesaleRate?: number) => number;
   refreshTenant: () => Promise<void>;
 }
 
@@ -117,13 +117,17 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const calculateMarkedUpPrice = useCallback(
-    (wholesalePrice: number): number => {
+    (retailPrice: number, wholesaleRate?: number): number => {
       if (!tenant || !tenant.is_custom_tenant) {
-        return wholesalePrice;
+        return retailPrice;
       }
       const markup = Number(tenant.default_markup_percent || 0);
+      if (markup <= 0) {
+        return retailPrice;
+      }
+      const base = wholesaleRate && wholesaleRate > 0 ? wholesaleRate : retailPrice;
       const multiplier = 1 + markup / 100;
-      return Math.round(wholesalePrice * multiplier * 100) / 100;
+      return Math.round(base * multiplier * 100) / 100;
     },
     [tenant]
   );

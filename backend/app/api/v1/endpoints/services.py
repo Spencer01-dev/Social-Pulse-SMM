@@ -30,7 +30,7 @@ async def list_public_services(
     """
     List active services for customers strictly for allowed platforms:
     TikTok, Facebook, Instagram, WhatsApp, and Telegram.
-    Security: Strictly hides provider IDs, provider cost rates, and provider branding (Delix Gains).
+    Security: Strictly hides provider IDs and provider cost rates.
     High performance: in-memory cached responses for instant retrieval.
     """
     # Check cache for non-search requests
@@ -47,9 +47,7 @@ async def list_public_services(
         select(Service)
         .where(
             Service.is_active == True,
-            Service.platform.in_(ALLOWED_PUBLIC_PLATFORMS),
-            ~Service.name.ilike("%delix%"),
-            ~Service.category.ilike("%delix%")
+            Service.platform.in_(ALLOWED_PUBLIC_PLATFORMS)
         )
         .order_by(Service.platform, Service.sort_order, Service.selling_rate)
     )
@@ -71,18 +69,17 @@ async def list_public_services(
 
     clean_services = []
     for s in services:
-        name_clean = s.name.replace("delix gains", "Social Pulse").replace("Delix Gains", "Social Pulse").replace("delix", "Social Pulse").replace("Delix", "Social Pulse")
-        desc_clean = (s.description or "").replace("delix gains", "Social Pulse").replace("Delix Gains", "Social Pulse").replace("delix", "Social Pulse").replace("Delix", "Social Pulse")
         clean_services.append(
             CustomerServiceResponse(
                 id=s.id,
                 provider_service_id=s.provider_service_id,
                 platform=s.platform,
-                name=name_clean,
-                description=desc_clean if desc_clean else None,
+                name=s.name,
+                description=s.description if s.description else None,
                 service_type=s.service_type,
                 category=s.category,
                 rate=s.selling_rate,
+                wholesale_rate=s.wholesale_rate,
                 min_quantity=s.min_quantity,
                 max_quantity=s.max_quantity,
                 refill_available=s.refill_available,
@@ -103,7 +100,7 @@ async def list_available_categories(
 ) -> Any:
     """
     Get distinct categories, optionally filtered by platform.
-    Strictly filters out provider branding (Delix Gains) and ensures platform-relevance.
+    Ensures platform-relevance.
     """
     cache_key = f"pub_cats_{platform.value if platform else 'all'}"
     cached = get_cache(cache_key)
@@ -114,9 +111,7 @@ async def list_available_categories(
         select(Service.category)
         .where(
             Service.is_active == True,
-            Service.platform.in_(ALLOWED_PUBLIC_PLATFORMS),
-            ~Service.category.ilike("%delix%"),
-            ~Service.name.ilike("%delix%")
+            Service.platform.in_(ALLOWED_PUBLIC_PLATFORMS)
         )
     )
     if platform:
@@ -239,6 +234,7 @@ async def get_service_details(
         service_type=service.service_type,
         category=service.category,
         rate=service.selling_rate,
+        wholesale_rate=service.wholesale_rate,
         min_quantity=service.min_quantity,
         max_quantity=service.max_quantity,
         refill_available=service.refill_available,

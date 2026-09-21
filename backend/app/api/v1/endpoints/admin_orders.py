@@ -193,7 +193,7 @@ async def retry_order_dispatch(
     admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
 ) -> Any:
     """
-    Retry submitting a failed or queued order directly to Delix Gains KE.
+    Retry submitting a failed or queued order directly to upstream provider.
     """
     result = await db.execute(
         select(Order)
@@ -277,7 +277,7 @@ async def admin_refill_order(
     admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
 ) -> Any:
     """
-    Admin triggers an automated refill request on the upstream provider (Delix Gains KE) for any order.
+    Admin triggers an automated refill request on the upstream provider for any order.
     """
     result = await db.execute(
         select(Order)
@@ -297,7 +297,7 @@ async def admin_refill_order(
             detail="Order has not been dispatched to an upstream provider or has no provider order ID."
         )
 
-    provider_slug = order.provider.slug if order.provider else "delix"
+    provider_slug = order.provider.slug if order.provider else "jap"
     from app.providers.manager import get_provider
     provider_client = get_provider(slug=provider_slug)
 

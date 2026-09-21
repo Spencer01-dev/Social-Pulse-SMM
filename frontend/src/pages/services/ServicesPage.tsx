@@ -24,6 +24,7 @@ import { servicesService } from '../../services/services';
 import { CustomerService, PlatformSummary, PlatformType } from '../../types';
 import { useCurrency } from '../../context/CurrencyContext';
 import { useTenant } from '../../context/TenantContext';
+import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/common/Button';
 
 // Fast client-side session cache to eliminate re-fetching latency
@@ -31,6 +32,7 @@ const catalogMemoryCache = new Map<string, CustomerService[]>();
 let platformsMemoryCache: PlatformSummary[] | null = null;
 
 export const ServicesPage: React.FC = () => {
+  const { user } = useAuth();
   const { formatCurrency } = useCurrency();
   const { isTenantMode, calculateMarkedUpPrice, tenant } = useTenant();
   const [services, setServices] = useState<CustomerService[]>(() => {
@@ -367,9 +369,22 @@ export const ServicesPage: React.FC = () => {
                         ? 'Package Price'
                         : 'Rate per 1,000'}
                     </span>
-                    <span className="text-lg font-extrabold text-amber-400">
-                      {formatCurrency(isTenantMode ? calculateMarkedUpPrice(Number(service.rate)) : Number(service.rate))}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-lg font-extrabold text-amber-400">
+                        {formatCurrency(
+                          isTenantMode
+                            ? calculateMarkedUpPrice(Number(service.rate), Number(service.wholesale_rate))
+                            : (user?.role === 'reseller' && service.wholesale_rate && Number(service.wholesale_rate) > 0
+                                ? Number(service.wholesale_rate)
+                                : Number(service.rate))
+                        )}
+                      </span>
+                      {user?.role === 'reseller' && service.wholesale_rate && Number(service.wholesale_rate) > 0 && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase">
+                          Wholesale
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="text-right text-xs text-slate-400">

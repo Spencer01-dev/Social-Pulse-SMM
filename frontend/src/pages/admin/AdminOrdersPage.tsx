@@ -154,7 +154,7 @@ export const AdminOrdersPage: React.FC = () => {
     setSavingOverride(true);
     try {
       await ordersService.retryOrderDispatch(overrideOrder.id);
-      alert(`Order #${overrideOrder.id.substring(0, 8)} successfully dispatched to Delix Gains KE!`);
+      alert(`Order #${overrideOrder.id.substring(0, 8)} successfully dispatched to upstream provider!`);
       setOverrideOrder(null);
       await fetchAdminOrders();
     } catch (err: any) {
@@ -379,7 +379,7 @@ export const AdminOrdersPage: React.FC = () => {
                     <span className="text-[10px] text-slate-400">{order.user_email}</span>
                   </td>
                   <td className="py-3.5 px-4 font-mono text-xs">
-                    <span className="text-slate-200 font-semibold">{order.provider_name || 'Delix Gains KE'}</span>
+                    <span className="text-slate-200 font-semibold">{order.provider_name || 'JustAnotherPanel'}</span>
                     {order.provider_order_id ? (
                       <span className="text-[11px] font-mono text-cyan-400 block font-bold">
                         #{order.provider_order_id}

@@ -37,7 +37,7 @@ export const servicesService = {
     return response.data;
   },
 
-  syncFromProvider: async (providerSlug: string = 'delix', defaultMarkup: number = 80): Promise<{ message: string; total_fetched: number; created: number; updated: number }> => {
+  syncFromProvider: async (providerSlug: string = 'jap', defaultMarkup: number = 80): Promise<{ message: string; total_fetched: number; created: number; updated: number }> => {
     const response = await apiClient.post('/admin/services/sync', null, {
       params: { provider_slug: providerSlug, default_markup: defaultMarkup },
       timeout: 120000,
@@ -55,7 +55,7 @@ export const servicesService = {
     return response.data;
   },
 
-  getProviderBalance: async (providerSlug: string = 'delix'): Promise<{ provider: string; balance: number; currency: string }> => {
+  getProviderBalance: async (providerSlug: string = 'jap'): Promise<{ provider: string; balance: number; currency: string }> => {
     const response = await apiClient.get('/admin/services/provider-balance', {
       params: { provider_slug: providerSlug },
     });

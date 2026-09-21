@@ -102,7 +102,7 @@ async def handle_reseller_action(
                 "name": s.name,
                 "type": s.service_type,
                 "category": s.category,
-                "rate": str(s.selling_rate),
+                "rate": str(s.wholesale_rate if (s.wholesale_rate and s.wholesale_rate > 0) else s.selling_rate),
                 "min": str(s.min_quantity),
                 "max": str(s.max_quantity),
                 "refill": s.refill_available,
@@ -146,8 +146,9 @@ async def handle_reseller_action(
         if int_qty > svc.max_quantity:
             return {"error": f"Maximum quantity is {svc.max_quantity}"}
 
-        # Calculate costs
-        total_charge = round((svc.selling_rate * Decimal(int_qty)) / Decimal(1000), 2)
+        # Calculate costs using wholesale rate for resellers
+        reseller_rate = svc.wholesale_rate if (svc.wholesale_rate and svc.wholesale_rate > 0) else svc.selling_rate
+        total_charge = round((reseller_rate * Decimal(int_qty)) / Decimal(1000), 2)
         provider_cost = round((svc.provider_rate * Decimal(int_qty)) / Decimal(1000), 2)
         profit = total_charge - provider_cost
 
@@ -280,7 +281,7 @@ async def handle_reseller_action(
         if not ord_item.provider_order_id:
             return {"error": "Order not yet processed by upstream provider"}
 
-        provider_slug = ord_item.provider.slug if ord_item.provider else "delix"
+        provider_slug = ord_item.provider.slug if ord_item.provider else "jap"
         provider_client = get_provider(slug=provider_slug)
 
         try:

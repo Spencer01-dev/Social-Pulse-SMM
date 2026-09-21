@@ -8,7 +8,7 @@ class Provider(TimeStampedUUIDModel):
     __tablename__ = "providers"
 
     name = Column(String(100), nullable=False)
-    slug = Column(String(50), unique=True, index=True, nullable=False)  # delix, mock, provider_a
+    slug = Column(String(50), unique=True, index=True, nullable=False)  # jap, secsers, mock
     api_url = Column(String(255), nullable=False)
     api_key_encrypted = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)

@@ -53,7 +53,7 @@ class ProviderRefillResponse:
 
 class ProviderInterface(ABC):
     """
-    Abstract interface for SMM Service Providers (Delix Gains, Mock, etc.)
+    Abstract interface for SMM Service Providers (JustAnotherPanel, Secsers, Mock, etc.)
     Ensures seamless pluggability of future providers without touching the order system.
     """
 

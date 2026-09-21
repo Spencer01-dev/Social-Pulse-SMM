@@ -30,7 +30,7 @@ class Service(TimeStampedUUIDModel):
     __tablename__ = "services"
 
     provider_id = Column(UUID(as_uuid=True), ForeignKey("providers.id", ondelete="SET NULL"), nullable=True, index=True)
-    provider_service_id = Column(String(100), index=True, nullable=False)  # ID on Delix Gains / external provider
+    provider_service_id = Column(String(100), index=True, nullable=False)  # ID on external provider
 
     platform = Column(
         String(50),
@@ -45,8 +45,9 @@ class Service(TimeStampedUUIDModel):
     category = Column(String(150), index=True, nullable=False)
 
     # Pricing per 1000 units
-    provider_rate = Column(Numeric(12, 2), default=0.00, nullable=False)  # What provider charges us
-    selling_rate = Column(Numeric(12, 2), default=0.00, nullable=False)   # What customer pays
+    provider_rate = Column(Numeric(12, 2), default=0.00, nullable=False)  # What provider charges us (Secret)
+    wholesale_rate = Column(Numeric(12, 2), default=0.00, nullable=True)  # What Child Panels & Resellers pay
+    selling_rate = Column(Numeric(12, 2), default=0.00, nullable=False)   # Public retail rate for direct customers
 
     markup_type = Column(
         Enum(

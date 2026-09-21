@@ -24,7 +24,7 @@ export const AdminServicesPage: React.FC = () => {
   const [providerBalance, setProviderBalance] = useState<{ provider: string; balance: number; currency: string } | null>(null);
 
   const [search, setSearch] = useState('');
-  const [syncProvider, setSyncProvider] = useState('delix');
+  const [syncProvider, setSyncProvider] = useState('jap');
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const [editRate, setEditRate] = useState<string>('');
 
@@ -146,7 +146,6 @@ export const AdminServicesPage: React.FC = () => {
               }}
               className="px-3 py-2 bg-slate-950/80 border border-amber-500/30 rounded-xl text-white text-xs font-semibold focus:outline-none focus:border-amber-500 cursor-pointer"
             >
-              <option value="delix">Delix Gains KE</option>
               <option value="jap">JustAnotherPanel</option>
               <option value="secsers">Secsers</option>
             </select>
@@ -163,11 +162,9 @@ export const AdminServicesPage: React.FC = () => {
                 {syncing
                   ? 'Syncing...'
                   : `Sync from ${
-                      syncProvider === 'jap'
-                        ? 'JustAnotherPanel'
-                        : syncProvider === 'secsers'
+                      syncProvider === 'secsers'
                         ? 'Secsers'
-                        : 'Delix Gains'
+                        : 'JustAnotherPanel'
                     }`}
               </span>
             </Button>
@@ -200,11 +197,9 @@ export const AdminServicesPage: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-                {syncProvider === 'jap'
-                  ? 'JustAnotherPanel'
-                  : syncProvider === 'secsers'
+                {syncProvider === 'secsers'
                   ? 'Secsers'
-                  : 'Delix Gains KE'}{' '}
+                  : 'JustAnotherPanel'}{' '}
                 Balance
               </span>
               <button
@@ -343,11 +338,9 @@ export const AdminServicesPage: React.FC = () => {
                         }`}
                       />
                       {service.provider_name ||
-                        (service.provider_slug === 'jap'
-                          ? 'JustAnotherPanel'
-                          : service.provider_slug === 'secsers'
+                        (service.provider_slug === 'secsers'
                           ? 'Secsers'
-                          : 'Delix Gains')}
+                          : 'JustAnotherPanel')}
                     </span>
                   </td>
                   <td className="py-3.5 px-4 font-mono text-slate-400">#{service.provider_service_id}</td>

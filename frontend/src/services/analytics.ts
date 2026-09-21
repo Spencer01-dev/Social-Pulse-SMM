@@ -77,12 +77,7 @@ export interface PlatformSettings {
   debug_mode: boolean;
   use_mock_providers: boolean;
   providers: {
-    delix: {
-      name?: string;
-      api_url: string;
-      has_api_key: boolean;
-    };
-    jap?: {
+    jap: {
       name?: string;
       api_url: string;
       has_api_key: boolean;

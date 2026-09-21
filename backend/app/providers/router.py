@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.provider import Provider
 from app.models.service import Service
 from app.providers.base import ProviderInterface, ProviderOrderResponse
-from app.providers.delix import DelixGainsProvider
 from app.providers.jap import JustAnotherPanelProvider
 from app.providers.secsers import SecsersProvider
 from app.providers.generic_smm import GenericSMMProvider
@@ -32,7 +31,7 @@ class SmartProviderRouter:
         **kwargs: Any
     ) -> Tuple[Optional[str], Optional[str], str]:
         """
-        Dispatches an order to the primary provider (Delix Gains KE).
+        Dispatches an order to the primary provider (JustAnotherPanel).
         If the primary provider fails, it automatically failovers to any active fallback in the chain.
 
         Returns: (provider_id, provider_order_id, status_message)
@@ -55,16 +54,16 @@ class SmartProviderRouter:
         active_providers = query.scalars().all()
 
         if not active_providers:
-            # Fallback to configured Delix Gains provider
-            delix_key = settings.DELIX_API_KEY
-            if delix_key and delix_key != "YOUR_DELIX_API_KEY_HERE":
+            # Fallback to configured JustAnotherPanel provider
+            jap_key = settings.JAP_API_KEY
+            if jap_key:
                 active_providers = [
                     Provider(
-                        name="Delix Gains KE",
-                        slug="delix",
-                        api_url=settings.DELIX_API_URL,
+                        name="JustAnotherPanel",
+                        slug="jap",
+                        api_url=settings.JAP_API_URL,
                         is_active=True,
-                        currency="KES"
+                        currency="USD"
                     )
                 ]
 
@@ -76,12 +75,7 @@ class SmartProviderRouter:
                 logger.info(f"[*] Attempting dispatch to Provider: {provider_record.name} ({provider_record.slug})")
 
                 # Instantiate provider client
-                if provider_record.slug in ["delix", "delixgains", "delixgainske", "default"]:
-                    client = DelixGainsProvider(
-                        api_url=provider_record.api_url or settings.DELIX_API_URL,
-                        api_key=settings.DELIX_API_KEY
-                    )
-                elif provider_record.slug in ["jap", "justanotherpanel", "just_another_panel", "just-another-panel"]:
+                if provider_record.slug in ["jap", "justanotherpanel", "just_another_panel", "just-another-panel", "default"]:
                     client = JustAnotherPanelProvider(
                         api_url=provider_record.api_url or settings.JAP_API_URL,
                         api_key=settings.JAP_API_KEY
@@ -95,7 +89,7 @@ class SmartProviderRouter:
                     client = GenericSMMProvider(
                         name=provider_record.name,
                         api_url=provider_record.api_url,
-                        api_key=settings.DELIX_API_KEY
+                        api_key=settings.JAP_API_KEY
                     )
 
                 # Submit order

@@ -70,6 +70,7 @@ async def list_admin_services(
             service_type=s.service_type,
             category=s.category,
             provider_rate=s.provider_rate,
+            wholesale_rate=s.wholesale_rate,
             selling_rate=s.selling_rate,
             profit_margin=round(s.selling_rate - s.provider_rate, 2),
             markup_type=s.markup_type,
@@ -92,13 +93,13 @@ async def list_admin_services(
 
 @router.post("/sync", response_model=SyncServicesResponse)
 async def sync_services(
-    provider_slug: str = "delix",
+    provider_slug: str = "jap",
     default_markup: Decimal = Query(Decimal("80.00"), ge=0, description="Default markup % for new services"),
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
 ) -> Any:
     """
-    Synchronize services from external provider (Delix Gains / Mock).
+    Synchronize services from external provider (JustAnotherPanel / upstream provider).
     """
     try:
         total, created, updated = await sync_services_from_provider(
@@ -157,6 +158,8 @@ async def update_service(
     if service_in.markup_value is not None:
         service.markup_value = service_in.markup_value
 
+    if service_in.wholesale_rate is not None:
+        service.wholesale_rate = service_in.wholesale_rate
     if service_in.selling_rate is not None:
         service.selling_rate = service_in.selling_rate
         service.markup_type = MarkupType.MANUAL
@@ -190,6 +193,7 @@ async def update_service(
         service_type=service.service_type,
         category=service.category,
         provider_rate=service.provider_rate,
+        wholesale_rate=service.wholesale_rate,
         selling_rate=service.selling_rate,
         profit_margin=round(service.selling_rate - service.provider_rate, 2),
         markup_type=service.markup_type,
@@ -248,7 +252,7 @@ async def apply_bulk_markup(
 
 @router.get("/provider-balance")
 async def get_provider_live_balance(
-    provider_slug: str = "delix",
+    provider_slug: str = "jap",
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
 ) -> Any:
@@ -280,12 +284,11 @@ async def get_all_providers_summary(
 ) -> Any:
     """
     Query live status, balance, and configuration across all registered SMM providers:
-    Delix Gains KE, JustAnotherPanel, and Secsers.
+    JustAnotherPanel and Secsers.
     """
     from app.core.config import settings
 
     providers_list = [
-        {"name": "Delix Gains KE", "slug": "delix", "api_url": settings.DELIX_API_URL, "currency": "KES"},
         {"name": "JustAnotherPanel", "slug": "jap", "api_url": settings.JAP_API_URL, "currency": "USD"},
         {"name": "Secsers", "slug": "secsers", "api_url": settings.SECSERS_API_URL, "currency": "USD"},
     ]

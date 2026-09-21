@@ -103,7 +103,8 @@ export interface CustomerService {
   description?: string;
   service_type: string;
   category: string;
-  rate: number; // Selling rate per 1,000 in KES
+  rate: number; // Retail selling rate per 1,000 in KES
+  wholesale_rate?: number; // Wholesale buy rate for Child Panels & Resellers
   min_quantity: number;
   max_quantity: number;
   refill_available: boolean;
@@ -116,6 +117,7 @@ export interface AdminService extends CustomerService {
   provider_slug?: string;
   provider_service_id: string;
   provider_rate: number;
+  wholesale_rate?: number;
   selling_rate: number;
   profit_margin: number;
   markup_type: MarkupType;

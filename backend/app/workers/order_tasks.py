@@ -16,7 +16,7 @@ logger = logging.getLogger("socialpulse.order_tasks")
 
 def map_provider_status(provider_status_str: str) -> OrderStatus:
     """
-    Map external provider (Delix Gains KE) status strings to SocialPulse OrderStatus enum.
+    Map external provider status strings to SocialPulse OrderStatus enum.
     """
     s = str(provider_status_str).lower().strip()
     if "pending" in s or "queue" in s:
@@ -38,7 +38,7 @@ def map_provider_status(provider_status_str: str) -> OrderStatus:
 
 async def sync_active_orders(db: AsyncSession) -> Tuple[int, int]:
     """
-    Poll status of all active orders from Delix Gains KE and external providers.
+    Poll status of all active orders from upstream providers.
     Automatically handles state progression (Pending -> Processing -> In Progress -> Completed/Partial/Canceled)
     and executes automated double-entry ledger refunds for Canceled or Partial orders.
     
@@ -62,7 +62,7 @@ async def sync_active_orders(db: AsyncSession) -> Tuple[int, int]:
     total_updated = 0
 
     for order in active_orders:
-        provider_slug = order.provider.slug if order.provider else "delix"
+        provider_slug = order.provider.slug if order.provider else "jap"
         provider_client = get_provider(slug=provider_slug)
 
         try:
@@ -83,7 +83,7 @@ async def sync_active_orders(db: AsyncSession) -> Tuple[int, int]:
                 order.status = new_status
                 changed = True
                 total_updated += 1
-                logger.info(f"[*] Order #{str(order.id)[:8]} (Delix ID #{order.provider_order_id}) transitioned: {old_status.value} -> {new_status.value}")
+                logger.info(f"[*] Order #{str(order.id)[:8]} (Provider ID #{order.provider_order_id}) transitioned: {old_status.value} -> {new_status.value}")
 
                 # Automated Double-Entry Refund for Canceled or Partial orders
                 if new_status in [OrderStatus.CANCELED, OrderStatus.PARTIAL]:
@@ -127,7 +127,7 @@ async def sync_active_orders(db: AsyncSession) -> Tuple[int, int]:
             if changed:
                 db.add(order)
         except Exception as err:
-            logger.warning(f"[!] Error syncing order #{str(order.id)[:8]} (Delix Order ID #{order.provider_order_id}): {err}")
+            logger.warning(f"[!] Error syncing order #{str(order.id)[:8]} (Provider Order ID #{order.provider_order_id}): {err}")
             continue
 
     if total_updated > 0:

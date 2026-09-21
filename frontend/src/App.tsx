@@ -10,6 +10,7 @@ import { DashboardHome } from './pages/DashboardHome';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { WhatsAppChannelPopup } from './components/common/WhatsAppChannelPopup';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 // Lazy loaded customer routes
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then(m => ({ default: m.ProfilePage })));
@@ -47,8 +48,9 @@ export const App: React.FC = () => {
           <BrowserRouter>
             <TenantSimulationBanner />
             <WhatsAppChannelPopup />
-            <Suspense fallback={<RouteLoadingFallback />}>
-              <Routes>
+            <ErrorBoundary>
+              <Suspense fallback={<RouteLoadingFallback />}>
+                <Routes>
             {/* Public Auth Routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
@@ -206,7 +208,8 @@ export const App: React.FC = () => {
           </Route>
         </Routes>
       </Suspense>
-      </BrowserRouter>
+    </ErrorBoundary>
+  </BrowserRouter>
         </TenantProvider>
       </CurrencyProvider>
     </AuthProvider>
