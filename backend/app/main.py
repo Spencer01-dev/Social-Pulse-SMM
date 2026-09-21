@@ -180,6 +180,20 @@ async def lifespan(app: FastAPI):
                     END $$;
                 """))
                 print("[+] Multi-Tenancy & Child Panel Provisioning columns verified.")
+
+                # Step 9: Ensure wholesale_rate column exists on services table
+                await conn.execute(text("""
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM information_schema.columns 
+                            WHERE table_name='services' AND column_name='wholesale_rate'
+                        ) THEN
+                            ALTER TABLE services ADD COLUMN wholesale_rate NUMERIC(12, 2) DEFAULT 0.00;
+                        END IF;
+                    END $$;
+                """))
+                print("[+] wholesale_rate column on services verified.")
             except Exception as e:
                 print(f"[!] Startup schema fix error: {e}")
         print("[+] Database schema verified and initialized.")
