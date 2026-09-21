@@ -312,3 +312,51 @@ async def get_all_providers_summary(
                 "error": str(exc)
             })
     return results
+
+
+@router.post("/purge-delix")
+async def purge_delix_and_orphans(
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
+) -> Any:
+    """
+    Purge all legacy Delix services, orders, and orphaned records from the database.
+    """
+    from sqlalchemy import text
+    from app.core.cache import clear_all_cache
+
+    await db.execute(text("""
+        UPDATE services 
+        SET fallback_provider_id = NULL, fallback_service_id = NULL 
+        WHERE fallback_provider_id IN (SELECT id FROM providers WHERE slug = 'delix' OR name ILIKE '%delix%');
+    """))
+
+    res_orders = await db.execute(text("""
+        DELETE FROM orders 
+        WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'delix' OR name ILIKE '%delix%');
+    """))
+
+    res_services = await db.execute(text("""
+        DELETE FROM services 
+        WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'delix' OR name ILIKE '%delix%')
+           OR provider_id IS NULL
+           OR provider_id NOT IN (SELECT id FROM providers WHERE id IS NOT NULL)
+           OR name ILIKE '%delix%' 
+           OR category ILIKE '%delix%';
+    """))
+
+    res_providers = await db.execute(text("""
+        DELETE FROM providers 
+        WHERE slug = 'delix' OR name ILIKE '%delix%';
+    """))
+
+    await db.commit()
+    clear_all_cache()
+
+    return {
+        "status": "success",
+        "deleted_services": res_services.rowcount,
+        "deleted_orders": res_orders.rowcount,
+        "deleted_providers": res_providers.rowcount
+    }
+

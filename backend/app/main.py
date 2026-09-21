@@ -194,6 +194,27 @@ async def lifespan(app: FastAPI):
                     END $$;
                 """))
                 print("[+] wholesale_rate column on services verified.")
+
+                # Step 10: Clean up Delix Gains and orphaned services from database
+                await conn.execute(text("""
+                    UPDATE services 
+                    SET fallback_provider_id = NULL, fallback_service_id = NULL 
+                    WHERE fallback_provider_id IN (SELECT id FROM providers WHERE slug = 'delix' OR name ILIKE '%delix%');
+
+                    DELETE FROM orders 
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'delix' OR name ILIKE '%delix%');
+
+                    DELETE FROM services 
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'delix' OR name ILIKE '%delix%')
+                       OR provider_id IS NULL
+                       OR provider_id NOT IN (SELECT id FROM providers WHERE id IS NOT NULL)
+                       OR name ILIKE '%delix%' 
+                       OR category ILIKE '%delix%';
+
+                    DELETE FROM providers 
+                    WHERE slug = 'delix' OR name ILIKE '%delix%';
+                """))
+                print("[+] Delix and orphaned services cleanup verified.")
             except Exception as e:
                 print(f"[!] Startup schema fix error: {e}")
         print("[+] Database schema verified and initialized.")
@@ -239,6 +260,8 @@ async def lifespan(app: FastAPI):
         async with AsyncSessionLocal() as db:
             total, created, updated = await sync_services_from_provider(db, provider_slug="jap")
             print(f"[+] Service sync complete: {total} fetched, {created} created, {updated} updated.")
+        from app.core.cache import clear_all_cache
+        clear_all_cache()
     except Exception as exc:
         print(f"[!] Warning during service sync: {exc}")
 
