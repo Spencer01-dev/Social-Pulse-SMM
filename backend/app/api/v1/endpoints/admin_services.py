@@ -328,17 +328,17 @@ async def purge_delix_and_orphans(
     await db.execute(text("""
         UPDATE services 
         SET fallback_provider_id = NULL, fallback_service_id = NULL 
-        WHERE fallback_provider_id IN (SELECT id FROM providers WHERE slug = 'delix' OR name ILIKE '%delix%');
+        WHERE fallback_provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers'));
     """))
 
     res_orders = await db.execute(text("""
         DELETE FROM orders 
-        WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'delix' OR name ILIKE '%delix%');
+        WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers'));
     """))
 
     res_services = await db.execute(text("""
         DELETE FROM services 
-        WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'delix' OR name ILIKE '%delix%')
+        WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers'))
            OR provider_id IS NULL
            OR provider_id NOT IN (SELECT id FROM providers WHERE id IS NOT NULL)
            OR name ILIKE '%delix%' 
@@ -347,7 +347,7 @@ async def purge_delix_and_orphans(
 
     res_providers = await db.execute(text("""
         DELETE FROM providers 
-        WHERE slug = 'delix' OR name ILIKE '%delix%';
+        WHERE slug NOT IN ('jap', 'secsers');
     """))
 
     await db.commit()
