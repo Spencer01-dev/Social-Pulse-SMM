@@ -14,6 +14,6 @@ class HealthCheckResponse(BaseModel):
     environment: str
     status: str
     timestamp: datetime
-    version: str = "1.0.0"
+    version: str = "1.0.1"
     database: ServiceStatus
     redis: ServiceStatus

@@ -55,7 +55,7 @@ async def health_check(db: AsyncSession = Depends(get_db)):
         environment=settings.ENVIRONMENT,
         status=overall_status,
         timestamp=datetime.now(timezone.utc),
-        version="1.0.0",
+        version="1.0.1",
         database=db_status,
         redis=redis_status
     )

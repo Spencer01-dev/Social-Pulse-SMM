@@ -195,7 +195,7 @@ async def lifespan(app: FastAPI):
 
                     UPDATE services 
                     SET wholesale_rate = ROUND(provider_rate * 1.32625, 2) 
-                    WHERE (wholesale_rate IS NULL OR wholesale_rate = 0.00) AND provider_rate > 0;
+                    WHERE (wholesale_rate IS NULL OR wholesale_rate <= 0.001) AND provider_rate > 0;
                 """))
                 print("[+] wholesale_rate column on services verified and populated.")
 
@@ -277,7 +277,7 @@ async def lifespan(app: FastAPI):
             result = await conn.execute(sql_text("""
                 UPDATE services 
                 SET wholesale_rate = ROUND(provider_rate * 1.32625, 2) 
-                WHERE (wholesale_rate IS NULL OR wholesale_rate = 0 OR wholesale_rate = 0.00) 
+                WHERE (wholesale_rate IS NULL OR wholesale_rate <= 0.001) 
                   AND provider_rate > 0;
             """))
             print(f"[+] Post-sync wholesale_rate fix: {result.rowcount} services updated.")
@@ -298,7 +298,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="SocialPulse - Production-ready Social Media Marketing Reseller Platform (SMM Panel) API",
-    version="1.0.0",
+    version="1.0.1",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
@@ -346,7 +346,7 @@ async def root():
     return JSONResponse(
         content={
             "project": settings.PROJECT_NAME,
-            "version": "1.0.0",
+            "version": "1.0.1",
             "status": "online",
             "docs": "/docs",
             "reseller_api_v2": "/api/v2",
