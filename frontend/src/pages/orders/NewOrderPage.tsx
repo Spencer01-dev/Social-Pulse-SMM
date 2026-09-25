@@ -41,10 +41,9 @@ import { ordersService } from '../../services/orders';
 import { CustomerService, PlatformType } from '../../types';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
-import { WhatsAppOrderPage } from './WhatsAppOrderPage';
 
 interface PlatformOption {
-  id: PlatformType | 'all' | 'whatsapp';
+  id: PlatformType | 'all';
   name: string;
   icon: React.ReactNode;
 }
@@ -71,7 +70,7 @@ export const NewOrderPage: React.FC = () => {
   const navigate = useNavigate();
 
   // Selection states
-  const [selectedPlatform, setSelectedPlatform] = useState<PlatformType | 'all' | 'whatsapp'>('tiktok');
+  const [selectedPlatform, setSelectedPlatform] = useState<PlatformType | 'all'>('tiktok');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedServiceId, setSelectedServiceId] = useState<string>('');
 
@@ -192,7 +191,7 @@ export const NewOrderPage: React.FC = () => {
     const fetchCategories = async () => {
       setLoadingCategories(true);
       try {
-        const platformArg = selectedPlatform === 'whatsapp' ? 'other' : selectedPlatform;
+        const platformArg = selectedPlatform !== 'all' ? selectedPlatform : undefined;
         const catList = await servicesService.getCategories(platformArg);
           setCategories(catList);
           if (catList.length > 0) {
@@ -222,9 +221,9 @@ export const NewOrderPage: React.FC = () => {
     const fetchServices = async () => {
       setLoadingServices(true);
       try {
-        const platformArg = selectedPlatform === 'whatsapp' ? 'other' : selectedPlatform;
+        const platformArg = selectedPlatform !== 'all' ? selectedPlatform : undefined;
         const data = await servicesService.getPublicServices({
-          platform: platformArg !== 'all' ? (platformArg as PlatformType) : undefined,
+          platform: platformArg,
           category: selectedCategory || undefined,
         });
 
@@ -263,18 +262,6 @@ export const NewOrderPage: React.FC = () => {
 
   // Active selected service object
   const currentService = services.find((s) => s.id === selectedServiceId);
-
-  // If user selected WhatsApp platform and current service is WhatsApp numbers, render WhatsAppOrderPage
-  const isWhatsApp =
-    selectedPlatform === 'whatsapp' ||
-    (currentService &&
-      (currentService.provider_service_id === '6048' ||
-        currentService.name.toLowerCase().includes('whatsapp number') ||
-        currentService.category.toLowerCase().includes('whatsapp numbers')));
-
-  if (isWhatsApp && selectedPlatform === 'whatsapp') {
-    return <WhatsAppOrderPage />;
-  }
 
   // Filtered and sorted services
   const filteredAndSortedServices = useMemo(() => {
