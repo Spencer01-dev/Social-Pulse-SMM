@@ -180,6 +180,9 @@ async def sync_services_from_provider(
                     markup_type=existing_service.markup_type,
                     markup_value=existing_service.markup_value
                 )
+            current_wholesale = float(existing_service.wholesale_rate or 0)
+            if current_wholesale <= 0 and effective_rate > 0:
+                existing_service.wholesale_rate = round(effective_rate * Decimal("1.32625"), 2)
 
             db.add(existing_service)
             updated_count += 1
@@ -190,6 +193,7 @@ async def sync_services_from_provider(
                 markup_type=MarkupType.PERCENTAGE,
                 markup_value=default_markup_percent
             )
+            wholesale_rate = round(effective_rate * Decimal("1.32625"), 2)
 
             is_platform_allowed = platform_detected in ALLOWED_ACTIVE_PLATFORMS
             new_service = Service(
@@ -201,6 +205,7 @@ async def sync_services_from_provider(
                 service_type=item.type,
                 category=category_clean,
                 provider_rate=effective_rate,
+                wholesale_rate=wholesale_rate,
                 selling_rate=selling_rate,
                 markup_type=MarkupType.PERCENTAGE,
                 markup_value=default_markup_percent,

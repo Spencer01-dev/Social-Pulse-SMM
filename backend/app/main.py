@@ -181,7 +181,7 @@ async def lifespan(app: FastAPI):
                 """))
                 print("[+] Multi-Tenancy & Child Panel Provisioning columns verified.")
 
-                # Step 9: Ensure wholesale_rate column exists on services table
+                # Step 9: Ensure wholesale_rate column exists on services table and is populated
                 await conn.execute(text("""
                     DO $$
                     BEGIN
@@ -192,8 +192,12 @@ async def lifespan(app: FastAPI):
                             ALTER TABLE services ADD COLUMN wholesale_rate NUMERIC(12, 2) DEFAULT 0.00;
                         END IF;
                     END $$;
+
+                    UPDATE services 
+                    SET wholesale_rate = ROUND(provider_rate * 1.32625, 2) 
+                    WHERE (wholesale_rate IS NULL OR wholesale_rate = 0.00) AND provider_rate > 0;
                 """))
-                print("[+] wholesale_rate column on services verified.")
+                print("[+] wholesale_rate column on services verified and populated.")
 
                 # Step 10: Clean up legacy providers (smm_africa, delix) and orphaned services
                 await conn.execute(text("""
@@ -264,6 +268,21 @@ async def lifespan(app: FastAPI):
         clear_all_cache()
     except Exception as exc:
         print(f"[!] Warning during service sync: {exc}")
+
+    # Post-sync: force-populate any remaining wholesale_rate=0 rows from provider_rate
+    try:
+        from app.core.database import engine
+        from sqlalchemy import text as sql_text
+        async with engine.begin() as conn:
+            result = await conn.execute(sql_text("""
+                UPDATE services 
+                SET wholesale_rate = ROUND(provider_rate * 1.32625, 2) 
+                WHERE (wholesale_rate IS NULL OR wholesale_rate = 0 OR wholesale_rate = 0.00) 
+                  AND provider_rate > 0;
+            """))
+            print(f"[+] Post-sync wholesale_rate fix: {result.rowcount} services updated.")
+    except Exception as exc:
+        print(f"[!] Warning during post-sync wholesale_rate fix: {exc}")
 
     poller_task = asyncio.create_task(order_status_poller_loop())
     yield

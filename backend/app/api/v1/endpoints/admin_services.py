@@ -350,6 +350,12 @@ async def purge_delix_and_orphans(
         WHERE slug NOT IN ('jap', 'secsers');
     """))
 
+    await db.execute(text("""
+        UPDATE services 
+        SET wholesale_rate = ROUND(provider_rate * 1.32625, 2) 
+        WHERE (wholesale_rate IS NULL OR wholesale_rate = 0.00) AND provider_rate > 0;
+    """))
+
     await db.commit()
     clear_all_cache()
 
