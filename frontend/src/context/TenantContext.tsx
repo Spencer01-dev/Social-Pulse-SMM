@@ -46,6 +46,22 @@ function hexToRgb(hex: string): string {
   return '245, 158, 11';
 }
 
+const MAIN_PLATFORM_DOMAINS = [
+  'socialpulse.io',
+  'www.socialpulse.io',
+  'socialpulsesmm.com',
+  'www.socialpulsesmm.com',
+  'social-pulse-smm.vercel.app',
+  'social-pulse-smm.onrender.com',
+  'localhost',
+  '127.0.0.1'
+];
+
+function isMainDomain(hostname: string): boolean {
+  const clean = hostname.split(':')[0].toLowerCase().trim();
+  return MAIN_PLATFORM_DOMAINS.some(d => clean === d || clean.endsWith(`.${d}`));
+}
+
 export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [tenant, setTenant] = useState<TenantData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -117,35 +133,48 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const calculateMarkedUpPrice = useCallback(
-    (retailPrice: number, wholesaleRate?: number): number => {
+    (retailPrice: number, _wholesaleRate?: number): number => {
       if (!tenant || !tenant.is_custom_tenant) {
         return retailPrice;
       }
       const markup = Number(tenant.default_markup_percent || 0);
       if (markup <= 0) {
+        // By default, child panels sell to end customers at the exact same price as SocialPulse retail
         return retailPrice;
       }
-      const base = wholesaleRate && wholesaleRate > 0 ? wholesaleRate : retailPrice;
+      // If child panel owner explicitly set a custom markup above retail
       const multiplier = 1 + markup / 100;
-      return Math.round(base * multiplier * 100) / 100;
+      return Math.round(retailPrice * multiplier * 100) / 100;
     },
     [tenant]
   );
 
   useEffect(() => {
+    const currentHost = window.location.hostname.toLowerCase();
+    const isMain = isMainDomain(currentHost);
+
     // 1. Check URL query params for explicit tenant override, e.g. ?tenant=testpanel.com
     const params = new URLSearchParams(window.location.search);
     const tenantParam = params.get('tenant');
 
-    // 2. Check stored session
-    const storedDomain = sessionStorage.getItem(TENANT_STORAGE_KEY);
-
-    const targetDomain = tenantParam || storedDomain;
-    if (targetDomain) {
-      resolveTenantForDomain(targetDomain);
-    } else {
-      setIsLoading(false);
+    if (tenantParam) {
+      resolveTenantForDomain(tenantParam);
+      return;
     }
+
+    if (isMain) {
+      // Main platform: never enter tenant mode; clear any residual test session
+      sessionStorage.removeItem(TENANT_STORAGE_KEY);
+      setTenant(null);
+      applyTenantTheme(null);
+      setIsLoading(false);
+      return;
+    }
+
+    // 2. Custom domain for a child panel (e.g. mypanel.com)
+    const storedDomain = sessionStorage.getItem(TENANT_STORAGE_KEY);
+    const targetDomain = storedDomain || currentHost;
+    resolveTenantForDomain(targetDomain);
   }, [resolveTenantForDomain]);
 
   return (

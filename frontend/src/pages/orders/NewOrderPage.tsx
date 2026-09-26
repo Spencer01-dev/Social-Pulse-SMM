@@ -339,13 +339,10 @@ export const NewOrderPage: React.FC = () => {
       (currentService.name || '').toLowerCase().includes('whatsapp number')
     : false;
 
-  // Calculate live charge
+  // Calculate live charge — unified retail pricing for all users and child panels
   const numQuantity = typeof quantity === 'number' ? quantity : 0;
-  const isResellerUser = user?.role === 'reseller' || user?.role === 'admin' || user?.role === 'super_admin';
   const effectiveRate = currentService
-    ? (isResellerUser && currentService.wholesale_rate && Number(currentService.wholesale_rate) > 0
-        ? Number(currentService.wholesale_rate)
-        : (isTenantMode ? calculateMarkedUpPrice(Number(currentService.rate), Number(currentService.wholesale_rate)) : Number(currentService.rate)))
+    ? (isTenantMode ? calculateMarkedUpPrice(Number(currentService.rate)) : Number(currentService.rate))
     : 0;
   const calculatedCharge = currentService
     ? isPackage
@@ -885,17 +882,10 @@ export const NewOrderPage: React.FC = () => {
                     {/* Price Line */}
                     <div className="mt-2 flex items-baseline gap-1.5">
                       <span className="text-base font-extrabold text-white">
-                        {isTenantMode
-                          ? calculateMarkedUpPrice(Number(service.rate), Number(service.wholesale_rate)).toFixed(4)
-                          : (isResellerUser && service.wholesale_rate && Number(service.wholesale_rate) > 0
-                              ? Number(service.wholesale_rate).toFixed(4)
-                              : Number(service.rate).toFixed(4))} KES
+                        {(isTenantMode
+                          ? calculateMarkedUpPrice(Number(service.rate)).toFixed(4)
+                          : Number(service.rate).toFixed(4))} KES
                       </span>
-                      {isResellerUser && service.wholesale_rate && Number(service.wholesale_rate) > 0 && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase">
-                          Wholesale
-                        </span>
-                      )}
                       <span className="text-xs text-slate-400">
                         {service.service_type?.toLowerCase() === 'package' ? 'per package' : 'per 1,000 likes'}
                       </span>
@@ -1037,11 +1027,6 @@ export const NewOrderPage: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400 pt-0.5">
                   <div>
                     Rate: <span className="text-emerald-400 font-extrabold">KES {Number(effectiveRate).toFixed(4)}</span> / 1k
-                    {isResellerUser && currentService.wholesale_rate && Number(currentService.wholesale_rate) > 0 && (
-                      <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase">
-                        Wholesale
-                      </span>
-                    )}
                   </div>
                   <div>•</div>
                   <div>

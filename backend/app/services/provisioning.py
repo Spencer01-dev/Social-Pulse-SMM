@@ -39,7 +39,7 @@ class ChildPanelProvisioningService:
                     "logo_url": None,
                     "theme_color": "#f59e0b",
                     "currency": panel.currency or "KES",
-                    "default_markup_percent": 100,
+                    "default_markup_percent": 0,
                     "contact_email": f"support@{panel.domain}",
                     "whatsapp_support": None,
                     "custom_cname_target": "cname.socialpulse.io"

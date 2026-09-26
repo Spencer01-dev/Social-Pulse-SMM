@@ -38,7 +38,7 @@ export const ChildPanelBrandingModal: React.FC<ChildPanelBrandingModalProps> = (
   );
   const [themeColor, setThemeColor] = useState<string>(existing.theme_color || '#f59e0b');
   const [markupPercent, setMarkupPercent] = useState<number>(
-    existing.default_markup_percent !== undefined ? existing.default_markup_percent : 100
+    existing.default_markup_percent !== undefined ? existing.default_markup_percent : 0
   );
   const [contactEmail, setContactEmail] = useState<string>(
     existing.contact_email || `support@${panel.domain}`
@@ -206,7 +206,7 @@ export const ChildPanelBrandingModal: React.FC<ChildPanelBrandingModalProps> = (
 
             <input
               type="range"
-              min="10"
+              min="0"
               max="500"
               step="5"
               value={markupPercent}
@@ -220,7 +220,7 @@ export const ChildPanelBrandingModal: React.FC<ChildPanelBrandingModalProps> = (
                 Live Profit Calculation Example
               </div>
               <div className="flex items-center justify-between text-slate-300">
-                <span>Wholesale Cost (SocialPulse):</span>
+                <span>SocialPulse Base Price:</span>
                 <span className="font-mono text-slate-400">KES {exampleWholesale.toFixed(2)}</span>
               </div>
               <div className="flex items-center justify-between text-white font-bold">

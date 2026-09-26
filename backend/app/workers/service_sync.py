@@ -180,8 +180,7 @@ async def sync_services_from_provider(
                     markup_type=existing_service.markup_type,
                     markup_value=existing_service.markup_value
                 )
-            current_wholesale = float(existing_service.wholesale_rate or 0)
-            if current_wholesale <= 0 and effective_rate > 0:
+            if effective_rate > 0:
                 existing_service.wholesale_rate = round(effective_rate * Decimal("1.32625"), 2)
 
             db.add(existing_service)

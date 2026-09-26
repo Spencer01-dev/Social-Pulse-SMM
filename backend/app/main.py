@@ -219,6 +219,18 @@ async def lifespan(app: FastAPI):
                     WHERE slug NOT IN ('jap', 'secsers');
                 """))
                 print("[+] Legacy providers and orphaned services cleanup verified.")
+
+                # Step 11: Remove child panels that match main platform domains (prevents tenant mode on main site)
+                await conn.execute(text("""
+                    DELETE FROM child_panels 
+                    WHERE domain IN (
+                        'socialpulse.io', 'www.socialpulse.io',
+                        'socialpulsesmm.com', 'www.socialpulsesmm.com',
+                        'social-pulse-smm.vercel.app', 'social-pulse-smm.onrender.com',
+                        'localhost', '127.0.0.1'
+                    );
+                """))
+                print("[+] Cleaned up any child panels matching main platform domains.")
             except Exception as e:
                 print(f"[!] Startup schema fix error: {e}")
         print("[+] Database schema verified and initialized.")
@@ -257,34 +269,30 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         print(f"[!] Warning during admin bootstrap: {exc}")
 
-    # Auto-sync services from JustAnotherPanel on startup
-    try:
-        from app.workers.service_sync import sync_services_from_provider
-
-        async with AsyncSessionLocal() as db:
-            total, created, updated = await sync_services_from_provider(db, provider_slug="jap")
-            print(f"[+] Service sync complete: {total} fetched, {created} created, {updated} updated.")
-        from app.core.cache import clear_all_cache
-        clear_all_cache()
-    except Exception as exc:
-        print(f"[!] Warning during service sync: {exc}")
-
-    # Post-sync: force-populate any remaining wholesale_rate=0 rows from provider_rate
-    try:
-        from app.core.database import engine
-        from sqlalchemy import text as sql_text
-        async with engine.begin() as conn:
-            result = await conn.execute(sql_text("""
-                UPDATE services 
-                SET wholesale_rate = ROUND(provider_rate * 1.32625, 2) 
-                WHERE (wholesale_rate IS NULL OR wholesale_rate <= 0.001) 
-                  AND provider_rate > 0;
-            """))
-            print(f"[+] Post-sync wholesale_rate fix: {result.rowcount} services updated.")
-    except Exception as exc:
-        print(f"[!] Warning during post-sync wholesale_rate fix: {exc}")
-
+    # Start background poller immediately so startup yields without delay
     poller_task = asyncio.create_task(order_status_poller_loop())
+
+    # Background service sync only if services table is completely empty
+    async def initial_services_check():
+        try:
+            from sqlalchemy import select, func
+            from app.models.service import Service
+            from app.workers.service_sync import sync_services_from_provider
+            async with AsyncSessionLocal() as db:
+                count_res = await db.execute(select(func.count(Service.id)))
+                service_count = count_res.scalar() or 0
+                if service_count == 0:
+                    print("[*] No services found in DB. Starting background initial sync...")
+                    total, created, updated = await sync_services_from_provider(db, provider_slug="jap")
+                    print(f"[+] Initial service sync complete: {total} fetched, {created} created, {updated} updated.")
+                    from app.core.cache import clear_all_cache
+                    clear_all_cache()
+                else:
+                    print(f"[*] Services already initialized ({service_count} active in DB). Skipping blocking sync.")
+        except Exception as exc:
+            print(f"[!] Warning during background service check: {exc}")
+
+    asyncio.create_task(initial_services_check())
     yield
     # Shutdown tasks
     print(f"[*] Shutting down {settings.PROJECT_NAME} backend...")

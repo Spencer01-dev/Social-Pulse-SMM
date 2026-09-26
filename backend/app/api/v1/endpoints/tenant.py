@@ -10,7 +10,11 @@ router = APIRouter(prefix="/tenant", tags=["Tenant Resolution"])
 
 MAIN_PLATFORM_DOMAINS = [
     "socialpulse.io",
+    "www.socialpulse.io",
+    "socialpulsesmm.com",
+    "www.socialpulsesmm.com",
     "social-pulse-smm.vercel.app",
+    "social-pulse-smm.onrender.com",
     "localhost",
     "127.0.0.1"
 ]
@@ -40,7 +44,7 @@ async def resolve_tenant(
 
     # Check if primary platform
     is_main = any(clean_domain == d or clean_domain.endswith(f".{d}") for d in MAIN_PLATFORM_DOMAINS)
-    if is_main and not domain:
+    if is_main:
         return {
             "is_custom_tenant": False,
             "tenant_id": None,
@@ -90,7 +94,7 @@ async def resolve_tenant(
         "currency": panel.currency,
         "contact_email": branding.get("contact_email", f"support@{panel.domain}"),
         "whatsapp_support": branding.get("whatsapp_support"),
-        "default_markup_percent": branding.get("default_markup_percent", 100),
+        "default_markup_percent": branding.get("default_markup_percent", 0),
         "nameserver1": panel.nameserver1,
         "nameserver2": panel.nameserver2,
         "expires_at": panel.expires_at.isoformat() if panel.expires_at else None

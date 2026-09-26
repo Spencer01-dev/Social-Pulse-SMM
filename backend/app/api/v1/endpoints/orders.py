@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_active_user
+from app.api.v1.endpoints.tenant import MAIN_PLATFORM_DOMAINS
 from app.core.database import get_db
 from app.models.child_panel import ChildPanel
 from app.models.order import Order, OrderStatus
@@ -43,17 +44,41 @@ async def create_order(
             detail="The requested service is currently inactive or unavailable."
         )
 
-    # 2. Determine tiered wholesale vs retail pricing
-    is_reseller = (
-        current_user.role in [UserRole.RESELLER, UserRole.ADMIN, UserRole.SUPER_ADMIN]
-        or current_user.tenant_id is not None
-        or (x_tenant_domain is not None and current_user.role == UserRole.RESELLER)
-    )
-    charge_rate = (
-        service.wholesale_rate
-        if (is_reseller and service.wholesale_rate is not None and service.wholesale_rate > 0)
-        else service.selling_rate
-    )
+    # 2. Resolve tenant context for child-panel attribution and pricing
+    tenant_id = None
+    panel = None
+    raw_domain = x_tenant_domain or request.headers.get("x-tenant-domain") or request.headers.get("X-Tenant-Domain")
+    if raw_domain:
+        clean_tenant_domain = (
+            raw_domain.split(":")[0]
+            .strip()
+            .lower()
+            .replace("https://", "")
+            .replace("http://", "")
+            .rstrip("/")
+        )
+        is_main = any(clean_tenant_domain == d or clean_tenant_domain.endswith(f".{d}") for d in MAIN_PLATFORM_DOMAINS)
+        if not is_main:
+            tenant_q = await db.execute(
+                select(ChildPanel).where(ChildPanel.domain == clean_tenant_domain)
+            )
+            panel = tenant_q.scalars().first()
+            if panel:
+                tenant_id = panel.id
+    if not tenant_id and current_user.tenant_id:
+        tenant_id = current_user.tenant_id
+        if not panel:
+            tenant_q = await db.execute(
+                select(ChildPanel).where(ChildPanel.id == tenant_id)
+            )
+            panel = tenant_q.scalars().first()
+
+    # Universal retail price is service.selling_rate across main platform and child panels
+    charge_rate = service.selling_rate
+    if panel and panel.branding_json:
+        markup = Decimal(str(panel.branding_json.get("default_markup_percent", 0)))
+        if markup > 0:
+            charge_rate = round(service.selling_rate * (Decimal("1.00") + markup / Decimal("100.00")), 2)
 
     # 3. Validate quantity boundaries & determine package vs per-1000 pricing
     is_package = (
@@ -123,28 +148,7 @@ async def create_order(
         error_msg = f"Provider failover exhausted: {str(exc)}"
         initial_status = OrderStatus.PENDING
 
-    # 8. Resolve tenant context for child-panel attribution
-    tenant_id = None
-    raw_domain = x_tenant_domain or request.headers.get("x-tenant-domain") or request.headers.get("X-Tenant-Domain")
-    if raw_domain:
-        clean_tenant_domain = (
-            raw_domain.split(":")[0]
-            .strip()
-            .lower()
-            .replace("https://", "")
-            .replace("http://", "")
-            .rstrip("/")
-        )
-        tenant_q = await db.execute(
-            select(ChildPanel).where(ChildPanel.domain == clean_tenant_domain)
-        )
-        panel = tenant_q.scalars().first()
-        if panel:
-            tenant_id = panel.id
-    if not tenant_id and current_user.tenant_id:
-        tenant_id = current_user.tenant_id
-
-    # 9. Persist order record in database
+    # 8. Persist order record in database (using tenant_id resolved in step 2)
     order = Order(
         user_id=current_user.id,
         tenant_id=tenant_id,
