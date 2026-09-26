@@ -12,6 +12,7 @@ from app.core.database import get_db
 from app.models.child_panel import ChildPanel
 from app.models.order import Order, OrderStatus
 from app.models.service import Service
+from app.models.transaction import PaymentMethod, Transaction, TransactionStatus, TransactionType
 from app.models.user import User, UserRole
 from app.providers.manager import get_provider
 from app.schemas.order import CustomerOrderResponse, OrderCreate
@@ -169,6 +170,47 @@ async def create_order(
     )
 
     db.add(order)
+    await db.flush()
+
+    # 9. Credit Child Panel owner profit (Spread between retail customer charge and wholesale cost)
+    if panel and panel.user_id and panel.user_id != current_user.id:
+        wholesale_rate = (
+            service.wholesale_rate 
+            if (service.wholesale_rate is not None and service.wholesale_rate > 0) 
+            else service.selling_rate
+        )
+        if is_package:
+            wholesale_cost = round(wholesale_rate * Decimal(order_in.quantity), 2)
+        else:
+            wholesale_cost = round((wholesale_rate * Decimal(order_in.quantity)) / Decimal(1000), 2)
+
+        panel_owner_profit = total_charge - wholesale_cost
+        if panel_owner_profit > Decimal("0.00"):
+            owner_q = await db.execute(
+                select(User).where(User.id == panel.user_id).with_for_update()
+            )
+            panel_owner = owner_q.scalars().first()
+            if panel_owner:
+                bal_before = panel_owner.balance
+                panel_owner.balance += panel_owner_profit
+                bal_after = panel_owner.balance
+                db.add(panel_owner)
+
+                tx = Transaction(
+                    user_id=panel_owner.id,
+                    order_id=order.id,
+                    tenant_id=panel.id,
+                    type=TransactionType.BONUS,
+                    amount=panel_owner_profit,
+                    balance_before=bal_before,
+                    balance_after=bal_after,
+                    currency="KES",
+                    payment_method=PaymentMethod.INTERNAL,
+                    status=TransactionStatus.COMPLETED,
+                    description=f"Child Panel profit from Order #{order.order_number}"
+                )
+                db.add(tx)
+
     await db.commit()
     await db.refresh(order)
 
