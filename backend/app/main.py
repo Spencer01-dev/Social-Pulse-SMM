@@ -231,6 +231,21 @@ async def lifespan(app: FastAPI):
                     );
                 """))
                 print("[+] Cleaned up any child panels matching main platform domains.")
+
+                # Step 12: One-time purge of all dummy balances on live database
+                await conn.execute(text("""
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='_live_dummy_funds_purged_lock') THEN
+                            CREATE TABLE _live_dummy_funds_purged_lock (id SERIAL PRIMARY KEY, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+                            UPDATE users SET balance = 0.00;
+                            DELETE FROM transactions;
+                            DELETE FROM orders;
+                            ALTER SEQUENCE IF EXISTS order_number_seq RESTART WITH 29100001;
+                        END IF;
+                    END $$;
+                """))
+                print("[+] Live dummy funds purged: All account balances reset to 0.00 KES.")
             except Exception as e:
                 print(f"[!] Startup schema fix error: {e}")
         print("[+] Database schema verified and initialized.")
