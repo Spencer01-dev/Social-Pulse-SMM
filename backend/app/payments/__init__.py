@@ -7,6 +7,7 @@ from app.payments.base import (
 from app.payments.exchange_rate import ExchangeRateService, exchange_rate_service
 from app.payments.mpesa import MpesaDarajaClient, mpesa_client, normalize_phone_number
 from app.payments.paystack import PaystackProvider, paystack_provider
+from app.payments.payhero import PayHeroClient, payhero_client
 
 __all__ = [
     "PaymentGatewayInterface",
@@ -19,4 +20,6 @@ __all__ = [
     "exchange_rate_service",
     "PaystackProvider",
     "paystack_provider",
+    "PayHeroClient",
+    "payhero_client",
 ]

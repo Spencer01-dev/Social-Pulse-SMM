@@ -320,6 +320,15 @@ export const ChildPanelPage: React.FC = () => {
                           </button>
 
                           <button
+                            onClick={() => navigate(`/child-panel/${panel.id}/manage`)}
+                            className="px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 hover:text-amber-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                            title="Manage Orders, Support Tickets, and Registered Users for this Child Panel"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                            Panel Admin Hub
+                          </button>
+
+                          <button
                             onClick={() => setBrandingModalPanel(panel)}
                             className="px-3 py-1.5 rounded-lg bg-[#222630] border border-[#2b303c] text-slate-200 hover:text-white hover:border-amber-500/40 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
                             title="Customize Site Name, Logo, Theme Color, and Retail Markup %"

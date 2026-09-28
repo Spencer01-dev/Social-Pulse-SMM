@@ -24,6 +24,7 @@ const DepositPage = lazy(() => import('./pages/wallet/DepositPage').then(m => ({
 const WalletLedgerPage = lazy(() => import('./pages/wallet/WalletLedgerPage').then(m => ({ default: m.WalletLedgerPage })));
 const SupportTicketsPage = lazy(() => import('./pages/support/SupportTicketsPage').then(m => ({ default: m.SupportTicketsPage })));
 const ChildPanelPage = lazy(() => import('./pages/childpanel/ChildPanelPage').then(m => ({ default: m.ChildPanelPage })));
+const ChildPanelManagePage = lazy(() => import('./pages/childpanel/ChildPanelManagePage').then(m => ({ default: m.ChildPanelManagePage })));
 const AffiliatesPage = lazy(() => import('./pages/affiliates/AffiliatesPage').then(m => ({ default: m.AffiliatesPage })));
 
 // Lazy loaded administrative routes
@@ -109,6 +110,22 @@ export const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <ChildPanelPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="child-panel/manage"
+                element={
+                  <ProtectedRoute>
+                    <ChildPanelManagePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="child-panel/:panelId/manage"
+                element={
+                  <ProtectedRoute>
+                    <ChildPanelManagePage />
                   </ProtectedRoute>
                 }
               />

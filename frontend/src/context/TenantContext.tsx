@@ -134,17 +134,12 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const calculateMarkedUpPrice = useCallback(
     (retailPrice: number, _wholesaleRate?: number): number => {
-      if (!tenant || !tenant.is_custom_tenant) {
-        return retailPrice;
-      }
-      const markup = Number(tenant.default_markup_percent || 0);
-      if (markup <= 0) {
-        // By default, child panels sell to end customers at the exact same price as SocialPulse retail
-        return retailPrice;
-      }
-      // If child panel owner explicitly set a custom markup above retail
-      const multiplier = 1 + markup / 100;
-      return Math.round(retailPrice * multiplier * 100) / 100;
+      // Child panels sell at the exact same retail price as the parent panel.
+      // Their profit comes from the wholesale gap:
+      //   Customer pays selling_rate (3.86) → same as parent
+      //   Wholesale deduction from child panel balance = wholesale_rate (3.29)
+      //   Child panel profit = 3.86 - 3.29 = 0.57 per 1,000
+      return retailPrice;
     },
     [tenant]
   );

@@ -21,7 +21,8 @@ import {
   ShieldAlert,
   LogOut,
   Zap,
-  Phone
+  Phone,
+  ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
@@ -54,9 +55,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { name: 'Services', href: '/services', icon: Layers },
     { name: 'Tickets', href: '/support', icon: LifeBuoy },
     { name: 'Api', href: '/api-docs', icon: Code2 },
-    ...(!isTenantMode ? [{ name: 'Child panel', href: '/child-panel', icon: Sparkles }] : []),
+    ...(!isTenantMode
+      ? [
+          { name: 'Child panel', href: '/child-panel', icon: Sparkles },
+          { name: 'Panel Admin Hub', href: '/child-panel/manage', icon: ShieldCheck, badge: 'Owner' },
+        ]
+      : []),
     { name: 'Refer & Earn', href: '/referrals', icon: Share2 },
     { name: 'Updates', href: '/updates', icon: Bell },
+  ];
+
+  const childPanelStaffNav = [
+    { name: 'Orders Monitor', href: '/child-panel/manage?tab=orders', icon: Package },
+    { name: 'Support Helpdesk', href: '/child-panel/manage?tab=tickets', icon: Headphones },
+    { name: 'User Management', href: '/child-panel/manage?tab=users', icon: Users },
+    { name: 'Panel Hub', href: '/child-panel/manage', icon: Sliders },
   ];
 
   const adminNav = [
@@ -182,6 +195,49 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                           {item.badge}
                         </span>
                       )}
+                    </NavLink>
+                  );
+                })}
+              </nav>
+            </div>
+          )}
+
+          {isTenantMode && isAuthenticated && (
+            <div className="pt-2 border-t border-[#2b303c]">
+              <span
+                className="px-3 text-[10px] font-black uppercase tracking-wider block mb-2"
+                style={{ color: accentColor }}
+              >
+                Panel Administration
+              </span>
+              <nav className="space-y-1">
+                {childPanelStaffNav.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.name}
+                      to={item.href}
+                      onClick={() => onClose()}
+                      className={({ isActive }) =>
+                        `flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                          isActive
+                            ? 'text-slate-950 shadow-lg'
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-[#222630]'
+                        }`
+                      }
+                      style={({ isActive }) =>
+                        isActive
+                          ? {
+                              backgroundColor: accentColor,
+                              boxShadow: `0 10px 15px -3px ${accentColor}40`,
+                            }
+                          : {}
+                      }
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Icon className="w-3.5 h-3.5" />
+                        <span>{item.name}</span>
+                      </div>
                     </NavLink>
                   );
                 })}

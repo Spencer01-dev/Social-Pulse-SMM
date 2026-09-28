@@ -538,15 +538,18 @@ export const DepositPage: React.FC = () => {
                 </Button>
               </div>
             ) : pollStatus === 'prompted' ? (
-              <div className="p-6 rounded-3xl bg-amber-950/20 border border-amber-500/30 text-center space-y-4 animate-pulse">
+              <div className="p-6 rounded-3xl bg-amber-950/20 border border-amber-500/30 text-center space-y-4">
                 <Clock className="w-10 h-10 text-amber-400 mx-auto animate-spin" />
                 <div>
                   <h3 className="text-base font-extrabold text-white">Check Your Phone</h3>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Enter your M-Pesa PIN on your phone to complete deposit of KES {mpesaAmountKes}.
+                  <p className="text-xs text-slate-300 mt-2">
+                    Enter your M-Pesa PIN on your phone to complete deposit of <strong className="text-amber-400">KES {mpesaAmountKes}</strong> to <strong className="text-emerald-400">PICNIC TECHNOLOGIES</strong>.
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Paybill: <span className="font-mono text-slate-200">997960</span> | Acc: <span className="font-mono text-slate-200">0010529</span>
                   </p>
                 </div>
-                <div className="text-xs font-mono text-amber-400">Auto-polling status... ({countdown}s)</div>
+                <div className="text-xs font-mono text-amber-400 animate-pulse">Auto-detecting payment confirmation... ({countdown}s)</div>
               </div>
             ) : (
               <form onSubmit={handleInitiateMpesa} className="space-y-5">
@@ -556,13 +559,13 @@ export const DepositPage: React.FC = () => {
                       <Smartphone className="w-5 h-5 text-emerald-400" />
                     </div>
                     <div>
-                      <span className="font-bold text-white text-xs block">Lipa Na M-Pesa Online</span>
-                      <span className="text-[10px] text-slate-400">Direct Safaricom STK Push</span>
+                      <span className="font-bold text-white text-xs block">PICNIC TECHNOLOGIES</span>
+                      <span className="text-[10px] text-slate-400">Paybill: 997960 • Acc: 0010529</span>
                     </div>
                   </div>
                   <span className="inline-flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold font-mono">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    Online
+                    Instant STK
                   </span>
                 </div>
 

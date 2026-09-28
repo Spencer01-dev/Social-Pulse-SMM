@@ -1,12 +1,14 @@
 import uuid
-from typing import Any, List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Any, List, Optional
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_active_user
+from app.api.v1.endpoints.tenant import MAIN_PLATFORM_DOMAINS
 from app.core.database import get_db
+from app.models.child_panel import ChildPanel
 from app.models.ticket import Ticket, TicketMessage, TicketStatus
 from app.models.user import User
 from app.schemas.ticket import (
@@ -23,14 +25,38 @@ router = APIRouter(prefix="/tickets", tags=["Customer Support Tickets"])
 @router.post("", response_model=TicketResponse, status_code=status.HTTP_201_CREATED)
 async def create_support_ticket(
     ticket_in: TicketCreate,
+    request: Request,
+    x_tenant_domain: Optional[str] = Header(None, alias="X-Tenant-Domain"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ) -> Any:
     """
     Open a new support ticket.
     """
+    tenant_id = current_user.tenant_id
+    if not tenant_id:
+        raw_domain = x_tenant_domain or request.headers.get("x-tenant-domain") or request.headers.get("X-Tenant-Domain")
+        if raw_domain:
+            clean_tenant_domain = (
+                raw_domain.split(":")[0]
+                .strip()
+                .lower()
+                .replace("https://", "")
+                .replace("http://", "")
+                .rstrip("/")
+            )
+            is_main = any(clean_tenant_domain == d or clean_tenant_domain.endswith(f".{d}") for d in MAIN_PLATFORM_DOMAINS)
+            if not is_main:
+                tenant_q = await db.execute(
+                    select(ChildPanel).where(ChildPanel.domain == clean_tenant_domain)
+                )
+                panel = tenant_q.scalars().first()
+                if panel:
+                    tenant_id = panel.id
+
     ticket = Ticket(
         user_id=current_user.id,
+        tenant_id=tenant_id,
         order_id=ticket_in.order_id,
         subject=ticket_in.subject,
         priority=ticket_in.priority,

@@ -74,12 +74,9 @@ async def create_order(
             )
             panel = tenant_q.scalars().first()
 
-    # Universal retail price is service.selling_rate across main platform and child panels
+    # Universal retail price: child panels sell at the same price as the parent panel.
+    # Child panel profit = selling_rate - wholesale_rate (deducted from their parent balance)
     charge_rate = service.selling_rate
-    if panel and panel.branding_json:
-        markup = Decimal(str(panel.branding_json.get("default_markup_percent", 0)))
-        if markup > 0:
-            charge_rate = round(service.selling_rate * (Decimal("1.00") + markup / Decimal("100.00")), 2)
 
     # 3. Validate quantity boundaries & determine package vs per-1000 pricing
     is_package = (
@@ -121,9 +118,46 @@ async def create_order(
             detail=f"Insufficient wallet balance. Total cost: KES {total_charge:,.2f} | Available balance: KES {current_bal:,.2f}. Please add funds to proceed."
         )
 
-    # 5. Deduct funds from locked user balance
+    # 4b. Prepaid Wholesale Check: Verify and lock Child Panel Owner's Parent Account
+    panel_owner = None
+    wholesale_cost = Decimal("0.00")
+    panel_owner_bal_before = Decimal("0.00")
+
+    if panel and panel.user_id and panel.user_id != current_user.id:
+        wholesale_rate = (
+            service.wholesale_rate 
+            if (service.wholesale_rate is not None and service.wholesale_rate > 0) 
+            else service.selling_rate
+        )
+        if is_package:
+            wholesale_cost = round(wholesale_rate * Decimal(order_in.quantity), 2)
+        else:
+            wholesale_cost = round((wholesale_rate * Decimal(order_in.quantity)) / Decimal(1000), 2)
+
+        owner_q = await db.execute(
+            select(User).where(User.id == panel.user_id).with_for_update()
+        )
+        panel_owner = owner_q.scalars().first()
+        if not panel_owner or panel_owner.balance < wholesale_cost:
+            avail = panel_owner.balance if panel_owner else Decimal("0.00")
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail=(
+                    f"Child panel wholesale balance is depleted. "
+                    f"Required: KES {wholesale_cost:,.2f} | Available: KES {avail:,.2f}. "
+                    f"Please contact the panel administrator to top up their parent account."
+                )
+            )
+
+    # 5. Deduct funds from customer wallet
     locked_user.balance -= total_charge
     db.add(locked_user)
+
+    # 5b. Deduct wholesale cost from Child Panel Owner's Parent Account
+    if panel_owner and wholesale_cost > Decimal("0.00"):
+        panel_owner_bal_before = panel_owner.balance
+        panel_owner.balance -= wholesale_cost
+        db.add(panel_owner)
 
     # 6. Sanitize and canonicalize target URL
     from app.core.link_cleaner import sanitize_and_canonicalize_target_link
@@ -172,44 +206,22 @@ async def create_order(
     db.add(order)
     await db.flush()
 
-    # 9. Credit Child Panel owner profit (Spread between retail customer charge and wholesale cost)
-    if panel and panel.user_id and panel.user_id != current_user.id:
-        wholesale_rate = (
-            service.wholesale_rate 
-            if (service.wholesale_rate is not None and service.wholesale_rate > 0) 
-            else service.selling_rate
+    # 9. Record Child Panel Owner wholesale deduction in transaction ledger
+    if panel_owner and wholesale_cost > Decimal("0.00"):
+        owner_tx = Transaction(
+            user_id=panel_owner.id,
+            order_id=order.id,
+            tenant_id=panel.id,
+            type=TransactionType.ORDER_PAYMENT,
+            amount=-wholesale_cost,
+            balance_before=panel_owner_bal_before,
+            balance_after=panel_owner.balance,
+            currency="KES",
+            payment_method=PaymentMethod.INTERNAL,
+            status=TransactionStatus.COMPLETED,
+            description=f"Wholesale fulfillment for Order #{order.order_number or ''} on {panel.domain}"
         )
-        if is_package:
-            wholesale_cost = round(wholesale_rate * Decimal(order_in.quantity), 2)
-        else:
-            wholesale_cost = round((wholesale_rate * Decimal(order_in.quantity)) / Decimal(1000), 2)
-
-        panel_owner_profit = total_charge - wholesale_cost
-        if panel_owner_profit > Decimal("0.00"):
-            owner_q = await db.execute(
-                select(User).where(User.id == panel.user_id).with_for_update()
-            )
-            panel_owner = owner_q.scalars().first()
-            if panel_owner:
-                bal_before = panel_owner.balance
-                panel_owner.balance += panel_owner_profit
-                bal_after = panel_owner.balance
-                db.add(panel_owner)
-
-                tx = Transaction(
-                    user_id=panel_owner.id,
-                    order_id=order.id,
-                    tenant_id=panel.id,
-                    type=TransactionType.BONUS,
-                    amount=panel_owner_profit,
-                    balance_before=bal_before,
-                    balance_after=bal_after,
-                    currency="KES",
-                    payment_method=PaymentMethod.INTERNAL,
-                    status=TransactionStatus.COMPLETED,
-                    description=f"Child Panel profit from Order #{order.order_number}"
-                )
-                db.add(tx)
+        db.add(owner_tx)
 
     await db.commit()
     await db.refresh(order)

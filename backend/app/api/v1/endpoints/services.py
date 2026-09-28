@@ -1,11 +1,14 @@
 import uuid
+from decimal import Decimal
 from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.endpoints.tenant import MAIN_PLATFORM_DOMAINS
 from app.core.cache import get_cache, set_cache
 from app.core.database import get_db
+from app.models.child_panel import ChildPanel
 from app.models.service import Platform, Service
 from app.schemas.service import CustomerServiceResponse, PlatformSummary
 
@@ -22,9 +25,11 @@ ALLOWED_PUBLIC_PLATFORMS = [
 
 @router.get("", response_model=List[CustomerServiceResponse])
 async def list_public_services(
+    request: Request,
     platform: Optional[Platform] = None,
     category: Optional[str] = None,
     search: Optional[str] = None,
+    x_tenant_domain: Optional[str] = Header(None, alias="X-Tenant-Domain"),
     db: AsyncSession = Depends(get_db)
 ) -> Any:
     """
@@ -32,13 +37,32 @@ async def list_public_services(
     TikTok, Facebook, Instagram, WhatsApp, and Telegram.
     Security: Strictly hides provider IDs and provider cost rates.
     High performance: in-memory cached responses for instant retrieval.
+    Child panels display the same retail price as the parent panel.
+    Their profit comes from wholesale gap (wholesale_rate vs selling_rate).
     """
+    # Resolve child panel context for caching purposes
+    tenant_domain = None
+    raw_domain = x_tenant_domain or request.headers.get("x-tenant-domain") or request.headers.get("X-Tenant-Domain")
+    if raw_domain:
+        clean_domain = (
+            raw_domain.split(":")[0]
+            .strip()
+            .lower()
+            .replace("https://", "")
+            .replace("http://", "")
+            .rstrip("/")
+        )
+        is_main = any(clean_domain == d or clean_domain.endswith(f".{d}") for d in MAIN_PLATFORM_DOMAINS)
+        if not is_main:
+            tenant_domain = clean_domain
+
     # Check cache for non-search requests
     cache_key = None
     if not search:
         p_str = platform.value if platform else "all"
         c_str = category if category else "all"
-        cache_key = f"pub_services_{p_str}_{c_str}"
+        t_str = tenant_domain if tenant_domain else "main"
+        cache_key = f"pub_services_{t_str}_{p_str}_{c_str}"
         cached_result = get_cache(cache_key)
         if cached_result is not None:
             return cached_result
@@ -69,6 +93,10 @@ async def list_public_services(
 
     clean_services = []
     for s in services:
+        # Child panels sell at the same retail price as the parent panel.
+        # Their margin = selling_rate - wholesale_rate (deducted from their parent balance)
+        effective_rate = s.selling_rate
+
         clean_services.append(
             CustomerServiceResponse(
                 id=s.id,
@@ -78,7 +106,7 @@ async def list_public_services(
                 description=s.description if s.description else None,
                 service_type=s.service_type,
                 category=s.category,
-                rate=s.selling_rate,
+                rate=effective_rate,
                 wholesale_rate=s.wholesale_rate,
                 min_quantity=s.min_quantity,
                 max_quantity=s.max_quantity,
@@ -88,7 +116,7 @@ async def list_public_services(
         )
 
     if cache_key:
-        set_cache(cache_key, clean_services, ttl_seconds=300)
+        set_cache(cache_key, clean_services, ttl_seconds=60)
 
     return clean_services
 
@@ -205,12 +233,29 @@ async def list_available_platforms(db: AsyncSession = Depends(get_db)) -> Any:
 @router.get("/{service_id}", response_model=CustomerServiceResponse)
 async def get_service_details(
     service_id: uuid.UUID,
+    request: Request,
+    x_tenant_domain: Optional[str] = Header(None, alias="X-Tenant-Domain"),
     db: AsyncSession = Depends(get_db)
 ) -> Any:
     """
-    Fetch a single service by ID.
+    Fetch a single service by ID. Child panels see the same retail price as the parent panel.
     """
-    cache_key = f"pub_service_{service_id}"
+    tenant_domain = None
+    raw_domain = x_tenant_domain or request.headers.get("x-tenant-domain") or request.headers.get("X-Tenant-Domain")
+    if raw_domain:
+        clean_domain = (
+            raw_domain.split(":")[0]
+            .strip()
+            .lower()
+            .replace("https://", "")
+            .replace("http://", "")
+            .rstrip("/")
+        )
+        is_main = any(clean_domain == d or clean_domain.endswith(f".{d}") for d in MAIN_PLATFORM_DOMAINS)
+        if not is_main:
+            tenant_domain = clean_domain
+
+    cache_key = f"pub_service_{tenant_domain or 'main'}_{service_id}"
     cached = get_cache(cache_key)
     if cached is not None:
         return cached
@@ -225,6 +270,9 @@ async def get_service_details(
             detail="Service not found or inactive"
         )
 
+    # Same retail price for child panels — no markup inflation
+    effective_rate = service.selling_rate
+
     res = CustomerServiceResponse(
         id=service.id,
         provider_service_id=service.provider_service_id,
@@ -233,12 +281,12 @@ async def get_service_details(
         description=service.description,
         service_type=service.service_type,
         category=service.category,
-        rate=service.selling_rate,
+        rate=effective_rate,
         wholesale_rate=service.wholesale_rate,
         min_quantity=service.min_quantity,
         max_quantity=service.max_quantity,
         refill_available=service.refill_available,
         cancel_available=service.cancel_available
     )
-    set_cache(cache_key, res, ttl_seconds=300)
+    set_cache(cache_key, res, ttl_seconds=60)
     return res

@@ -1,13 +1,16 @@
 import uuid
 from decimal import Decimal
 from typing import Any, Dict, Optional
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import desc, select
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from sqlalchemy import desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_active_user
+from app.api.v1.endpoints.tenant import MAIN_PLATFORM_DOMAINS
+from app.core.config import settings
 from app.core.database import get_db
+from app.models.child_panel import ChildPanel
 from app.models.transaction import (
     PaymentMethod,
     Transaction,
@@ -17,6 +20,7 @@ from app.models.transaction import (
 from app.models.user import User
 from app.payments.exchange_rate import exchange_rate_service
 from app.payments.mpesa import mpesa_client, normalize_phone_number
+from app.payments.payhero import PayHeroClient, payhero_client
 from app.payments.paystack import paystack_provider
 from app.schemas.payment import (
     CurrenciesResponse,
@@ -42,19 +46,45 @@ async def get_supported_currencies() -> Any:
     }
 
 
+async def resolve_tenant_panel(
+    request: Request,
+    x_tenant_domain: Optional[str],
+    current_user: User,
+    db: AsyncSession
+) -> Optional[ChildPanel]:
+    """Helper to detect if request originated from a Child Panel domain."""
+    raw_domain = x_tenant_domain or request.headers.get("x-tenant-domain") or request.headers.get("X-Tenant-Domain")
+    if raw_domain:
+        clean = raw_domain.strip().lower().replace("https://", "").replace("http://", "").rstrip("/")
+        if not any(clean == d or clean.endswith(f".{d}") for d in MAIN_PLATFORM_DOMAINS):
+            q = await db.execute(select(ChildPanel).where(ChildPanel.domain == clean))
+            panel = q.scalars().first()
+            if panel:
+                return panel
+
+    if current_user.tenant_id:
+        q = await db.execute(select(ChildPanel).where(ChildPanel.id == current_user.tenant_id))
+        return q.scalars().first()
+
+    return None
+
+
 # =========================================================================
-# SAFARICOM M-PESA DARAJA STK PUSH ENGINE
+# SAFARICOM M-PESA & PAYHERO TILL STK PUSH ENGINE
 # =========================================================================
 
 @router.post("/mpesa/stk-push", response_model=MpesaSTKPushResponse)
 async def initiate_mpesa_stk_push(
     req: MpesaSTKPushRequest,
+    request: Request,
+    x_tenant_domain: Optional[str] = Header(None, alias="X-Tenant-Domain"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ) -> Any:
     """
     Initiate Lipa Na M-Pesa STK Push to the user's mobile device.
-    Creates a pending transaction ledger entry and returns CheckoutRequestID.
+    If the request is from a Child Panel with a configured PayHero Till/Paybill,
+    it automatically routes the customer payment directly into the Child Panel's Till!
     """
     if req.amount < 10:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Minimum deposit amount is KES 10.00.")
@@ -64,7 +94,85 @@ async def initiate_mpesa_stk_push(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    # Trigger STK Push via Daraja
+    panel = await resolve_tenant_panel(request, x_tenant_domain, current_user, db)
+    gw = (panel.metadata_json or {}).get("payment_gateway", {}) if panel else {}
+    use_child_payhero = (
+        panel is not None
+        and gw.get("is_active", True)
+        and gw.get("gateway_provider") == "payhero"
+        and bool(gw.get("payhero_channel_id"))
+    )
+    use_platform_payhero = (
+        not use_child_payhero
+        and bool(settings.PAYHERO_API_KEY)
+        and bool(settings.PAYHERO_CHANNEL_ID)
+    )
+
+    if use_child_payhero or use_platform_payhero:
+        if use_child_payhero:
+            channel_id = str(gw.get("payhero_channel_id"))
+            api_key = gw.get("payhero_api_key")
+            api_secret = gw.get("payhero_api_secret")
+            account_name = gw.get("payhero_account_name") or (panel.domain if panel else "SocialPulse")
+        else:
+            channel_id = str(settings.PAYHERO_CHANNEL_ID)
+            api_key = settings.PAYHERO_API_KEY
+            api_secret = settings.PAYHERO_API_SECRET
+            account_name = "PICNIC TECHNOLOGIES"
+
+        ph_client = PayHeroClient(
+            api_key=api_key,
+            api_secret=api_secret,
+            channel_id=channel_id,
+        )
+        external_ref = f"PH-{uuid.uuid4().hex[:12].upper()}"
+
+        try:
+            ph_resp = await ph_client.initiate_stk_push(
+                phone=formatted_phone,
+                amount=req.amount,
+                external_reference=external_ref,
+                account_name=account_name
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Failed to initiate Till STK Push via PayHero: {str(exc)}"
+            )
+
+        checkout_id = ph_resp.get("checkout_request_id") or external_ref
+        transaction = Transaction(
+            user_id=current_user.id,
+            tenant_id=panel.id if panel else None,
+            type=TransactionType.DEPOSIT,
+            amount=req.amount,
+            balance_before=current_user.balance,
+            balance_after=current_user.balance,
+            currency="KES",
+            payment_method=PaymentMethod.MPESA,
+            payment_reference=external_ref,
+            status=TransactionStatus.PENDING,
+            description=f"Till Deposit ({account_name} Till {channel_id} - {formatted_phone})",
+            metadata_json={
+                "phone_number": formatted_phone,
+                "channel_id": channel_id,
+                "external_reference": external_ref,
+                "checkout_request_id": checkout_id,
+                "gateway": "payhero",
+                "panel_id": str(panel.id) if panel else None,
+            }
+        )
+        db.add(transaction)
+        await db.commit()
+
+        return MpesaSTKPushResponse(
+            checkout_request_id=checkout_id,
+            merchant_request_id=external_ref,
+            customer_message=f"STK Push prompt sent to {formatted_phone}. Pay directly to {account_name}.",
+            status="pending"
+        )
+
+    # Standard Platform M-Pesa Daraja STK Push
     try:
         stk_resp = await mpesa_client.initiate_deposit(
             phone_or_wallet=formatted_phone,
@@ -81,10 +189,11 @@ async def initiate_mpesa_stk_push(
     # Record Pending Transaction in ledger
     transaction = Transaction(
         user_id=current_user.id,
+        tenant_id=panel.id if panel else None,
         type=TransactionType.DEPOSIT,
         amount=req.amount,
         balance_before=current_user.balance,
-        balance_after=current_user.balance,  # Will update upon confirmation
+        balance_after=current_user.balance,
         currency="KES",
         payment_method=PaymentMethod.MPESA,
         payment_reference=stk_resp.checkout_request_id,
@@ -94,6 +203,7 @@ async def initiate_mpesa_stk_push(
             "phone_number": formatted_phone,
             "merchant_request_id": stk_resp.merchant_request_id,
             "checkout_request_id": stk_resp.checkout_request_id,
+            "gateway": "daraja",
         }
     )
 
@@ -197,6 +307,86 @@ async def mpesa_daraja_callback(
     return {"ResultCode": 0, "ResultDesc": "Callback processed successfully"}
 
 
+# =========================================================================
+# PAYHERO WEBHOOK CALLBACK (Till / Paybill Direct Payments)
+# =========================================================================
+
+@router.post("/payhero/callback")
+async def payhero_webhook_callback(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+) -> Any:
+    """
+    Public Webhook endpoint for PayHero Kenya STK Push callbacks.
+    Handles responses for direct Till and Paybill payments.
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        return {"status": "error", "message": "Invalid JSON"}
+
+    response_data = data.get("response", data) if isinstance(data, dict) else {}
+    status_str = str(response_data.get("Status", data.get("status", ""))).lower()
+    external_ref = response_data.get("ExternalReference") or data.get("external_reference") or response_data.get("reference")
+    receipt_no = response_data.get("MpesaReceiptNumber") or response_data.get("receipt") or external_ref
+
+    if not external_ref:
+        return {"status": "acknowledged", "message": "Missing reference"}
+
+    query = await db.execute(
+        select(Transaction)
+        .options(selectinload(Transaction.user))
+        .where(
+            or_(
+                Transaction.payment_reference == external_ref,
+                Transaction.metadata_json["external_reference"].as_string() == external_ref,
+                Transaction.metadata_json["checkout_request_id"].as_string() == external_ref,
+            )
+        )
+        .with_for_update()
+    )
+    transaction = query.scalars().first()
+
+    if not transaction:
+        return {"status": "acknowledged", "message": "Transaction not found locally"}
+
+    if transaction.status != TransactionStatus.PENDING:
+        return {"status": "acknowledged", "message": "Already processed"}
+
+    user = transaction.user
+    if not user:
+        return {"status": "error", "message": "User missing"}
+
+    if status_str in ["success", "successful", "0", "queued"]:
+        amount = Decimal(str(response_data.get("Amount", transaction.amount)))
+        balance_before = user.balance
+        user.balance += amount
+        balance_after = user.balance
+
+        transaction.balance_before = balance_before
+        transaction.balance_after = balance_after
+        transaction.amount = amount
+        transaction.payment_reference = receipt_no
+        transaction.status = TransactionStatus.COMPLETED
+        transaction.description = f"PayHero Till Deposit (Receipt: {receipt_no})"
+        transaction.metadata_json = {
+            **(transaction.metadata_json or {}),
+            "mpesa_receipt": receipt_no,
+            "payhero_callback": data
+        }
+
+        db.add(user)
+        db.add(transaction)
+        await db.commit()
+    else:
+        transaction.status = TransactionStatus.FAILED
+        transaction.description = f"PayHero M-Pesa Failed: {response_data.get('Description', 'Cancelled')}"
+        db.add(transaction)
+        await db.commit()
+
+    return {"status": "success", "message": "PayHero callback processed"}
+
+
 @router.get("/mpesa/status/{checkout_request_id}", response_model=MpesaSTKStatusResponse)
 async def query_mpesa_stk_status(
     checkout_request_id: str,
@@ -221,30 +411,75 @@ async def query_mpesa_stk_status(
     if not transaction:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment request not found.")
 
-    # If still pending, query Daraja / Mock directly
+    # If still pending, query PayHero or Daraja directly
     if transaction.status == TransactionStatus.PENDING:
-        try:
-            status_data = await mpesa_client.verify_payment(checkout_request_id)
-            if status_data.result_code == "0":
-                # Confirmed! Credit user
-                balance_before = current_user.balance
-                current_user.balance += transaction.amount
-                balance_after = current_user.balance
+        gw_type = (transaction.metadata_json or {}).get("gateway", "daraja")
+        if gw_type == "payhero":
+            try:
+                ext_ref = (transaction.metadata_json or {}).get("external_reference") or checkout_request_id
+                client_to_use = payhero_client
+                panel_id = (transaction.metadata_json or {}).get("panel_id")
+                if panel_id:
+                    try:
+                        q_p = await db.execute(select(ChildPanel).where(ChildPanel.id == uuid.UUID(panel_id)))
+                        cp = q_p.scalars().first()
+                        if cp:
+                            cp_gw = (cp.metadata_json or {}).get("payment_gateway", {})
+                            if cp_gw.get("payhero_api_key"):
+                                client_to_use = PayHeroClient(
+                                    api_key=cp_gw.get("payhero_api_key"),
+                                    api_secret=cp_gw.get("payhero_api_secret"),
+                                    channel_id=str(cp_gw.get("payhero_channel_id")),
+                                )
+                    except Exception:
+                        pass
+                ph_status = await client_to_use.check_payment_status(ext_ref)
+                if str(ph_status.get("status", "")).lower() in ["success", "successful"]:
+                    balance_before = current_user.balance
+                    current_user.balance += transaction.amount
+                    balance_after = current_user.balance
 
-                receipt = status_data.mpesa_receipt or f"QHJ{checkout_request_id[:8]}"
-                transaction.balance_before = balance_before
-                transaction.balance_after = balance_after
-                transaction.payment_reference = receipt
-                transaction.status = TransactionStatus.COMPLETED
-                transaction.description = f"Lipa Na M-Pesa Deposit (Receipt: {receipt})"
+                    receipt = ph_status.get("receipt") or ext_ref
+                    transaction.balance_before = balance_before
+                    transaction.balance_after = balance_after
+                    transaction.payment_reference = receipt
+                    transaction.status = TransactionStatus.COMPLETED
+                    transaction.description = f"PayHero Till Deposit (Receipt: {receipt})"
+                    transaction.metadata_json = {
+                        **(transaction.metadata_json or {}),
+                        "mpesa_receipt": receipt
+                    }
 
-                db.add(current_user)
-                db.add(transaction)
-                await db.commit()
-                await db.refresh(current_user)
-                await db.refresh(transaction)
-        except Exception:
-            pass
+                    db.add(current_user)
+                    db.add(transaction)
+                    await db.commit()
+                    await db.refresh(current_user)
+                    await db.refresh(transaction)
+            except Exception:
+                pass
+        else:
+            try:
+                status_data = await mpesa_client.verify_payment(checkout_request_id)
+                if status_data.result_code == "0":
+                    # Confirmed! Credit user
+                    balance_before = current_user.balance
+                    current_user.balance += transaction.amount
+                    balance_after = current_user.balance
+
+                    receipt = status_data.mpesa_receipt or f"QHJ{checkout_request_id[:8]}"
+                    transaction.balance_before = balance_before
+                    transaction.balance_after = balance_after
+                    transaction.payment_reference = receipt
+                    transaction.status = TransactionStatus.COMPLETED
+                    transaction.description = f"Lipa Na M-Pesa Deposit (Receipt: {receipt})"
+
+                    db.add(current_user)
+                    db.add(transaction)
+                    await db.commit()
+                    await db.refresh(current_user)
+                    await db.refresh(transaction)
+            except Exception:
+                pass
 
     return MpesaSTKStatusResponse(
         checkout_request_id=checkout_request_id,

@@ -56,7 +56,7 @@ def calculate_selling_rate(
     provider_rate: Decimal,
     markup_type: MarkupType,
     markup_value: Decimal,
-    min_selling_rate: Decimal = Decimal("5.00")
+    min_selling_rate: Decimal = Decimal("0.80")
 ) -> Decimal:
     """
     Compute customer selling rate based on provider rate and markup rules.
@@ -180,8 +180,8 @@ async def sync_services_from_provider(
                     markup_type=existing_service.markup_type,
                     markup_value=existing_service.markup_value
                 )
-            if effective_rate > 0:
-                existing_service.wholesale_rate = round(effective_rate * Decimal("1.32625"), 2)
+                if effective_rate > 0:
+                    existing_service.wholesale_rate = round(effective_rate * Decimal("1.32625"), 2)
 
             db.add(existing_service)
             updated_count += 1

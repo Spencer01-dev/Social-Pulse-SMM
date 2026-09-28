@@ -1,13 +1,14 @@
 import secrets
 from datetime import timedelta
-from typing import Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Any, Optional
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_active_user
+from app.api.v1.endpoints.tenant import MAIN_PLATFORM_DOMAINS
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import (
@@ -16,6 +17,7 @@ from app.core.security import (
     get_password_hash,
     verify_password,
 )
+from app.models.child_panel import ChildPanel
 from app.models.user import User, UserRole
 from app.schemas.token import RefreshTokenRequest, Token, TokenPayload
 from app.schemas.user import UserCreate, UserLogin, UserResponse
@@ -26,10 +28,12 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     user_in: UserCreate,
+    request: Request,
+    x_tenant_domain: Optional[str] = Header(None, alias="X-Tenant-Domain"),
     db: AsyncSession = Depends(get_db)
 ) -> Any:
     """
-    Register a new customer account on SocialPulse.
+    Register a new customer account on SocialPulse or a custom child panel.
     """
     # Check if email or username already registered
     result = await db.execute(
@@ -53,6 +57,27 @@ async def register(
                 detail="This username is already taken. Please choose another."
             )
 
+    # Resolve child panel tenant context if registered on a custom child panel domain
+    tenant_id = None
+    raw_domain = x_tenant_domain or request.headers.get("x-tenant-domain") or request.headers.get("X-Tenant-Domain")
+    if raw_domain:
+        clean_tenant_domain = (
+            raw_domain.split(":")[0]
+            .strip()
+            .lower()
+            .replace("https://", "")
+            .replace("http://", "")
+            .rstrip("/")
+        )
+        is_main = any(clean_tenant_domain == d or clean_tenant_domain.endswith(f".{d}") for d in MAIN_PLATFORM_DOMAINS)
+        if not is_main:
+            tenant_q = await db.execute(
+                select(ChildPanel).where(ChildPanel.domain == clean_tenant_domain)
+            )
+            panel = tenant_q.scalars().first()
+            if panel:
+                tenant_id = panel.id
+
     # Check if this is the very first user in the database -> automatically make SUPER_ADMIN
     count_result = await db.execute(select(User))
     first_user = count_result.scalars().first()
@@ -65,6 +90,7 @@ async def register(
         phone_number=user_in.phone_number,
         hashed_password=get_password_hash(user_in.password),
         role=assigned_role,
+        tenant_id=tenant_id,
         is_active=True,
         is_verified=False,
         currency=settings.PRIMARY_CURRENCY,

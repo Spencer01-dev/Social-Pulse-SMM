@@ -95,6 +95,14 @@ class Settings(BaseSettings):
     PAYSTACK_PUBLIC_KEY: str = ""
     PAYSTACK_SECRET_KEY: str = ""
 
+    # PayHero Kenya (Instant Till / Paybill STK Push)
+    PAYHERO_API_KEY: str = ""
+    PAYHERO_API_SECRET: str = ""
+    PAYHERO_CHANNEL_ID: str = ""
+    PAYHERO_ACCOUNT_ID: str = ""
+    PAYHERO_BASE_URL: str = "https://backend.payhero.co.ke/api/v2"
+    PAYHERO_CALLBACK_URL: str = "https://social-pulse-smm.onrender.com/api/v1/payments/payhero/callback"
+
     # Currency
     PRIMARY_CURRENCY: str = "KES"
     DEFAULT_USD_TO_KES: float = 130.00
