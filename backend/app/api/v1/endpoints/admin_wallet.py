@@ -2,7 +2,7 @@ import uuid
 from decimal import Decimal
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import desc, select
+from sqlalchemy import desc, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -85,3 +85,18 @@ async def adjust_user_balance(
     await db.refresh(transaction)
 
     return transaction
+
+
+@router.post("/purge-dummy-funds")
+async def purge_all_dummy_funds(
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_roles([UserRole.SUPER_ADMIN]))
+) -> Any:
+    """
+    Purge all dummy balances, test transactions, and test orders across the platform.
+    """
+    await db.execute(text("UPDATE users SET balance = 0.00;"))
+    await db.execute(text("DELETE FROM transactions;"))
+    await db.execute(text("DELETE FROM orders;"))
+    await db.commit()
+    return {"status": "success", "message": "All dummy balances reset to 0.00 KES, transactions and orders purged."}

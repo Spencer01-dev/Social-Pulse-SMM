@@ -191,32 +191,34 @@ async def lifespan(app: FastAPI):
                         ) THEN
                             ALTER TABLE services ADD COLUMN wholesale_rate NUMERIC(12, 2) DEFAULT 0.00;
                         END IF;
+                        UPDATE services 
+                        SET wholesale_rate = ROUND(provider_rate * 1.32625, 2) 
+                        WHERE (wholesale_rate IS NULL OR wholesale_rate <= 0.001) AND provider_rate > 0;
                     END $$;
-
-                    UPDATE services 
-                    SET wholesale_rate = ROUND(provider_rate * 1.32625, 2) 
-                    WHERE (wholesale_rate IS NULL OR wholesale_rate <= 0.001) AND provider_rate > 0;
                 """))
                 print("[+] wholesale_rate column on services verified and populated.")
 
                 # Step 10: Clean up legacy providers (smm_africa, delix) and orphaned services
                 await conn.execute(text("""
-                    UPDATE services 
-                    SET fallback_provider_id = NULL, fallback_service_id = NULL 
-                    WHERE fallback_provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers'));
+                    DO $$
+                    BEGIN
+                        UPDATE services 
+                        SET fallback_provider_id = NULL, fallback_service_id = NULL 
+                        WHERE fallback_provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers'));
 
-                    DELETE FROM orders 
-                    WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers'));
+                        DELETE FROM orders 
+                        WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers'));
 
-                    DELETE FROM services 
-                    WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers'))
-                       OR provider_id IS NULL
-                       OR provider_id NOT IN (SELECT id FROM providers WHERE id IS NOT NULL)
-                       OR name ILIKE '%delix%' 
-                       OR category ILIKE '%delix%';
+                        DELETE FROM services 
+                        WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers'))
+                           OR provider_id IS NULL
+                           OR provider_id NOT IN (SELECT id FROM providers WHERE id IS NOT NULL)
+                           OR name ILIKE '%delix%' 
+                           OR category ILIKE '%delix%';
 
-                    DELETE FROM providers 
-                    WHERE slug NOT IN ('jap', 'secsers');
+                        DELETE FROM providers 
+                        WHERE slug NOT IN ('jap', 'secsers');
+                    END $$;
                 """))
                 print("[+] Legacy providers and orphaned services cleanup verified.")
 
@@ -236,8 +238,8 @@ async def lifespan(app: FastAPI):
                 await conn.execute(text("""
                     DO $$
                     BEGIN
-                        IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='_live_dummy_funds_purged_lock') THEN
-                            CREATE TABLE _live_dummy_funds_purged_lock (id SERIAL PRIMARY KEY, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+                        IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='_live_dummy_funds_purged_lock_v2') THEN
+                            CREATE TABLE _live_dummy_funds_purged_lock_v2 (id SERIAL PRIMARY KEY, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
                             UPDATE users SET balance = 0.00;
                             DELETE FROM transactions;
                             DELETE FROM orders;
