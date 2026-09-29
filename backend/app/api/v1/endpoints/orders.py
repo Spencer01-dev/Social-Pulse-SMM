@@ -16,6 +16,7 @@ from app.models.transaction import PaymentMethod, Transaction, TransactionStatus
 from app.models.user import User, UserRole
 from app.providers.manager import get_provider
 from app.schemas.order import CustomerOrderResponse, OrderCreate
+from app.workers.order_tasks import sync_single_order
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -409,3 +410,38 @@ async def request_order_refill(
         "order_id": str(order.id),
         "message": f"Refill requested successfully from upstream provider! Refill ID: #{refill_resp.refill_id}"
     }
+
+
+@router.post("/{order_id}/sync")
+async def customer_sync_order(
+    order_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """
+    Customer live check: query upstream provider for live delivery progress of an order.
+    """
+    result = await db.execute(
+        select(Order)
+        .options(selectinload(Order.service), selectinload(Order.provider), selectinload(Order.user))
+        .where(Order.id == order_id, Order.user_id == current_user.id)
+    )
+    order = result.scalars().first()
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    changed, updated_order = await sync_single_order(db, order)
+    delivered = max(0, updated_order.quantity - updated_order.remains)
+    pct = round((delivered / (updated_order.quantity or 1)) * 100)
+
+    return {
+        "success": True,
+        "message": f"Progress updated: {delivered}/{updated_order.quantity} received ({pct}%).",
+        "status": updated_order.status.value,
+        "start_count": updated_order.start_count,
+        "remains": updated_order.remains,
+        "delivered": delivered,
+        "progress_percent": pct,
+        "changed": changed
+    }
+

@@ -18,11 +18,17 @@ async def sanitize_and_canonicalize_target_link(raw_text: str, timeout: float = 
     match = url_pattern.search(raw_text)
     
     if not match:
-        return raw_text.strip()
-
-    extracted_url = match.group(0)
-    if not extracted_url.startswith("http"):
-        extracted_url = "https://" + extracted_url
+        text = raw_text.strip()
+        # Handle cases where domain is entered without protocol or www (e.g. tiktok.com/@user, instagram.com/...)
+        domain_match = re.search(r'\b((?:tiktok|instagram|facebook|youtube|twitter|x)\.com/[^\s<>"]+|youtu\.be/[^\s<>"]+)', text, re.IGNORECASE)
+        if domain_match:
+            extracted_url = "https://" + domain_match.group(1)
+        else:
+            return text
+    else:
+        extracted_url = match.group(0)
+        if not extracted_url.startswith("http"):
+            extracted_url = "https://" + extracted_url
 
     # 2. Check if it's a short redirect link that needs canonicalization
     short_domains = ["vm.tiktok.com", "vt.tiktok.com", "youtu.be", "fb.me", "ig.me", "t.co", "bit.ly"]

@@ -22,6 +22,7 @@ import { CustomerOrder, OrderStatus } from '../../types';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { useAuth } from '../../context/AuthContext';
+import { formatExternalUrl } from '../../utils/url';
 
 interface TableVisualSettings {
   multiSelection: boolean;
@@ -69,7 +70,31 @@ export const OrderListPage: React.FC = () => {
 
   // Refill action state
   const [refillingOrderId, setRefillingOrderId] = useState<string | null>(null);
+  const [syncingOrderId, setSyncingOrderId] = useState<string | null>(null);
   const [refillFeedback, setRefillFeedback] = useState<{ id: string; success: boolean; message: string } | null>(null);
+
+  const handleCustomerSyncOrder = async (orderId: string) => {
+    setSyncingOrderId(orderId);
+    try {
+      const res = await ordersService.syncSingleOrderCustomer(orderId);
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId
+            ? {
+                ...o,
+                status: res.status,
+                start_count: res.start_count,
+                remains: res.remains,
+              }
+            : o
+        )
+      );
+    } catch (err: any) {
+      console.error('Failed to sync order', err);
+    } finally {
+      setSyncingOrderId(null);
+    }
+  };
 
   const handleRefillClick = async (order: CustomerOrder) => {
     if (refillingOrderId) return;
@@ -575,10 +600,11 @@ export const OrderListPage: React.FC = () => {
                     </td>
                     <td className="py-3.5 px-4 max-w-[200px] truncate">
                       <a
-                        href={order.target_link}
+                        href={formatExternalUrl(order.target_link, order.platform, order.service_name)}
                         target="_blank"
-                        rel="noreferrer"
+                        rel="noopener noreferrer"
                         className="text-amber-400 hover:text-amber-300 flex items-center gap-1"
+                        title={formatExternalUrl(order.target_link, order.platform, order.service_name)}
                       >
                         <span className="truncate">{order.target_link}</span>
                         <ExternalLink className="w-3 h-3 flex-shrink-0" />
@@ -588,26 +614,38 @@ export const OrderListPage: React.FC = () => {
                       <span className="text-white font-semibold block">{order.quantity.toLocaleString()}</span>
                       <span className="text-[10px] text-slate-400">Start: {order.start_count}</span>
                     </td>
-                    <td className="py-3.5 px-4 font-mono min-w-[140px]">
-                      <div className="flex items-center justify-between text-[10px] text-slate-300 mb-1">
-                        <span>{isCompleted ? 'Delivered' : isPending ? 'Queued' : `${delivered} / ${order.quantity}`}</span>
-                        <span className="text-amber-400 font-bold">{isCompleted ? '100%' : isPending ? '0%' : `${progressPct}%`}</span>
+                    <td className="py-3.5 px-4 font-mono min-w-[160px]">
+                      <div className="flex items-center justify-between text-[11px] mb-1">
+                        <span className="text-white font-medium flex items-center gap-1.5">
+                          {isCompleted ? 'Delivered' : isPending ? 'Queued' : `+${delivered.toLocaleString()} / ${order.quantity.toLocaleString()}`}
+                          {order.status === 'in_progress' && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">
+                              ● Live
+                            </span>
+                          )}
+                        </span>
+                        <span className={`font-bold ${isCompleted ? 'text-emerald-400' : 'text-amber-400'}`}>
+                          {isCompleted ? '100%' : isPending ? '0%' : `${progressPct}%`}
+                        </span>
                       </div>
-                      <div className="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden border border-slate-800">
+                      <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
                         <div
-                          className={`h-full rounded-full transition-all duration-500 ${
+                          className={`h-full rounded-full transition-all duration-700 ease-out ${
                             isCompleted
-                              ? 'bg-emerald-400'
+                              ? 'bg-gradient-to-r from-emerald-500 to-emerald-400'
                               : order.status === 'in_progress'
-                              ? 'bg-amber-400 animate-pulse'
+                              ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-amber-300 animate-pulse'
                               : 'bg-slate-700'
                           }`}
                           style={{ width: `${progressPct}%` }}
                         />
                       </div>
-                      <span className="text-[9px] text-slate-500 block mt-0.5">
-                        {isCompleted ? 'Finished' : isPending ? `${order.quantity} queued` : `${order.remains} remaining`}
-                      </span>
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1">
+                        <span>{order.start_count > 0 ? `Start: ${order.start_count}` : ''}</span>
+                        <span className="text-amber-300 font-semibold">
+                          {isCompleted ? 'Finished' : isPending ? `${order.quantity} queued` : `${order.remains.toLocaleString()} remaining`}
+                        </span>
+                      </div>
                     </td>
                     {tableSettings.showPrice && (
                       <td className="py-3.5 px-4 font-bold text-emerald-400">
@@ -621,9 +659,18 @@ export const OrderListPage: React.FC = () => {
                         {new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </td>
                     )}
-                    {(tableSettings.refillButton || tableSettings.cancelButton) && (
+                    {(tableSettings.refillButton || tableSettings.cancelButton || true) && (
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleCustomerSyncOrder(order.id)}
+                            disabled={syncingOrderId === order.id}
+                            title="Live Track & Sync Progress"
+                            className="p-1.5 rounded-lg bg-amber-500/15 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30 transition-colors disabled:opacity-50"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${syncingOrderId === order.id ? 'animate-spin' : ''}`} />
+                          </button>
                           {tableSettings.refillButton && (
                             order.refill_available ? (
                               <button

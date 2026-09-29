@@ -23,6 +23,7 @@ import { analyticsService, DailyRevenue, MonthlySummary } from '../../services/a
 import { AdminOrder, OrderStatus } from '../../types';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
+import { formatExternalUrl } from '../../utils/url';
 import { DailyRevenueCalendar } from '../../components/analytics/DailyRevenueCalendar';
 
 export const AdminOrdersPage: React.FC = () => {
@@ -43,6 +44,7 @@ export const AdminOrdersPage: React.FC = () => {
   const [newStartCount, setNewStartCount] = useState<string>('');
   const [newRemains, setNewRemains] = useState<string>('');
   const [savingOverride, setSavingOverride] = useState(false);
+  const [syncingSingleOrderId, setSyncingSingleOrderId] = useState<string | null>(null);
 
   // Monthly Revenue & Profit Modal State
   const [showMonthModal, setShowMonthModal] = useState(false);
@@ -129,6 +131,30 @@ export const AdminOrdersPage: React.FC = () => {
       setSyncMessage(`Sync Error: ${err.message}`);
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleSyncSingleOrder = async (orderId: string) => {
+    setSyncingSingleOrderId(orderId);
+    try {
+      const res = await ordersService.syncSingleOrderAdmin(orderId);
+      setSyncMessage(res.message);
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId
+            ? {
+                ...o,
+                status: res.status,
+                start_count: res.start_count,
+                remains: res.remains,
+              }
+            : o
+        )
+      );
+    } catch (err: any) {
+      setSyncMessage(`Sync failed: ${err.response?.data?.detail || err.message}`);
+    } finally {
+      setSyncingSingleOrderId(null);
     }
   };
 
@@ -437,35 +463,50 @@ export const AdminOrdersPage: React.FC = () => {
                   <td className="py-3.5 px-4 max-w-xs truncate">
                     <div className="font-medium text-white truncate">{order.service_name}</div>
                     <a
-                      href={order.target_link}
+                      href={formatExternalUrl(order.target_link, order.platform, order.service_name)}
                       target="_blank"
-                      rel="noreferrer"
+                      rel="noopener noreferrer"
                       className="text-[11px] text-amber-400 hover:text-amber-300 flex items-center gap-1 truncate"
+                      title={formatExternalUrl(order.target_link, order.platform, order.service_name)}
                     >
                       <span className="truncate">{order.target_link}</span>
                       <ExternalLink className="w-3 h-3 flex-shrink-0" />
                     </a>
                   </td>
-                  <td className="py-3.5 px-4 font-mono min-w-[130px]">
+                  <td className="py-3.5 px-4 font-mono min-w-[150px]">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-white font-semibold">{order.quantity.toLocaleString()}</span>
-                      <span className="text-[10px] text-slate-400">Start: {order.start_count}</span>
+                      <span className="text-white font-semibold flex items-center gap-1.5">
+                        {order.quantity.toLocaleString()}
+                        {order.status === 'in_progress' && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">
+                            ● Live
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        Start: {order.start_count}
+                        {order.start_count > 0 && ` → ${order.start_count + order.quantity}`}
+                      </span>
                     </div>
-                    <div className="w-full bg-slate-900 rounded-full h-1.5 mt-1 overflow-hidden border border-slate-800">
+                    <div className="w-full bg-slate-900 rounded-full h-2 mt-1.5 overflow-hidden border border-slate-800">
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${
+                        className={`h-full rounded-full transition-all duration-700 ease-out ${
                           isCompleted
-                            ? 'bg-emerald-400'
+                            ? 'bg-gradient-to-r from-emerald-500 to-emerald-400'
                             : order.status === 'in_progress'
-                            ? 'bg-amber-400 animate-pulse'
+                            ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-amber-300 animate-pulse'
                             : 'bg-slate-700'
                         }`}
                         style={{ width: `${order.status === 'completed' ? 100 : progressPct}%` }}
                       />
                     </div>
-                    <div className="flex items-center justify-between text-[9px] text-slate-400 mt-0.5">
-                      <span>{order.status === 'completed' ? '100% Done' : `${progressPct}% done`}</span>
-                      <span className="text-amber-400/80">{order.remains} left</span>
+                    <div className="flex items-center justify-between text-[10px] font-mono mt-1">
+                      <span className={isCompleted ? 'text-emerald-400 font-bold' : order.status === 'in_progress' ? 'text-amber-300 font-bold' : 'text-slate-400'}>
+                        {isCompleted ? '100% Done' : `+${delivered.toLocaleString()} (${progressPct}%)`}
+                      </span>
+                      <span className="text-amber-400 font-bold">
+                        {isCompleted ? '0 left' : `${order.remains.toLocaleString()} left`}
+                      </span>
                     </div>
                   </td>
                   <td className="py-3.5 px-4 font-mono">
@@ -489,6 +530,16 @@ export const AdminOrdersPage: React.FC = () => {
                   </td>
                   <td className="py-3.5 px-4 text-right">
                     <div className="flex items-center justify-end gap-1">
+                      {order.provider_order_id && (
+                        <button
+                          onClick={() => handleSyncSingleOrder(order.id)}
+                          disabled={syncingSingleOrderId === order.id}
+                          className="p-1.5 rounded-lg text-amber-400 hover:text-amber-300 hover:bg-amber-500/20 transition-colors"
+                          title="Live Sync Progress with Upstream Provider"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${syncingSingleOrderId === order.id ? 'animate-spin' : ''}`} />
+                        </button>
+                      )}
                       {order.refill_available && order.provider_order_id && (
                         <button
                           onClick={() => handleAdminRefill(order)}

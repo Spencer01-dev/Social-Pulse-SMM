@@ -64,4 +64,32 @@ export const ordersService = {
     );
     return response.data;
   },
+
+  syncSingleOrderAdmin: async (orderId: string): Promise<{
+    success: boolean;
+    message: string;
+    status: OrderStatus;
+    start_count: number;
+    remains: number;
+    delivered: number;
+    progress_percent: number;
+    changed: boolean;
+  }> => {
+    const response = await apiClient.post(`/admin/orders/${orderId}/sync`);
+    return response.data;
+  },
+
+  syncSingleOrderCustomer: async (orderId: string): Promise<{
+    success: boolean;
+    message: string;
+    status: OrderStatus;
+    start_count: number;
+    remains: number;
+    delivered: number;
+    progress_percent: number;
+    changed: boolean;
+  }> => {
+    const response = await apiClient.post(`/orders/${orderId}/sync`);
+    return response.data;
+  },
 };

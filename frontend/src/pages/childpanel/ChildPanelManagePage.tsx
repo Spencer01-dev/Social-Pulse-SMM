@@ -40,6 +40,7 @@ import { Button } from '../../components/common/Button';
 import { useAuth } from '../../context/AuthContext';
 import { useCurrency } from '../../context/CurrencyContext';
 import { useTenant } from '../../context/TenantContext';
+import { formatExternalUrl } from '../../utils/url';
 import {
   childPanelService,
   ChildPanelData,
@@ -742,7 +743,16 @@ export const ChildPanelManagePage: React.FC = () => {
                         </td>
                         <td className="py-3 px-4 max-w-[180px]">
                           <div className="flex items-center gap-1.5">
-                            <span className="truncate text-slate-400 font-mono text-[11px]">{o.target_link}</span>
+                            <a
+                              href={formatExternalUrl(o.target_link, undefined, o.service_name)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="truncate text-amber-400 hover:text-amber-300 font-mono text-[11px] flex items-center gap-1"
+                              title={formatExternalUrl(o.target_link, undefined, o.service_name)}
+                            >
+                              <span className="truncate">{o.target_link}</span>
+                              <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                            </a>
                             <button
                               onClick={() => copyToClipboard(o.target_link, o.id)}
                               className="text-slate-500 hover:text-white shrink-0"

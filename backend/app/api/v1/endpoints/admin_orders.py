@@ -12,7 +12,7 @@ from app.models.order import Order, OrderStatus
 from app.models.service import Service
 from app.models.user import User, UserRole
 from app.schemas.order import AdminOrderResponse, OrderStatusUpdate
-from app.workers.order_tasks import sync_active_orders
+from app.workers.order_tasks import sync_active_orders, sync_single_order
 
 router = APIRouter(prefix="/admin/orders", tags=["Admin Orders Monitoring"])
 
@@ -267,6 +267,40 @@ async def trigger_active_orders_sync(
         "message": f"Order synchronization finished. Checked {checked} active orders, updated {updated}.",
         "checked": checked,
         "updated": updated
+    }
+
+
+@router.post("/{order_id}/sync")
+async def admin_sync_order(
+    order_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
+) -> Any:
+    """
+    Instantly check upstream provider status and live progress (remains, start count) for a single order.
+    """
+    result = await db.execute(
+        select(Order)
+        .options(selectinload(Order.service), selectinload(Order.provider), selectinload(Order.user))
+        .where(Order.id == order_id)
+    )
+    order = result.scalars().first()
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    changed, updated_order = await sync_single_order(db, order)
+    delivered = max(0, updated_order.quantity - updated_order.remains)
+    pct = round((delivered / (updated_order.quantity or 1)) * 100)
+
+    return {
+        "success": True,
+        "message": f"Order #{str(updated_order.id)[:8]} synced: {delivered}/{updated_order.quantity} delivered ({pct}%), {updated_order.remains} remaining.",
+        "status": updated_order.status.value,
+        "start_count": updated_order.start_count,
+        "remains": updated_order.remains,
+        "delivered": delivered,
+        "progress_percent": pct,
+        "changed": changed
     }
 
 

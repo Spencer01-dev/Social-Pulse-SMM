@@ -82,7 +82,6 @@ async def sync_active_orders(db: AsyncSession) -> Tuple[int, int]:
                 old_status = order.status
                 order.status = new_status
                 changed = True
-                total_updated += 1
                 logger.info(f"[*] Order #{str(order.id)[:8]} (Provider ID #{order.provider_order_id}) transitioned: {old_status.value} -> {new_status.value}")
 
                 # Automated Double-Entry Refund for Canceled or Partial orders
@@ -125,6 +124,7 @@ async def sync_active_orders(db: AsyncSession) -> Tuple[int, int]:
                         logger.info(f"[+] Auto-refund processed for Order #{str(order.id)[:8]}: {order.currency} {refund_amount} credited to user {order.user.email}")
 
             if changed:
+                total_updated += 1
                 db.add(order)
         except Exception as err:
             logger.warning(f"[!] Error syncing order #{str(order.id)[:8]} (Provider Order ID #{order.provider_order_id}): {err}")
@@ -134,3 +134,80 @@ async def sync_active_orders(db: AsyncSession) -> Tuple[int, int]:
         await db.commit()
 
     return total_checked, total_updated
+
+
+async def sync_single_order(db: AsyncSession, order: Order) -> Tuple[bool, Order]:
+    """
+    Sync a single order immediately against its upstream provider.
+    Updates start_count, remains, and status, and commits to DB.
+    """
+    if not order.provider_order_id:
+        return False, order
+
+    provider_slug = order.provider.slug if order.provider else "jap"
+    provider_client = get_provider(slug=provider_slug)
+
+    try:
+        status_data = await provider_client.get_order_status(order.provider_order_id)
+        new_status = map_provider_status(status_data.status)
+
+        changed = False
+        if status_data.start_count is not None and order.start_count != status_data.start_count:
+            order.start_count = status_data.start_count
+            changed = True
+        if status_data.remains is not None and order.remains != status_data.remains:
+            order.remains = status_data.remains
+            changed = True
+
+        if new_status != order.status:
+            old_status = order.status
+            order.status = new_status
+            changed = True
+            logger.info(f"[*] Single sync: Order #{str(order.id)[:8]} transitioned: {old_status.value} -> {new_status.value}")
+
+            if new_status in [OrderStatus.CANCELED, OrderStatus.PARTIAL]:
+                refund_amount = Decimal("0.00")
+                if new_status == OrderStatus.CANCELED:
+                    refund_amount = order.charge
+                elif new_status == OrderStatus.PARTIAL and order.quantity > 0:
+                    unfulfilled_ratio = Decimal(order.remains) / Decimal(order.quantity)
+                    refund_amount = round(order.charge * unfulfilled_ratio, 2)
+
+                if refund_amount > 0 and order.user:
+                    balance_before = order.user.balance
+                    balance_after = balance_before + refund_amount
+                    order.user.balance = balance_after
+                    db.add(order.user)
+
+                    refund_tx = Transaction(
+                        user_id=order.user.id,
+                        order_id=order.id,
+                        type=TransactionType.ORDER_REFUND,
+                        amount=refund_amount,
+                        balance_before=balance_before,
+                        balance_after=balance_after,
+                        currency=order.currency or "KES",
+                        payment_method=PaymentMethod.INTERNAL,
+                        payment_reference=f"REFUND-{str(order.id)[:8]}",
+                        status=TransactionStatus.COMPLETED,
+                        description=f"Automated refund for {new_status.value} Order #{str(order.id)[:8]} ({order.remains} unfulfilled)",
+                        metadata_json={
+                            "order_id": str(order.id),
+                            "provider_order_id": order.provider_order_id,
+                            "unfulfilled_units": order.remains,
+                            "total_quantity": order.quantity,
+                            "status": new_status.value,
+                        }
+                    )
+                    db.add(refund_tx)
+
+        if changed:
+            db.add(order)
+            await db.commit()
+            await db.refresh(order)
+
+        return changed, order
+    except Exception as err:
+        logger.warning(f"[!] Error syncing single order #{str(order.id)[:8]}: {err}")
+        return False, order
+
