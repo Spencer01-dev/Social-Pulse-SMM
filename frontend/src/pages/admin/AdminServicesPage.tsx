@@ -8,7 +8,9 @@ import {
   Search,
   CheckCircle2,
   Sliders,
-  DollarSign
+  DollarSign,
+  Key,
+  AlertCircle,
 } from 'lucide-react';
 import { servicesService } from '../../services/services';
 import { AdminService, MarkupType } from '../../types';
@@ -21,12 +23,24 @@ export const AdminServicesPage: React.FC = () => {
   const [loadingBalance, setLoadingBalance] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
-  const [providerBalance, setProviderBalance] = useState<{ provider: string; balance: number; currency: string } | null>(null);
+  const [providerBalance, setProviderBalance] = useState<{
+    provider: string;
+    balance: number;
+    currency: string;
+    status?: string;
+    error?: string;
+  } | null>(null);
 
   const [search, setSearch] = useState('');
   const [syncProvider, setSyncProvider] = useState('jap');
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const [editRate, setEditRate] = useState<string>('');
+
+  // Provider Key Modal State
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [keyInput, setKeyInput] = useState('');
+  const [savingKey, setSavingKey] = useState(false);
+  const [keyModalFeedback, setKeyModalFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Bulk Markup Modal State
   const [showMarkupModal, setShowMarkupModal] = useState(false);
@@ -116,6 +130,41 @@ export const AdminServicesPage: React.FC = () => {
     }
   };
 
+  const handleSaveProviderKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!keyInput.trim()) return;
+    setSavingKey(true);
+    setKeyModalFeedback(null);
+    try {
+      const res = await servicesService.updateProviderKey({
+        provider_slug: syncProvider,
+        api_key: keyInput.trim(),
+      });
+      if (res.status === 'connected' || res.balance !== undefined) {
+        setKeyModalFeedback({ type: 'success', message: res.message });
+        setProviderBalance({
+          provider: syncProvider,
+          balance: res.balance ?? 0,
+          currency: res.currency || 'USD',
+          status: 'connected',
+        });
+        setTimeout(() => {
+          setShowKeyModal(false);
+          setKeyModalFeedback(null);
+        }, 1500);
+      } else {
+        setKeyModalFeedback({ type: 'error', message: res.message || res.error || 'Failed to verify key' });
+      }
+    } catch (err: any) {
+      setKeyModalFeedback({
+        type: 'error',
+        message: err.response?.data?.detail || err.message || 'Failed to update key',
+      });
+    } finally {
+      setSavingKey(false);
+    }
+  };
+
   return (
     <div className="space-y-8 animate-fadeIn">
       {/* Header & Main Actions */}
@@ -194,13 +243,10 @@ export const AdminServicesPage: React.FC = () => {
       {/* Provider Balance & Sync Status */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="flex items-center justify-between">
-          <div>
+          <div className="flex-1 pr-2">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-                {syncProvider === 'secsers'
-                  ? 'Secsers'
-                  : 'JustAnotherPanel'}{' '}
-                Balance
+                {syncProvider === 'secsers' ? 'Secsers' : 'JustAnotherPanel'} Balance
               </span>
               <button
                 onClick={async () => {
@@ -219,18 +265,60 @@ export const AdminServicesPage: React.FC = () => {
               >
                 <RefreshCw className={`w-3 h-3 ${loadingBalance ? 'animate-spin' : ''}`} />
               </button>
+              <button
+                onClick={() => {
+                  setKeyInput('4181c34178be65d635d0ea70687c285c');
+                  setKeyModalFeedback(null);
+                  setShowKeyModal(true);
+                }}
+                title="Configure Provider API Key"
+                className="text-slate-400 hover:text-amber-400 transition-colors"
+              >
+                <Key className="w-3 h-3" />
+              </button>
             </div>
-            <span className="text-2xl font-extrabold text-white mt-1 block">
+            <div className="mt-1">
               {loadingBalance ? (
                 <span className="text-sm font-medium text-amber-400 animate-pulse">Connecting...</span>
+              ) : providerBalance?.status === 'offline' ? (
+                <div>
+                  <div className="flex items-center gap-1.5 text-rose-400 text-sm font-bold">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                    <span>Offline</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[11px] text-slate-400 truncate max-w-[150px]" title={providerBalance.error}>
+                      {providerBalance.error || 'Authentication Failed'}
+                    </span>
+                    <button
+                      onClick={() => {
+                        setKeyInput('4181c34178be65d635d0ea70687c285c');
+                        setKeyModalFeedback(null);
+                        setShowKeyModal(true);
+                      }}
+                      className="text-[10px] text-amber-400 hover:underline font-semibold"
+                    >
+                      Update Key
+                    </button>
+                  </div>
+                </div>
               ) : providerBalance ? (
-                `${providerBalance.currency} ${Number(providerBalance.balance).toFixed(2)}`
+                <div>
+                  <span className="text-2xl font-extrabold text-white">
+                    {providerBalance.currency} {Number(providerBalance.balance).toFixed(2)}
+                  </span>
+                  {providerBalance.currency === 'USD' && Number(providerBalance.balance) > 0 && (
+                    <span className="text-xs text-slate-400 block font-normal mt-0.5">
+                      ≈ KES {(Number(providerBalance.balance) * 130).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  )}
+                </div>
               ) : (
-                <span className="text-sm font-medium text-slate-400">KES 0.00</span>
+                <span className="text-sm font-medium text-slate-400">USD 0.00</span>
               )}
-            </span>
+            </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0">
             <DollarSign className="w-5 h-5" />
           </div>
         </Card>
@@ -452,6 +540,79 @@ export const AdminServicesPage: React.FC = () => {
                 </Button>
                 <Button type="submit" variant="primary" size="md" isLoading={applyingMarkup}>
                   Apply to All Services
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Provider API Key Modal */}
+      {showKeyModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md glass-card rounded-3xl p-6 border border-slate-800 relative animate-scaleUp">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                  <Key className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">
+                    {syncProvider === 'secsers' ? 'Secsers' : 'JustAnotherPanel'} API Key
+                  </h3>
+                  <p className="text-xs text-slate-400">Connect wholesale catalog &amp; balance</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowKeyModal(false)}
+                className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {keyModalFeedback && (
+              <div
+                className={`p-3 rounded-xl border text-xs my-3 flex items-center gap-2 ${
+                  keyModalFeedback.type === 'success'
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                    : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                }`}
+              >
+                {keyModalFeedback.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                )}
+                <span>{keyModalFeedback.message}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveProviderKey} className="space-y-4 mt-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Provider Reseller API Key
+                </label>
+                <input
+                  type="text"
+                  value={keyInput}
+                  onChange={(e) => setKeyInput(e.target.value)}
+                  placeholder="Paste your API key"
+                  className="w-full px-3.5 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-amber-500/50"
+                  required
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Obtained from your {syncProvider === 'secsers' ? 'Secsers' : 'JustAnotherPanel'} Account &gt; API tab.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <Button type="button" variant="ghost" size="md" onClick={() => setShowKeyModal(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary" size="md" isLoading={savingKey}>
+                  Save &amp; Verify Balance
                 </Button>
               </div>
             </form>

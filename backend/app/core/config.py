@@ -78,7 +78,7 @@ class Settings(BaseSettings):
 
     # Primary Provider (JustAnotherPanel - JAP)
     JAP_API_URL: str = "https://justanotherpanel.com/api/v2"
-    JAP_API_KEY: str = "ab911e2dcb2c1d8bb3c08a025f943fc7"
+    JAP_API_KEY: str = "4181c34178be65d635d0ea70687c285c"
 
     # Upstream Provider (Secsers)
     SECSERS_API_URL: str = "https://secsers.com/api/v2"

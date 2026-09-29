@@ -105,3 +105,10 @@ class SyncServicesResponse(BaseModel):
     created: int
     updated: int
     message: str
+
+
+class ProviderKeyUpdateRequest(BaseModel):
+    provider_slug: str = "jap"
+    api_key: str
+    api_url: Optional[str] = None
+

@@ -117,7 +117,9 @@ async def sync_services_from_provider(
         await db.refresh(provider_record)
 
     # 2. Fetch live services from provider
-    provider_client = get_provider(slug=provider_slug)
+    p_key = provider_record.api_key_encrypted if (provider_record and provider_record.api_key_encrypted) else None
+    p_url = provider_record.api_url if (provider_record and provider_record.api_url) else None
+    provider_client = get_provider(slug=provider_slug, api_url=p_url, api_key=p_key)
     remote_services = await provider_client.get_services()
 
     # Also update provider live balance in background

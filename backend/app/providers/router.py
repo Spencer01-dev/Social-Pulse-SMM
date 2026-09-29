@@ -75,21 +75,22 @@ class SmartProviderRouter:
                 logger.info(f"[*] Attempting dispatch to Provider: {provider_record.name} ({provider_record.slug})")
 
                 # Instantiate provider client
+                p_key = provider_record.api_key_encrypted
                 if provider_record.slug in ["jap", "justanotherpanel", "just_another_panel", "just-another-panel", "default"]:
                     client = JustAnotherPanelProvider(
                         api_url=provider_record.api_url or settings.JAP_API_URL,
-                        api_key=settings.JAP_API_KEY
+                        api_key=p_key or settings.JAP_API_KEY
                     )
                 elif provider_record.slug in ["secsers", "secsers.com", "secser"]:
                     client = SecsersProvider(
                         api_url=provider_record.api_url or settings.SECSERS_API_URL,
-                        api_key=settings.SECSERS_API_KEY
+                        api_key=p_key or settings.SECSERS_API_KEY
                     )
                 else:
                     client = GenericSMMProvider(
                         name=provider_record.name,
                         api_url=provider_record.api_url,
-                        api_key=settings.JAP_API_KEY
+                        api_key=p_key or settings.JAP_API_KEY
                     )
 
                 # Submit order

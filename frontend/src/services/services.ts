@@ -55,10 +55,21 @@ export const servicesService = {
     return response.data;
   },
 
-  getProviderBalance: async (providerSlug: string = 'jap'): Promise<{ provider: string; balance: number; currency: string }> => {
+  getProviderBalance: async (
+    providerSlug: string = 'jap'
+  ): Promise<{ provider: string; balance: number; currency: string; status?: string; error?: string }> => {
     const response = await apiClient.get('/admin/services/provider-balance', {
       params: { provider_slug: providerSlug },
     });
+    return response.data;
+  },
+
+  updateProviderKey: async (data: {
+    provider_slug: string;
+    api_key: string;
+    api_url?: string;
+  }): Promise<{ success: boolean; message: string; balance?: number; currency?: string; status?: string; error?: string }> => {
+    const response = await apiClient.post('/admin/services/provider-key', data);
     return response.data;
   },
 };

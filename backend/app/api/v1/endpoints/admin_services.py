@@ -16,6 +16,7 @@ from app.providers.manager import get_provider
 from app.schemas.service import (
     AdminServiceResponse,
     BulkMarkupRequest,
+    ProviderKeyUpdateRequest,
     ServiceUpdate,
     SyncServicesResponse,
 )
@@ -257,24 +258,101 @@ async def get_provider_live_balance(
     admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
 ) -> Any:
     """
-    Query live balance directly from provider API.
+    Query live balance directly from provider API, checking database configuration first.
     """
+    from app.core.config import settings
+    clean_slug = provider_slug.lower().strip()
+    provider_query = await db.execute(select(Provider).where(Provider.slug == clean_slug))
+    p_record = provider_query.scalars().first()
+
+    custom_key = p_record.api_key_encrypted if (p_record and p_record.api_key_encrypted) else None
+    custom_url = p_record.api_url if (p_record and p_record.api_url) else None
+
     try:
-        provider_client = get_provider(slug=provider_slug)
+        provider_client = get_provider(slug=clean_slug, api_url=custom_url, api_key=custom_key)
         balance_info = await provider_client.get_balance()
+
+        if p_record:
+            p_record.balance = balance_info.balance
+            p_record.currency = balance_info.currency
+            await db.commit()
+
         return {
-            "provider": provider_slug,
+            "provider": clean_slug,
             "balance": float(balance_info.balance),
             "currency": balance_info.currency,
             "status": "connected"
         }
     except Exception as e:
+        err_detail = e.detail if isinstance(e, HTTPException) else str(e)
         return {
-            "provider": provider_slug,
-            "balance": 0.0,
-            "currency": "KES",
+            "provider": clean_slug,
+            "balance": float(p_record.balance) if p_record else 0.0,
+            "currency": p_record.currency if p_record else "USD",
             "status": "offline",
-            "error": str(e)
+            "error": err_detail
+        }
+
+
+@router.post("/provider-key")
+async def update_provider_key(
+    req: ProviderKeyUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
+) -> Any:
+    """
+    Save provider API credentials directly in database and immediately test connectivity.
+    """
+    from app.core.config import settings
+    clean_slug = req.provider_slug.lower().strip()
+    query = await db.execute(select(Provider).where(Provider.slug == clean_slug))
+    p_record = query.scalars().first()
+
+    p_name = "JustAnotherPanel" if clean_slug in ["jap", "justanotherpanel"] else ("Secsers" if clean_slug == "secsers" else clean_slug.capitalize())
+    p_url = req.api_url or (settings.JAP_API_URL if clean_slug in ["jap", "justanotherpanel"] else settings.SECSERS_API_URL)
+
+    if not p_record:
+        p_record = Provider(
+            name=p_name,
+            slug=clean_slug,
+            api_url=p_url,
+            api_key_encrypted=req.api_key.strip(),
+            currency="USD",
+            is_active=True,
+            balance=Decimal("0.00")
+        )
+        db.add(p_record)
+    else:
+        p_record.api_key_encrypted = req.api_key.strip()
+        if req.api_url:
+            p_record.api_url = req.api_url.strip()
+
+    await db.commit()
+    await db.refresh(p_record)
+
+    # Immediately verify connectivity and fetch live balance
+    try:
+        client = get_provider(slug=clean_slug, api_key=p_record.api_key_encrypted, api_url=p_record.api_url)
+        balance_info = await client.get_balance()
+        p_record.balance = balance_info.balance
+        p_record.currency = balance_info.currency
+        await db.commit()
+        return {
+            "success": True,
+            "message": f"Successfully connected to {p_name}! Live balance: {balance_info.currency} {balance_info.balance}",
+            "balance": float(balance_info.balance),
+            "currency": balance_info.currency,
+            "status": "connected"
+        }
+    except Exception as exc:
+        err_msg = exc.detail if isinstance(exc, HTTPException) else str(exc)
+        return {
+            "success": True,
+            "message": f"API key saved, but provider connection failed: {err_msg}",
+            "balance": float(p_record.balance),
+            "currency": p_record.currency,
+            "status": "offline",
+            "error": err_msg
         }
 
 
