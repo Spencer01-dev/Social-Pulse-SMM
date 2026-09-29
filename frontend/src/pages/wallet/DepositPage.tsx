@@ -99,7 +99,7 @@ export const DepositPage: React.FC = () => {
           if (res.success) {
             setVerificationResult({
               success: true,
-              message: res.message || 'Paystack deposit credited to wallet!',
+              message: res.message || 'Deposit credited to wallet!',
               credited: res.credited_kes,
               currency: res.currency_paid,
             });
@@ -113,7 +113,7 @@ export const DepositPage: React.FC = () => {
         } catch (err: any) {
           setVerificationResult({
             success: false,
-            message: err.response?.data?.detail || 'Unable to verify Paystack payment.',
+            message: err.response?.data?.detail || 'Unable to verify payment.',
           });
         } finally {
           setVerifyingExternal(false);
@@ -218,7 +218,7 @@ export const DepositPage: React.FC = () => {
         window.location.href = res.authorization_url;
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || `Failed to initiate Paystack checkout for ${currency}.`);
+      setError(err.response?.data?.detail || `Failed to initiate checkout for ${currency}.`);
     } finally {
       setSubmitting(false);
     }
@@ -276,7 +276,7 @@ export const DepositPage: React.FC = () => {
       const res = await paymentsService.verifyPaystack(simulatorModal.txRef);
       setVerificationResult({
         success: res.success,
-        message: 'Paystack simulation successful! Wallet credited.',
+        message: 'Simulation successful! Wallet credited.',
         credited: res.credited_kes,
         currency: simulatorModal.currency,
       });
@@ -299,9 +299,9 @@ export const DepositPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-[#1b1f27] border border-amber-500/30 rounded-3xl p-8 max-w-md w-full text-center space-y-4 shadow-2xl">
             <Loader2 className="w-12 h-12 text-amber-400 animate-spin mx-auto" />
-            <h3 className="text-lg font-black text-white">Verifying Paystack Payment...</h3>
+            <h3 className="text-lg font-black text-white">Verifying Payment...</h3>
             <p className="text-xs text-slate-400">
-              Connecting with Paystack secure gateway and crediting your wallet balance in real-time.
+              Connecting with secure gateway and crediting your wallet balance in real-time.
             </p>
           </div>
         </div>
@@ -319,7 +319,7 @@ export const DepositPage: React.FC = () => {
                 Sandbox Simulator
               </div>
               <h3 className="text-xl font-extrabold text-white">
-                Simulate Paystack Checkout
+                Simulate Checkout
               </h3>
               <p className="text-xs text-slate-400 mt-1">
                 Deposit of <strong className="text-white">{simulatorModal.currency} {simulatorModal.amount.toLocaleString()}</strong>
@@ -406,7 +406,7 @@ export const DepositPage: React.FC = () => {
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Deposit Funds</h1>
             <p className="text-xs sm:text-sm text-slate-400 mt-1">
-              Instant Kenyan Lipa Na M-Pesa STK push & seamless Paystack multi-currency checkout.
+              Instant Kenyan Lipa Na M-Pesa STK push & seamless multi-currency checkout.
             </p>
           </div>
 
@@ -457,7 +457,7 @@ export const DepositPage: React.FC = () => {
           }`}
         >
           <span className="text-base">🇳🇬</span>
-          <span>Nigeria (Paystack / ₦)</span>
+          <span>Nigeria (₦)</span>
         </button>
 
         <button
@@ -469,7 +469,7 @@ export const DepositPage: React.FC = () => {
           }`}
         >
           <span className="text-base">🇬🇭</span>
-          <span>Ghana (Paystack / GH₵)</span>
+          <span>Ghana (GH₵)</span>
         </button>
 
         <button
@@ -481,7 +481,7 @@ export const DepositPage: React.FC = () => {
           }`}
         >
           <span className="text-base">🇿🇦</span>
-          <span>South Africa (Paystack / R)</span>
+          <span>South Africa (R)</span>
         </button>
 
         <button
@@ -493,7 +493,7 @@ export const DepositPage: React.FC = () => {
           }`}
         >
           <CreditCard className="w-4 h-4" />
-          <span>Global Cards (Paystack / USD $)</span>
+          <span>Global Cards (USD $)</span>
         </button>
       </div>
 
@@ -641,7 +641,7 @@ export const DepositPage: React.FC = () => {
               <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-xl font-black mb-3">
                 🇳🇬
               </div>
-              <h2 className="text-xl font-black text-white">Nigeria Paystack Checkout</h2>
+              <h2 className="text-xl font-black text-white">Nigeria Checkout</h2>
               <p className="text-xs text-slate-400">
                 Pay via Instant Bank Transfer, USSD, Apple Pay, or Nigerian Verve/Mastercard/Visa.
               </p>
@@ -696,7 +696,7 @@ export const DepositPage: React.FC = () => {
                 disabled={submittingNgn}
                 leftIcon={submittingNgn ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
               >
-                {submittingNgn ? 'Connecting Paystack...' : `Proceed to Paystack (₦ ${Number(ngnAmount || 0).toLocaleString()})`}
+                {submittingNgn ? 'Connecting...' : `Proceed to Pay (₦ ${Number(ngnAmount || 0).toLocaleString()})`}
               </Button>
             </form>
           </div>
@@ -713,7 +713,7 @@ export const DepositPage: React.FC = () => {
               <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto text-xl font-black mb-3">
                 🇬🇭
               </div>
-              <h2 className="text-xl font-black text-white">Ghana Paystack Checkout (GHS)</h2>
+              <h2 className="text-xl font-black text-white">Ghana Checkout (GHS)</h2>
               <p className="text-xs text-slate-400">
                 Instant checkout for MTN Mobile Money, Vodafone Cash, AirtelTigo, and local cards.
               </p>
@@ -784,7 +784,7 @@ export const DepositPage: React.FC = () => {
               <div className="w-12 h-12 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center mx-auto text-xl font-black mb-3">
                 🇿🇦
               </div>
-              <h2 className="text-xl font-black text-white">South Africa Paystack Checkout (ZAR)</h2>
+              <h2 className="text-xl font-black text-white">South Africa Checkout (ZAR)</h2>
               <p className="text-xs text-slate-400">
                 Supports South African Cards, EFT and local payment methods.
               </p>
@@ -838,7 +838,7 @@ export const DepositPage: React.FC = () => {
                 disabled={submittingZar}
                 leftIcon={submittingZar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Building2 className="w-4 h-4" />}
               >
-                {submittingZar ? 'Opening Paystack...' : `Deposit R ${Number(zarAmount || 0).toLocaleString()}`}
+                {submittingZar ? 'Connecting...' : `Deposit R ${Number(zarAmount || 0).toLocaleString()}`}
               </Button>
             </form>
           </div>
@@ -855,7 +855,7 @@ export const DepositPage: React.FC = () => {
               <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto text-xl font-black mb-3">
                 💳
               </div>
-              <h2 className="text-xl font-black text-white">Global Visa / Mastercard via Paystack</h2>
+              <h2 className="text-xl font-black text-white">Global Visa / Mastercard</h2>
               <p className="text-xs text-slate-400">
                 Deposit internationally using any Debit or Credit card in USD ($).
               </p>
@@ -909,7 +909,7 @@ export const DepositPage: React.FC = () => {
                 disabled={submittingCard}
                 leftIcon={submittingCard ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
               >
-                {submittingCard ? 'Launching Paystack...' : `Pay $${Number(cardAmountUsd || 0).toLocaleString()} USD`}
+                {submittingCard ? 'Connecting...' : `Pay $${Number(cardAmountUsd || 0).toLocaleString()} USD`}
               </Button>
             </form>
           </div>
