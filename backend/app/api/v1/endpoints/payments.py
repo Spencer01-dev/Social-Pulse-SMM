@@ -91,8 +91,11 @@ async def initiate_mpesa_stk_push(
 
     try:
         formatted_phone = normalize_phone_number(req.phone_number)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect phone number. Please enter a valid M-Pesa number (e.g. 0712345678 or 254712345678)."
+        )
 
     panel = await resolve_tenant_panel(request, x_tenant_domain, current_user, db)
     gw = (panel.metadata_json or {}).get("payment_gateway", {}) if panel else {}

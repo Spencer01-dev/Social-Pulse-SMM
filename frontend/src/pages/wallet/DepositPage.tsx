@@ -130,13 +130,23 @@ export const DepositPage: React.FC = () => {
   // ==========================================
   const handleInitiateMpesa = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phoneNumber.trim()) {
-      setError('Please enter a valid M-Pesa phone number (e.g. 0712345678).');
+
+    // Clean and validate Kenyan phone number
+    const cleaned = phoneNumber.replace(/[\s\-\+]/g, '');
+    if (!cleaned) {
+      setError('Please enter your M-Pesa mobile number.');
       return;
     }
+
+    const isValidKenyan = /^(?:254|0)?[17]\d{8}$/.test(cleaned);
+    if (cleaned.length < 9 || !isValidKenyan) {
+      setError('Incorrect phone number. Please enter a valid M-Pesa number (e.g. 0712345678 or 254712345678).');
+      return;
+    }
+
     const numAmount = typeof mpesaAmountKes === 'number' ? mpesaAmountKes : 0;
-    if (!numAmount || numAmount < 1) {
-      setError('Minimum deposit amount is KES 1.00.');
+    if (!numAmount || numAmount < 10) {
+      setError('Minimum deposit amount is KES 10.00.');
       return;
     }
 
@@ -144,7 +154,7 @@ export const DepositPage: React.FC = () => {
     setSubmittingMpesa(true);
     try {
       const res = await paymentsService.initiateMpesaSTK({
-        phone_number: phoneNumber.trim(),
+        phone_number: cleaned,
         amount: numAmount,
       });
       setCheckoutId(res.checkout_request_id);
@@ -152,8 +162,29 @@ export const DepositPage: React.FC = () => {
       setPollStatus('prompted');
       setCountdown(45);
     } catch (err: any) {
-      const msg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to initiate M-Pesa STK Push.';
-      setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
+      const detail = err.response?.data?.detail;
+      let msg = 'Failed to initiate M-Pesa STK Push.';
+
+      if (Array.isArray(detail)) {
+        const phoneErr = detail.find((d: any) => Array.isArray(d.loc) && d.loc.includes('phone_number'));
+        if (phoneErr) {
+          msg = 'Incorrect phone number. Please enter a valid M-Pesa number (e.g. 0712345678).';
+        } else {
+          msg = detail[0]?.msg || msg;
+        }
+      } else if (typeof detail === 'string') {
+        if (detail.toLowerCase().includes('phone') || detail.toLowerCase().includes('kenyan phone number')) {
+          msg = 'Incorrect phone number. Please enter a valid M-Pesa number (e.g. 0712345678).';
+        } else {
+          msg = detail;
+        }
+      } else if (err.response?.data?.message) {
+        msg = err.response.data.message;
+      } else if (err.message) {
+        msg = err.message;
+      }
+
+      setError(msg);
     } finally {
       setSubmittingMpesa(false);
     }
@@ -589,7 +620,7 @@ export const DepositPage: React.FC = () => {
                   </label>
                   <input
                     type="number"
-                    min="1"
+                    min="10"
                     placeholder="e.g. 100"
                     value={mpesaAmountKes}
                     onChange={(e) => setMpesaAmountKes(e.target.value ? Number(e.target.value) : '')}
@@ -599,7 +630,7 @@ export const DepositPage: React.FC = () => {
 
                   {/* Presets */}
                   <div className="flex flex-wrap gap-2 mt-3">
-                    {[9, 15, 50, 100, 200, 500, 1000].map((preset) => (
+                    {[10, 50, 100, 200, 500, 1000].map((preset) => (
                       <button
                         key={preset}
                         type="button"

@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.gzip import GZipMiddleware
@@ -333,6 +334,28 @@ app = FastAPI(
 # Register SlowAPI State and Exception Handler
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    for err in errors:
+        loc = err.get("loc", [])
+        if "phone_number" in loc:
+            return JSONResponse(
+                status_code=422,
+                content={"detail": "Incorrect phone number. Please enter a valid M-Pesa number (e.g. 0712345678 or 254712345678)."}
+            )
+        if "amount" in loc:
+            return JSONResponse(
+                status_code=422,
+                content={"detail": "Invalid amount entered. Please enter a valid deposit amount."}
+            )
+    first_msg = errors[0].get("msg", "Invalid input submitted.") if errors else "Invalid input submitted."
+    return JSONResponse(
+        status_code=422,
+        content={"detail": first_msg}
+    )
 
 # Register Security Headers Middleware
 app.add_middleware(SecurityHeadersMiddleware)
