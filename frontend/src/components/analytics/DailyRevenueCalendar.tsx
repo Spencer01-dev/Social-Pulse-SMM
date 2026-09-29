@@ -13,6 +13,7 @@ import {
   Clock,
   Layers,
   Filter,
+  BarChart3,
 } from 'lucide-react';
 import { DailyRevenue } from '../../services/analytics';
 import { useCurrency } from '../../context/CurrencyContext';
@@ -23,6 +24,7 @@ interface DailyRevenueCalendarProps {
   dailyData: DailyRevenue[];
   onRefresh?: () => void;
   onDateSelect?: (dateStr: string) => void;
+  onViewMonthSummary?: (month: number, year: number) => void;
   className?: string;
   collapsible?: boolean;
   defaultExpanded?: boolean;
@@ -149,6 +151,7 @@ export const DailyRevenueCalendar: React.FC<DailyRevenueCalendarProps> = ({
   dailyData,
   onRefresh,
   onDateSelect,
+  onViewMonthSummary,
   className = '',
   title = 'Daily Revenue & Performance',
 }) => {
@@ -428,6 +431,18 @@ export const DailyRevenueCalendar: React.FC<DailyRevenueCalendarProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
+              {onViewMonthSummary && (
+                <button
+                  type="button"
+                  onClick={() => onViewMonthSummary(currentMonth + 1, currentYear)}
+                  className="h-12 px-3.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+                  title={`View ${MONTH_NAMES[currentMonth]} ${currentYear} Total Revenue and Gross Profit`}
+                >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  <span>Month Totals</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={handleGoToday}
@@ -519,6 +534,17 @@ export const DailyRevenueCalendar: React.FC<DailyRevenueCalendarProps> = ({
             <span className="text-slate-300">
               Orders: <strong className="text-amber-400 font-mono">{monthStats.totalOrders}</strong>
             </span>
+
+            {onViewMonthSummary && (
+              <button
+                type="button"
+                onClick={() => onViewMonthSummary(currentMonth + 1, currentYear)}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/25 text-[10px] font-bold transition-all ml-1"
+              >
+                <BarChart3 className="w-3 h-3" />
+                View Month Breakdown
+              </button>
+            )}
           </div>
 
           <button

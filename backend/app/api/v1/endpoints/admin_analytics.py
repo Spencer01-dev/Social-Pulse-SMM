@@ -1,3 +1,4 @@
+import calendar
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, List
@@ -227,6 +228,122 @@ async def get_daily_revenue_trends(
         )
 
     return timeline
+
+
+@router.get("/monthly-summary")
+async def get_monthly_summary(
+    year: int,
+    month: int,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
+) -> Any:
+    """
+    Get aggregated total revenue, provider cost, gross profit, and order volume for a specific month and year.
+    """
+    days_in_month = calendar.monthrange(year, month)[1]
+    start_dt_utc = datetime(year, month, 1, 0, 0, 0, tzinfo=timezone.utc)
+    end_dt_utc = datetime(year, month, days_in_month, 23, 59, 59, 999999, tzinfo=timezone.utc)
+    start_dt_naive = datetime(year, month, 1, 0, 0, 0)
+    end_dt_naive = datetime(year, month, days_in_month, 23, 59, 59, 999999)
+
+    active_order_filter = ~Order.status.in_([OrderStatus.CANCELED, OrderStatus.FAILED])
+
+    try:
+        query = (
+            select(
+                func.coalesce(func.sum(Order.charge), Decimal("0.00")),
+                func.coalesce(func.sum(Order.profit), Decimal("0.00")),
+                func.coalesce(func.sum(Order.provider_cost), Decimal("0.00")),
+                func.count(Order.id)
+            )
+            .where(
+                Order.created_at >= start_dt_utc,
+                Order.created_at <= end_dt_utc,
+                active_order_filter
+            )
+        )
+        result = await db.execute(query)
+        total_rev, total_profit, total_cost, total_orders = result.first()
+    except Exception:
+        query = (
+            select(
+                func.coalesce(func.sum(Order.charge), Decimal("0.00")),
+                func.coalesce(func.sum(Order.profit), Decimal("0.00")),
+                func.coalesce(func.sum(Order.provider_cost), Decimal("0.00")),
+                func.count(Order.id)
+            )
+            .where(
+                Order.created_at >= start_dt_naive,
+                Order.created_at <= end_dt_naive,
+                active_order_filter
+            )
+        )
+        result = await db.execute(query)
+        total_rev, total_profit, total_cost, total_orders = result.first()
+
+    # Query daily breakdown for that month
+    try:
+        daily_query = (
+            select(Order.created_at, Order.charge, Order.profit, Order.id)
+            .where(
+                Order.created_at >= start_dt_utc,
+                Order.created_at <= end_dt_utc,
+                active_order_filter
+            )
+            .order_by(Order.created_at.asc())
+        )
+        daily_res = await db.execute(daily_query)
+        rows = daily_res.all()
+    except Exception:
+        daily_query = (
+            select(Order.created_at, Order.charge, Order.profit, Order.id)
+            .where(
+                Order.created_at >= start_dt_naive,
+                Order.created_at <= end_dt_naive,
+                active_order_filter
+            )
+            .order_by(Order.created_at.asc())
+        )
+        daily_res = await db.execute(daily_query)
+        rows = daily_res.all()
+
+    daily_map = {}
+    for r in rows:
+        created = r[0]
+        if hasattr(created, "day"):
+            d = created.day
+            if d not in daily_map:
+                daily_map[d] = {"revenue": Decimal("0.00"), "profit": Decimal("0.00"), "orders": 0}
+            daily_map[d]["revenue"] += Decimal(str(r[1] or 0))
+            daily_map[d]["profit"] += Decimal(str(r[2] or 0))
+            daily_map[d]["orders"] += 1
+
+    days_list = []
+    for d in range(1, days_in_month + 1):
+        if d in daily_map:
+            days_list.append({
+                "day": d,
+                "date": f"{year}-{month:02d}-{d:02d}",
+                "revenue": float(daily_map[d]["revenue"]),
+                "profit": float(daily_map[d]["profit"]),
+                "orders_count": daily_map[d]["orders"],
+            })
+
+    total_rev_dec = Decimal(str(total_rev or 0))
+    total_prof_dec = Decimal(str(total_profit or 0))
+    margin = round(float((total_prof_dec / total_rev_dec) * Decimal("100.0")), 2) if total_rev_dec > 0 else 0.0
+
+    return {
+        "year": year,
+        "month": month,
+        "month_name": calendar.month_name[month],
+        "total_revenue": float(total_rev_dec),
+        "total_gross_profit": float(total_prof_dec),
+        "total_provider_cost": float(total_cost or 0),
+        "total_orders": int(total_orders or 0),
+        "profit_margin_percent": margin,
+        "days": days_list,
+    }
 
 
 @router.get("/platform-breakdown", response_model=List[PlatformMetricItem])

@@ -43,6 +43,26 @@ export interface DailyRevenue {
   orders_count: number;
 }
 
+export interface MonthlySummaryDay {
+  day: number;
+  date: string;
+  revenue: number;
+  profit: number;
+  orders_count: number;
+}
+
+export interface MonthlySummary {
+  year: number;
+  month: number;
+  month_name: string;
+  total_revenue: number;
+  total_gross_profit: number;
+  total_provider_cost: number;
+  total_orders: number;
+  profit_margin_percent: number;
+  days: MonthlySummaryDay[];
+}
+
 export interface PlatformMetric {
   platform: string;
   name: string;
@@ -129,6 +149,11 @@ export const analyticsService = {
 
   getDailyRevenue: async (days: number = 14): Promise<DailyRevenue[]> => {
     const response = await apiClient.get<DailyRevenue[]>('/admin/analytics/daily-revenue', { params: { days } });
+    return response.data;
+  },
+
+  getMonthlySummary: async (year: number, month: number): Promise<MonthlySummary> => {
+    const response = await apiClient.get<MonthlySummary>('/admin/analytics/monthly-summary', { params: { year, month } });
     return response.data;
   },
 

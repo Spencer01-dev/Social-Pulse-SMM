@@ -13,10 +13,13 @@ import {
   Clock,
   Copy,
   RotateCcw,
-  CalendarDays
+  CalendarDays,
+  Calendar,
+  BarChart3,
+  Percent,
 } from 'lucide-react';
 import { ordersService } from '../../services/orders';
-import { analyticsService, DailyRevenue } from '../../services/analytics';
+import { analyticsService, DailyRevenue, MonthlySummary } from '../../services/analytics';
 import { AdminOrder, OrderStatus } from '../../types';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -40,6 +43,34 @@ export const AdminOrdersPage: React.FC = () => {
   const [newStartCount, setNewStartCount] = useState<string>('');
   const [newRemains, setNewRemains] = useState<string>('');
   const [savingOverride, setSavingOverride] = useState(false);
+
+  // Monthly Revenue & Profit Modal State
+  const [showMonthModal, setShowMonthModal] = useState(false);
+  const [monthModalYear, setMonthModalYear] = useState(new Date().getFullYear());
+  const [monthModalMonth, setMonthModalMonth] = useState(new Date().getMonth() + 1); // 1-indexed (1-12)
+  const [monthSummary, setMonthSummary] = useState<MonthlySummary | null>(null);
+  const [loadingMonthSummary, setLoadingMonthSummary] = useState(false);
+
+  const fetchMonthSummary = async (yr: number, mo: number) => {
+    setLoadingMonthSummary(true);
+    try {
+      const data = await analyticsService.getMonthlySummary(yr, mo);
+      setMonthSummary(data);
+    } catch (err) {
+      console.error('Failed to fetch monthly summary:', err);
+    } finally {
+      setLoadingMonthSummary(false);
+    }
+  };
+
+  const handleOpenMonthModal = (mo?: number, yr?: number) => {
+    const targetMonth = mo ?? monthModalMonth;
+    const targetYear = yr ?? monthModalYear;
+    setMonthModalMonth(targetMonth);
+    setMonthModalYear(targetYear);
+    setShowMonthModal(true);
+    fetchMonthSummary(targetYear, targetMonth);
+  };
 
   const fetchAdminOrders = async () => {
     setLoading(true);
@@ -205,16 +236,28 @@ export const AdminOrdersPage: React.FC = () => {
             Global fulfillment status, provider dispatch IDs, and profit analytics
           </p>
         </div>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={handleSyncActive}
-          disabled={syncing}
-          className="flex items-center gap-1.5"
-        >
-          <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-          <span>Poll Active Orders</span>
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => handleOpenMonthModal()}
+            className="flex items-center gap-1.5 bg-[#181a20] border-[#2b303c] text-white hover:border-amber-400 shadow-sm"
+          >
+            <Calendar className="w-4 h-4 text-amber-400" />
+            <span>Monthly Revenue & Profits</span>
+          </Button>
+
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleSyncActive}
+            disabled={syncing}
+            className="flex items-center gap-1.5"
+          >
+            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            <span>Poll Active Orders</span>
+          </Button>
+        </div>
       </div>
 
       {/* Metrics Row */}
@@ -274,6 +317,7 @@ export const AdminOrdersPage: React.FC = () => {
         dailyData={dailyRevenue}
         onRefresh={fetchRevenue}
         onDateSelect={(dateStr) => setSelectedDate(dateStr)}
+        onViewMonthSummary={(mo, yr) => handleOpenMonthModal(mo, yr)}
         title="Daily Fulfillment & Orders Calendar"
       />
 
@@ -585,6 +629,204 @@ export const AdminOrdersPage: React.FC = () => {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Monthly Revenue & Gross Profit Modal */}
+      {showMonthModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-[#161a22] border border-[#2b303c] rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto custom-scrollbar">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4 pb-4 border-b border-[#2b303c]">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                    <BarChart3 className="w-4 h-4" />
+                  </span>
+                  <h3 className="text-xl font-black text-white">Monthly Revenue & Gross Profit</h3>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Total revenue, gross profit, and order fulfillment breakdown for any chosen month
+                </p>
+              </div>
+              <button
+                onClick={() => setShowMonthModal(false)}
+                className="w-8 h-8 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Selectors Bar: Month and Year */}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-[#101216] border border-[#2b303c] rounded-2xl">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Month:</span>
+                <select
+                  value={monthModalMonth}
+                  onChange={(e) => {
+                    const m = Number(e.target.value);
+                    setMonthModalMonth(m);
+                    fetchMonthSummary(monthModalYear, m);
+                  }}
+                  className="px-3 py-2 bg-[#181c24] border border-[#2b303c] rounded-xl text-white text-xs font-bold focus:border-amber-400 focus:outline-none"
+                >
+                  {[
+                    'January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'
+                  ].map((m, idx) => (
+                    <option key={m} value={idx + 1}>{m}</option>
+                  ))}
+                </select>
+
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Year:</span>
+                <select
+                  value={monthModalYear}
+                  onChange={(e) => {
+                    const y = Number(e.target.value);
+                    setMonthModalYear(y);
+                    fetchMonthSummary(y, monthModalMonth);
+                  }}
+                  className="px-3 py-2 bg-[#181c24] border border-[#2b303c] rounded-xl text-white text-xs font-bold focus:border-amber-400 focus:outline-none"
+                >
+                  {[2024, 2025, 2026, 2027].map((yr) => (
+                    <option key={yr} value={yr}>{yr}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const nowYr = now.getFullYear();
+                    const nowMo = now.getMonth() + 1;
+                    setMonthModalYear(nowYr);
+                    setMonthModalMonth(nowMo);
+                    fetchMonthSummary(nowYr, nowMo);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-extrabold transition-all"
+                >
+                  Current Month
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fetchMonthSummary(monthModalYear, monthModalMonth)}
+                  disabled={loadingMonthSummary}
+                  className="p-2 rounded-xl bg-[#181c24] hover:bg-[#202530] text-slate-300 hover:text-white border border-[#2b303c] transition-colors"
+                  title="Refresh"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingMonthSummary ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Content Display */}
+            {loadingMonthSummary ? (
+              <div className="py-12 text-center space-y-3">
+                <RefreshCw className="w-8 h-8 text-amber-400 animate-spin mx-auto" />
+                <p className="text-xs text-slate-400">Loading monthly financial data...</p>
+              </div>
+            ) : monthSummary ? (
+              <div className="space-y-5">
+                {/* Highlight Month Header */}
+                <div className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300">
+                  <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-amber-400" />
+                    {monthSummary.month_name} {monthSummary.year} Performance
+                  </span>
+                  <span className="text-xs font-mono font-bold text-amber-400">
+                    {monthSummary.total_orders} total orders
+                  </span>
+                </div>
+
+                {/* 3 Metric Cards: Total Revenue, Gross Profit, Profit Margin */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-4 bg-[#11141a] rounded-2xl border border-[#2b303c] space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
+                      <DollarSign className="w-3.5 h-3.5 text-blue-400" />
+                      Total Revenue
+                    </span>
+                    <div className="text-xl font-black text-white font-mono">
+                      KES {monthSummary.total_revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-[#11141a] rounded-2xl border border-emerald-500/30 bg-emerald-950/10 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider flex items-center gap-1.5">
+                      <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                      Total Gross Profit
+                    </span>
+                    <div className="text-xl font-black text-emerald-400 font-mono">
+                      +KES {monthSummary.total_gross_profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-[#11141a] rounded-2xl border border-[#2b303c] space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
+                      <Percent className="w-3.5 h-3.5 text-amber-400" />
+                      Profit Margin
+                    </span>
+                    <div className="text-xl font-black text-amber-400 font-mono">
+                      {monthSummary.profit_margin_percent}%
+                    </div>
+                  </div>
+                </div>
+
+                {/* Provider cost sub-detail */}
+                <div className="p-3 bg-[#11141a] rounded-xl border border-[#2b303c]/60 flex items-center justify-between text-xs text-slate-400">
+                  <span>Wholesale Provider Cost:</span>
+                  <span className="font-mono text-slate-200">
+                    KES {monthSummary.total_provider_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                {/* Daily Breakdown for this month */}
+                <div className="space-y-2">
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                    Daily Sales & Profits Breakdown
+                  </span>
+                  {monthSummary.days && monthSummary.days.length > 0 ? (
+                    <div className="border border-[#2b303c] rounded-2xl overflow-hidden max-h-56 overflow-y-auto custom-scrollbar">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-[#11141a] text-slate-400 font-bold border-b border-[#2b303c] sticky top-0">
+                          <tr>
+                            <th className="py-2.5 px-3">Date</th>
+                            <th className="py-2.5 px-3">Orders</th>
+                            <th className="py-2.5 px-3">Revenue (KES)</th>
+                            <th className="py-2.5 px-3 text-right">Gross Profit (KES)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#2b303c]/40 font-mono">
+                          {monthSummary.days.map((d) => (
+                            <tr key={d.date} className="hover:bg-[#181c24] transition-colors">
+                              <td className="py-2 px-3 text-slate-300 font-bold">{d.date}</td>
+                              <td className="py-2 px-3 text-amber-400">{d.orders_count}</td>
+                              <td className="py-2 px-3 text-white">KES {d.revenue.toFixed(2)}</td>
+                              <td className="py-2 px-3 text-right text-emerald-400 font-bold">
+                                +KES {d.profit.toFixed(2)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="py-6 text-center text-xs text-slate-500 bg-[#11141a] rounded-2xl border border-[#2b303c]">
+                      No active sales recorded for {monthSummary.month_name} {monthSummary.year}.
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {/* Footer */}
+            <div className="flex justify-end pt-2 border-t border-[#2b303c]">
+              <Button variant="ghost" size="md" onClick={() => setShowMonthModal(false)}>
+                Close
+              </Button>
+            </div>
           </div>
         </div>
       )}
