@@ -647,6 +647,7 @@ export const OrderListPage: React.FC = () => {
                           {tableSettings.cancelButton && (
                             <Link
                               to="/support"
+                              state={{ orderId: order.id }}
                               title="Request Cancellation"
                               className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-colors"
                             >

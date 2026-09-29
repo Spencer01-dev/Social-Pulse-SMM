@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   LifeBuoy,
   Plus,
@@ -26,6 +27,7 @@ import { Button } from '../../components/common/Button';
 
 export const SupportTicketsPage: React.FC = () => {
   const { user } = useAuth();
+  const location = useLocation();
 
   const [tickets, setTickets] = useState<TicketSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +41,20 @@ export const SupportTicketsPage: React.FC = () => {
   const [newOrderId, setNewOrderId] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [creatingTicket, setCreatingTicket] = useState(false);
+
+  // Pre-fill if routed with an order cancellation request
+  useEffect(() => {
+    const state = location.state as { orderId?: string; providerOrderId?: string } | undefined;
+    if (state?.orderId) {
+      setNewOrderId(state.orderId);
+      const provTag = state.providerOrderId ? ` (Ref #${state.providerOrderId})` : '';
+      setNewSubject(`Order Cancellation Request - #${state.orderId.slice(0, 8)}${provTag}`);
+      setNewMessage(
+        `Hello,\n\nI would like to request a cancellation for Order ID: ${state.orderId}${provTag}.\n\nReason:\n`
+      );
+      setIsModalOpen(true);
+    }
+  }, [location.state]);
 
   // Reply State
   const [replyText, setReplyText] = useState('');
