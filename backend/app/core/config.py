@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     @classmethod
     def assemble_async_db_url(cls, v: Optional[str]) -> Optional[str]:
         if isinstance(v, str) and v:
+            v = v.strip()
             if v.startswith("postgres://"):
                 return v.replace("postgres://", "postgresql+asyncpg://", 1)
             elif v.startswith("postgresql://") and not v.startswith("postgresql+asyncpg://"):
@@ -49,6 +50,7 @@ class Settings(BaseSettings):
     @classmethod
     def assemble_sync_db_url(cls, v: Optional[str]) -> Optional[str]:
         if isinstance(v, str) and v:
+            v = v.strip()
             if v.startswith("postgresql+asyncpg://"):
                 return v.replace("postgresql+asyncpg://", "postgresql://", 1)
             elif v.startswith("postgres://"):
