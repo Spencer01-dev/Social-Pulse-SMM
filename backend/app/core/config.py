@@ -74,6 +74,8 @@ class Settings(BaseSettings):
         "https://social-pulse-smm.pages.dev",
         "https://*.pages.dev",
         "https://*.vercel.app",
+        "https://socialpulsesmm.com",
+        "https://www.socialpulsesmm.com",
         "*"
     ]
 
