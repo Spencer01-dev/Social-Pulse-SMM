@@ -373,7 +373,7 @@ for dev_o in dev_origins:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$",
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$|^https://([a-zA-Z0-9-]+\.)?pages\.dev$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
