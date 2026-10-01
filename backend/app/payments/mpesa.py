@@ -120,7 +120,7 @@ class MpesaDarajaClient(PaymentGatewayInterface):
 
         callback_url = self.callback_url
         if not callback_url or callback_url.startswith("http://localhost") or callback_url.startswith("http://127.0.0.1") or not callback_url.startswith("https://"):
-            callback_url = "https://social-pulse-smm.onrender.com/api/v1/payments/mpesa/callback"
+            callback_url = "https://social-pulse-smm-0geu.onrender.com/api/v1/payments/mpesa/callback"
 
         payload = {
             "BusinessShortCode": self.shortcode,

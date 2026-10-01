@@ -229,7 +229,7 @@ async def lifespan(app: FastAPI):
                     WHERE domain IN (
                         'socialpulse.io', 'www.socialpulse.io',
                         'socialpulsesmm.com', 'www.socialpulsesmm.com',
-                        'social-pulse-smm.vercel.app', 'social-pulse-smm.onrender.com',
+                        'social-pulse-smm.vercel.app', 'social-pulse-smm.onrender.com', 'social-pulse-smm-0geu.onrender.com',
                         'localhost', '127.0.0.1'
                     );
                 """))

@@ -1423,7 +1423,7 @@ export const ChildPanelManagePage: React.FC = () => {
                       Webhook Callback URL (Already configured automatically):
                     </span>
                     <code className="text-amber-300 font-mono text-[11px] bg-black/40 px-2 py-0.5 rounded">
-                      https://social-pulse-smm.onrender.com/api/v1/payments/payhero/callback
+                      https://social-pulse-smm-0geu.onrender.com/api/v1/payments/payhero/callback
                     </code>
                   </div>
                 </div>

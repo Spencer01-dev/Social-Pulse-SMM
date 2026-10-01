@@ -96,7 +96,7 @@ class Settings(BaseSettings):
     MPESA_CONSUMER_SECRET: str = ""
     MPESA_SHORTCODE: str = "174379"
     MPESA_PASSKEY: str = ""
-    MPESA_CALLBACK_URL: str = "https://social-pulse-smm.onrender.com/api/v1/payments/mpesa/callback"
+    MPESA_CALLBACK_URL: str = "https://social-pulse-smm-0geu.onrender.com/api/v1/payments/mpesa/callback"
 
     PAYSTACK_PUBLIC_KEY: str = ""
     PAYSTACK_SECRET_KEY: str = ""
@@ -107,7 +107,7 @@ class Settings(BaseSettings):
     PAYHERO_CHANNEL_ID: str = ""
     PAYHERO_ACCOUNT_ID: str = ""
     PAYHERO_BASE_URL: str = "https://backend.payhero.co.ke/api/v2"
-    PAYHERO_CALLBACK_URL: str = "https://social-pulse-smm.onrender.com/api/v1/payments/payhero/callback"
+    PAYHERO_CALLBACK_URL: str = "https://social-pulse-smm-0geu.onrender.com/api/v1/payments/payhero/callback"
 
     # Currency
     PRIMARY_CURRENCY: str = "KES"
