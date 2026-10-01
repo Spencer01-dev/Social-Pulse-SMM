@@ -1,12 +1,19 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import { HealthStatus } from '../types';
 
-const API_BASE_URL =
+let rawBaseUrl =
   import.meta.env.VITE_API_URL ||
   import.meta.env.VITE_API_BASE_URL ||
+  'https://social-pulse-smm-0geu.onrender.com/api/v1';
+
+if (rawBaseUrl && rawBaseUrl.includes('social-pulse-smm.onrender.com')) {
+  rawBaseUrl = rawBaseUrl.replace('social-pulse-smm.onrender.com', 'social-pulse-smm-0geu.onrender.com');
+}
+
+const API_BASE_URL =
   (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
     ? 'http://localhost:8000/api/v1'
-    : 'https://social-pulse-smm-0geu.onrender.com/api/v1');
+    : rawBaseUrl);
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
