@@ -71,7 +71,9 @@ async def list_public_services(
         select(Service)
         .where(
             Service.is_active == True,
-            Service.platform.in_(ALLOWED_PUBLIC_PLATFORMS)
+            Service.platform.in_(ALLOWED_PUBLIC_PLATFORMS),
+            Service.provider_rate > Decimal("0.00"),
+            Service.selling_rate > Service.provider_rate
         )
         .order_by(Service.platform, Service.sort_order, Service.selling_rate)
     )

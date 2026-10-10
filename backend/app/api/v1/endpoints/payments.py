@@ -329,26 +329,78 @@ async def payhero_webhook_callback(
         return {"status": "error", "message": "Invalid JSON"}
 
     response_data = data.get("response", data) if isinstance(data, dict) else {}
-    status_str = str(response_data.get("Status", data.get("status", ""))).lower()
-    external_ref = response_data.get("ExternalReference") or data.get("external_reference") or response_data.get("reference")
-    receipt_no = response_data.get("MpesaReceiptNumber") or response_data.get("receipt") or external_ref
+    status_raw = str(
+        response_data.get("Status")
+        or response_data.get("status")
+        or data.get("Status")
+        or data.get("status")
+        or response_data.get("PaymentStatus")
+        or ""
+    ).strip().lower()
+    external_ref = (
+        response_data.get("ExternalReference")
+        or response_data.get("external_reference")
+        or data.get("ExternalReference")
+        or data.get("external_reference")
+        or response_data.get("reference")
+        or data.get("reference")
+    )
+    checkout_id = (
+        response_data.get("CheckoutRequestID")
+        or response_data.get("checkout_request_id")
+        or data.get("CheckoutRequestID")
+        or data.get("checkout_request_id")
+    )
+    receipt_no = (
+        response_data.get("MpesaReceiptNumber")
+        or response_data.get("receipt")
+        or data.get("MpesaReceiptNumber")
+        or data.get("receipt")
+        or external_ref
+        or checkout_id
+    )
 
-    if not external_ref:
+    if not external_ref and not checkout_id:
         return {"status": "acknowledged", "message": "Missing reference"}
+
+    filters = []
+    if external_ref:
+        filters.append(Transaction.payment_reference == str(external_ref))
+        filters.append(Transaction.metadata_json["external_reference"].astext == str(external_ref))
+    if checkout_id:
+        filters.append(Transaction.payment_reference == str(checkout_id))
+        filters.append(Transaction.metadata_json["checkout_request_id"].astext == str(checkout_id))
 
     query = await db.execute(
         select(Transaction)
         .options(selectinload(Transaction.user))
-        .where(
-            or_(
-                Transaction.payment_reference == external_ref,
-                Transaction.metadata_json["external_reference"].as_string() == external_ref,
-                Transaction.metadata_json["checkout_request_id"].as_string() == external_ref,
-            )
-        )
+        .where(or_(*filters))
         .with_for_update()
     )
     transaction = query.scalars().first()
+
+    # Fallback: if not found by ref, check latest pending deposit for matching phone & amount
+    if not transaction:
+        phone = response_data.get("Phone") or response_data.get("phone") or data.get("phone_number")
+        amount_val = response_data.get("Amount") or data.get("amount")
+        if amount_val:
+            try:
+                amt_dec = Decimal(str(amount_val))
+                q_amt = await db.execute(
+                    select(Transaction)
+                    .options(selectinload(Transaction.user))
+                    .where(
+                        Transaction.type == TransactionType.DEPOSIT,
+                        Transaction.status == TransactionStatus.PENDING,
+                        Transaction.amount == amt_dec,
+                    )
+                    .order_by(desc(Transaction.created_at))
+                    .limit(1)
+                    .with_for_update()
+                )
+                transaction = q_amt.scalars().first()
+            except Exception:
+                pass
 
     if not transaction:
         return {"status": "acknowledged", "message": "Transaction not found locally"}
@@ -360,8 +412,14 @@ async def payhero_webhook_callback(
     if not user:
         return {"status": "error", "message": "User missing"}
 
-    if status_str in ["success", "successful", "0", "queued"]:
-        amount = Decimal(str(response_data.get("Amount", transaction.amount)))
+    is_success = (
+        status_raw in ["success", "successful", "0", "queued", "completed", "paid", "confirmed"]
+        or response_data.get("Success") is True
+        or data.get("success") is True
+    )
+
+    if is_success:
+        amount = Decimal(str(response_data.get("Amount", data.get("amount", transaction.amount))))
         balance_before = user.balance
         user.balance += amount
         balance_after = user.balance
@@ -404,8 +462,11 @@ async def query_mpesa_stk_status(
         select(Transaction)
         .options(selectinload(Transaction.user))
         .where(
-            (Transaction.payment_reference == checkout_request_id) |
-            (Transaction.metadata_json["checkout_request_id"].as_string() == checkout_request_id),
+            or_(
+                Transaction.payment_reference == checkout_request_id,
+                Transaction.metadata_json["checkout_request_id"].astext == checkout_request_id,
+                Transaction.metadata_json["external_reference"].astext == checkout_request_id,
+            ),
             Transaction.user_id == current_user.id
         )
     )
@@ -437,12 +498,13 @@ async def query_mpesa_stk_status(
                     except Exception:
                         pass
                 ph_status = await client_to_use.check_payment_status(ext_ref)
-                if str(ph_status.get("status", "")).lower() in ["success", "successful"]:
+                st_low = str(ph_status.get("status", ph_status.get("Status", ""))).lower()
+                if st_low in ["success", "successful", "completed", "paid", "confirmed"] or ph_status.get("receipt"):
                     balance_before = current_user.balance
                     current_user.balance += transaction.amount
                     balance_after = current_user.balance
 
-                    receipt = ph_status.get("receipt") or ext_ref
+                    receipt = ph_status.get("receipt") or ph_status.get("MpesaReceiptNumber") or ext_ref
                     transaction.balance_before = balance_before
                     transaction.balance_after = balance_after
                     transaction.payment_reference = receipt

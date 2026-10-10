@@ -77,6 +77,10 @@ class PayHeroClient:
         formatted_phone = normalize_phone_number(phone)
         ref = external_reference or f"PH-{uuid.uuid4().hex[:12].upper()}"
         cb_url = callback_url or self.callback_url
+        if not cb_url or cb_url.startswith("http://localhost") or cb_url.startswith("http://127.0.0.1") or not cb_url.startswith("https://"):
+            cb_url = "https://social-pulse-smm-0geu.onrender.com/api/v1/payments/payhero/callback"
+        if "social-pulse-smm.onrender.com" in cb_url:
+            cb_url = cb_url.replace("social-pulse-smm.onrender.com", "social-pulse-smm-0geu.onrender.com")
 
         if self.is_simulator:
             checkout_id = f"ws_CO_{uuid.uuid4().hex[:16]}"
@@ -144,11 +148,27 @@ class PayHeroClient:
             }
 
         async with httpx.AsyncClient(timeout=self.timeout, verify=False) as client:
-            response = await client.get(
+            headers = self._get_headers()
+            candidates = [
+                f"{self.base_url}/transactions?reference={reference}",
+                f"{self.base_url}/transactions/{reference}",
                 f"{self.base_url}/payments/{reference}",
-                headers=self._get_headers(),
-            )
-            return response.json()
+            ]
+            for target_url in candidates:
+                try:
+                    response = await client.get(target_url, headers=headers)
+                    if response.status_code == 200:
+                        data = response.json()
+                        if isinstance(data, list) and len(data) > 0:
+                            return data[0]
+                        if isinstance(data, dict):
+                            if "data" in data and isinstance(data["data"], list) and len(data["data"]) > 0:
+                                return data["data"][0]
+                            return data
+                except Exception:
+                    continue
+
+        return {"status": "Pending", "reference": reference}
 
 
 # Global default PayHero client instance
