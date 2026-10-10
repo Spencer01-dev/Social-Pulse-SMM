@@ -175,6 +175,8 @@ export const DepositPage: React.FC = () => {
       } else if (typeof detail === 'string') {
         if (detail.toLowerCase().includes('phone') || detail.toLowerCase().includes('kenyan phone number')) {
           msg = 'Incorrect phone number. Please enter a valid M-Pesa number (e.g. 0712345678).';
+        } else if (detail.toLowerCase().includes('blocked for spamming') || detail.toLowerCase().includes('rate limit')) {
+          msg = 'PayHero Security Notice: Multiple rapid deposit requests were initiated in a short period. Please wait 3–5 minutes for the cooldown to reset, or contact PayHero support via WhatsApp to unblock.';
         } else {
           msg = detail;
         }

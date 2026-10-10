@@ -138,9 +138,15 @@ async def initiate_mpesa_stk_push(
                 account_name=account_name
             )
         except Exception as exc:
+            err_str = str(exc)
+            if "blocked for spamming" in err_str.lower():
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Payment rate limit reached: PayHero has temporarily placed a security cooldown due to repeated push attempts. Please wait a few minutes, or reach out to PayHero Support to unblock your channel."
+                )
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Failed to initiate Till STK Push via PayHero: {str(exc)}"
+                detail=f"Failed to initiate Till STK Push via PayHero: {err_str}"
             )
 
         checkout_id = ph_resp.get("checkout_request_id") or external_ref
