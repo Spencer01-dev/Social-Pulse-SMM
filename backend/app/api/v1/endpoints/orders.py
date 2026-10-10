@@ -107,6 +107,17 @@ async def create_order(
 
     profit = total_charge - provider_cost
 
+    # 3b. Negative-Margin Guard: Block orders where provider cost exceeds selling price
+    if profit < Decimal("0.00"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"This service is currently mispriced — selling rate (KES {total_charge:,.2f}) "
+                f"is below provider cost (KES {provider_cost:,.2f}). "
+                f"Please contact the administrator to update the service pricing."
+            )
+        )
+
     # 4. Atomically lock user row to eliminate double-spend / race condition exploits
     user_lock_query = await db.execute(
         select(User).where(User.id == current_user.id).with_for_update()

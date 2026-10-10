@@ -71,8 +71,9 @@ def calculate_selling_rate(
     else:  # MANUAL
         calculated = provider_rate
 
-    # Enforce minimum threshold and round to 2 decimal places
-    final_price = max(calculated, min_selling_rate)
+    # Enforce minimum threshold: never sell below provider cost or minimum selling rate
+    cost_floor = max(provider_rate, min_selling_rate)
+    final_price = max(calculated, cost_floor)
     return round(final_price, 2)
 
 

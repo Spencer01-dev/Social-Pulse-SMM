@@ -33,6 +33,8 @@ export const AdminServicesPage: React.FC = () => {
 
   const [search, setSearch] = useState('');
   const [syncProvider, setSyncProvider] = useState('jap');
+  const [providerFilter, setProviderFilter] = useState<string>('all');
+  const [platformFilter, setPlatformFilter] = useState<string>('all');
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const [editRate, setEditRate] = useState<string>('');
 
@@ -48,12 +50,18 @@ export const AdminServicesPage: React.FC = () => {
   const [markupValue, setMarkupValue] = useState<string>('80');
   const [applyingMarkup, setApplyingMarkup] = useState(false);
 
-  const fetchAdminData = async () => {
+  const fetchAdminData = async (overrideSearch?: string) => {
     setLoading(true);
     setLoadingBalance(true);
     try {
+      const activeSearch = overrideSearch !== undefined ? overrideSearch : search;
+      const params: any = {};
+      if (activeSearch.trim()) params.search = activeSearch.trim();
+      if (providerFilter !== 'all') params.provider_slug = providerFilter;
+      if (platformFilter !== 'all') params.platform = platformFilter;
+
       const [servicesData, balanceData] = await Promise.all([
-        servicesService.getAdminServices({ search: search || undefined, provider_slug: syncProvider }),
+        servicesService.getAdminServices(params),
         servicesService.getProviderBalance(syncProvider).catch(() => null),
       ]);
       setServices(servicesData);
@@ -72,8 +80,11 @@ export const AdminServicesPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchAdminData();
-  }, [syncProvider]);
+    const handler = setTimeout(() => {
+      fetchAdminData();
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [search, providerFilter, platformFilter, syncProvider]);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -359,8 +370,8 @@ export const AdminServicesPage: React.FC = () => {
 
       {/* Services Table */}
       <Card title="Services Catalog & Pricing Matrix" subtitle="Configure pricing and visibility for each individual service">
-        <div className="mb-4">
-          <div className="relative max-w-md">
+        <div className="mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="relative flex-1 max-w-md">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
               <Search className="w-4 h-4" />
             </div>
@@ -368,10 +379,52 @@ export const AdminServicesPage: React.FC = () => {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && fetchAdminData()}
-              placeholder="Filter by name, provider ID..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-950/60 border border-slate-800 rounded-xl text-white placeholder-slate-500 text-xs focus:outline-none focus:border-blue-500"
+              placeholder="Search by name, provider ID, category..."
+              className="w-full pl-9 pr-9 py-2 bg-slate-950/60 border border-slate-800 rounded-xl text-white placeholder-slate-500 text-xs focus:outline-none focus:border-blue-500 transition-colors"
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Platform Filter */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-medium text-slate-400">Platform:</span>
+              <select
+                value={platformFilter}
+                onChange={(e) => setPlatformFilter(e.target.value)}
+                className="px-3 py-1.5 bg-slate-950/80 border border-slate-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-blue-500 cursor-pointer"
+              >
+                <option value="all">All Platforms</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="instagram">Instagram</option>
+                <option value="facebook">Facebook</option>
+                <option value="tiktok">TikTok</option>
+                <option value="telegram">Telegram</option>
+                <option value="other">Other Platforms</option>
+              </select>
+            </div>
+
+            {/* Provider Filter */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-medium text-slate-400">Provider:</span>
+              <select
+                value={providerFilter}
+                onChange={(e) => setProviderFilter(e.target.value)}
+                className="px-3 py-1.5 bg-slate-950/80 border border-slate-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-blue-500 cursor-pointer"
+              >
+                <option value="all">All Providers</option>
+                <option value="jap">JustAnotherPanel</option>
+                <option value="secsers">Secsers</option>
+              </select>
+            </div>
           </div>
         </div>
 

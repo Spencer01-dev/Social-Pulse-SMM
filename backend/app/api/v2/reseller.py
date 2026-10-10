@@ -152,6 +152,10 @@ async def handle_reseller_action(
         provider_cost = round((svc.provider_rate * Decimal(int_qty)) / Decimal(1000), 2)
         profit = total_charge - provider_cost
 
+        # Negative-Margin Guard: Block loss-making orders
+        if profit < Decimal("0.00"):
+            return {"error": f"Service mispriced — selling rate (KES {total_charge:.2f}) is below provider cost (KES {provider_cost:.2f}). Contact the admin to fix pricing."}
+
         # Balance check
         if user.balance < total_charge:
             return {"error": f"Not enough funds on balance. Required: KES {total_charge:.2f}"}

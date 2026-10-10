@@ -32,7 +32,7 @@ async def list_admin_services(
     is_active: Optional[bool] = None,
     search: Optional[str] = None,
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(500, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
 ) -> Any:
@@ -176,6 +176,17 @@ async def update_service(
         service.fallback_provider_id = service_in.fallback_provider_id
     if service_in.fallback_service_id is not None:
         service.fallback_service_id = service_in.fallback_service_id
+
+    # Negative-Margin Guard: Prevent saving a selling rate below the provider rate
+    if service.selling_rate < service.provider_rate:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Selling rate (KES {service.selling_rate:,.2f}) cannot be lower than provider cost "
+                f"(KES {service.provider_rate:,.2f}). This would result in a loss on every order. "
+                f"Please set a selling rate above the provider cost."
+            )
+        )
 
     db.add(service)
     await db.commit()
