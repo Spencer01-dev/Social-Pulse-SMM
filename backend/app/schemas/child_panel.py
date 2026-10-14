@@ -115,3 +115,41 @@ class ChildPanelUserBalanceAdjust(BaseModel):
 class ChildPanelUserStatusUpdate(BaseModel):
     is_active: bool
 
+
+# ─── Service Management ────────────────────────────────────────────────────────
+
+class ChildPanelServiceItemResponse(BaseModel):
+    """A catalog service as seen from the child panel owner's service management view."""
+    id: uuid.UUID
+    platform: str
+    name: str
+    description: Optional[str] = None
+    service_type: str
+    category: str
+    wholesale_rate: Decimal          # what the panel owner pays per 1k
+    default_client_rate: Decimal     # wholesale * panel default_markup (computed)
+    custom_markup_percent: Optional[Decimal] = None  # per-service override, if any
+    effective_client_rate: Decimal   # final rate shown to end clients
+    min_quantity: int
+    max_quantity: int
+    refill_available: bool
+    cancel_available: bool
+    is_enabled: bool                 # whether this service is shown on the panel
+
+    class Config:
+        from_attributes = True
+
+
+class ChildPanelServiceConfigUpdate(BaseModel):
+    """Body for toggling a service or setting its custom markup."""
+    is_enabled: Optional[bool] = None
+    custom_markup_percent: Optional[Decimal] = Field(
+        None, ge=0, le=10000,
+        description="Override markup % for this service (0 = sell at wholesale; null = use panel default)"
+    )
+
+
+class ChildPanelServiceBulkUpdate(BaseModel):
+    """Bulk enable/disable a list of service IDs."""
+    service_ids: list[uuid.UUID]
+    is_enabled: bool

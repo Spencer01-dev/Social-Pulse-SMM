@@ -9,6 +9,7 @@ from app.api.v1.endpoints.tenant import MAIN_PLATFORM_DOMAINS
 from app.core.cache import get_cache, set_cache
 from app.core.database import get_db
 from app.models.child_panel import ChildPanel
+from app.models.child_panel_service import ChildPanelServiceConfig
 from app.models.service import Platform, Service
 from app.schemas.service import CustomerServiceResponse, PlatformSummary
 
@@ -95,6 +96,7 @@ async def list_public_services(
 
     clean_services = []
     tenant_markup_percent = Decimal("0")
+    panel_record = None
     if tenant_domain:
         panel_q = await db.execute(
             select(ChildPanel).where(ChildPanel.domain == tenant_domain)
@@ -106,9 +108,44 @@ async def list_public_services(
             except Exception:
                 tenant_markup_percent = Decimal("0")
 
+    # Fetch per-panel disabled service IDs (only for tenant contexts)
+    disabled_service_ids: set = set()
+    if panel_record and services:
+        svc_ids = [s.id for s in services]
+        cfg_q = await db.execute(
+            select(ChildPanelServiceConfig.service_id).where(
+                ChildPanelServiceConfig.panel_id == panel_record.id,
+                ChildPanelServiceConfig.service_id.in_(svc_ids),
+                ChildPanelServiceConfig.is_enabled == False
+            )
+        )
+        disabled_service_ids = {str(row[0]) for row in cfg_q.all()}
+
+    # Fetch per-service custom markups for this panel
+    custom_markups: dict = {}
+    if panel_record and services:
+        svc_ids = [s.id for s in services]
+        markup_q = await db.execute(
+            select(ChildPanelServiceConfig.service_id, ChildPanelServiceConfig.custom_markup_percent).where(
+                ChildPanelServiceConfig.panel_id == panel_record.id,
+                ChildPanelServiceConfig.service_id.in_(svc_ids),
+                ChildPanelServiceConfig.custom_markup_percent.isnot(None)
+            )
+        )
+        custom_markups = {str(row[0]): Decimal(str(row[1])) for row in markup_q.all()}
+
     for s in services:
+        # Skip disabled services for this panel
+        if str(s.id) in disabled_service_ids:
+            continue
+
         ws = s.wholesale_rate if (s.wholesale_rate and s.wholesale_rate > Decimal("0")) else round(s.provider_rate * Decimal("1.30"), 2)
-        if tenant_markup_percent > Decimal("0"):
+
+        # Apply per-service custom markup if set, else fall back to panel default
+        svc_custom = custom_markups.get(str(s.id))
+        if svc_custom is not None:
+            effective_rate = round(ws * (Decimal("1") + (svc_custom / Decimal("100"))), 2)
+        elif tenant_markup_percent > Decimal("0"):
             # Child panel client price: wholesale_rate marked up by tenant's configured margin
             effective_rate = round(ws * (Decimal("1") + (tenant_markup_percent / Decimal("100"))), 2)
         else:

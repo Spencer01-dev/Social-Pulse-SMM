@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff, Zap } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useTenant } from '../../context/TenantContext';
 import { Button } from '../../components/common/Button';
 
 export const LoginPage: React.FC = () => {
@@ -12,10 +13,14 @@ export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   const { login } = useAuth();
+  const { isTenantMode, tenant } = useTenant();
   const navigate = useNavigate();
   const location = useLocation();
 
   const from = location.state?.from?.pathname || '/';
+
+  const accentColor = isTenantMode && tenant ? tenant.theme_color || '#f59e0b' : '#f59e0b';
+  const brandTitle = isTenantMode && tenant ? tenant.site_name : 'SocialPulse';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,14 +50,36 @@ export const LoginPage: React.FC = () => {
       {/* Brand Header */}
       <div className="text-center mb-8 relative z-10">
         <Link to="/" className="inline-flex items-center gap-2.5 mb-3">
-          <div className="w-10 h-10 rounded-2xl bg-[#f59e0b] text-slate-950 flex items-center justify-center font-black shadow-lg shadow-amber-500/20">
-            <Zap className="w-5 h-5 fill-slate-950 text-slate-950" />
-          </div>
+          {isTenantMode && tenant?.logo_url ? (
+            <img
+              src={tenant.logo_url}
+              alt={brandTitle}
+              className="h-10 max-w-[180px] object-contain rounded"
+              onError={(e) => {
+                (e.currentTarget as HTMLElement).style.display = 'none';
+              }}
+            />
+          ) : (
+            <div
+              className="w-10 h-10 rounded-2xl text-slate-950 flex items-center justify-center font-black shadow-lg shadow-amber-500/20"
+              style={{ backgroundColor: accentColor }}
+            >
+              <Zap className="w-5 h-5 fill-slate-950 text-slate-950" />
+            </div>
+          )}
           <span className="text-2xl font-extrabold tracking-tight text-white">
-            Social<span className="text-[#f59e0b]">Pulse</span>
+            {isTenantMode && tenant ? (
+              <span>{brandTitle}</span>
+            ) : (
+              <>
+                Social<span className="text-[#f59e0b]">Pulse</span>
+              </>
+            )}
           </span>
         </Link>
-        <p className="text-xs sm:text-sm text-slate-400">Sign in to your account and manage your campaigns</p>
+        <p className="text-xs sm:text-sm text-slate-400">
+          {isTenantMode && tenant?.tagline ? tenant.tagline : 'Sign in to your account and manage your campaigns'}
+        </p>
       </div>
 
       {/* Main Login Card */}

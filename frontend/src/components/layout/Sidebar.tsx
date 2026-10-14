@@ -100,13 +100,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         {/* Mobile Header with Close Button */}
         <div className="flex items-center justify-between p-4 border-b border-[#2b303c] lg:hidden">
           <div className="flex items-center gap-2.5">
-            <div
-              className="w-8 h-8 rounded-xl text-slate-950 flex items-center justify-center font-black transition-colors"
-              style={{ backgroundColor: accentColor }}
-            >
-              <Zap className="w-4 h-4 fill-slate-950 text-slate-950" />
-            </div>
-            <span className="font-extrabold text-white">{brandTitle}</span>
+            {isTenantMode && tenant?.logo_url ? (
+              <img
+                src={tenant.logo_url}
+                alt={brandTitle}
+                className="h-7 max-w-[120px] object-contain shrink-0 rounded"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                }}
+              />
+            ) : (
+              <div
+                className="w-8 h-8 rounded-xl text-slate-950 flex items-center justify-center font-black transition-colors"
+                style={{ backgroundColor: accentColor }}
+              >
+                <Zap className="w-4 h-4 fill-slate-950 text-slate-950" />
+              </div>
+            )}
+            <span className="font-extrabold text-white text-sm">{brandTitle}</span>
           </div>
           <button
             onClick={onClose}

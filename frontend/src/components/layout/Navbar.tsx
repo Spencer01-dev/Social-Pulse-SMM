@@ -38,12 +38,23 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
 
         {/* Brand Logo */}
         <Link to="/" className="flex items-center gap-2">
-          <div
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-slate-950 flex items-center justify-center font-black shadow-lg shrink-0 transition-colors"
-            style={{ backgroundColor: accentColor }}
-          >
-            <Zap className="w-4 h-4 sm:w-4.5 sm:h-4.5 fill-slate-950 text-slate-950" />
-          </div>
+          {isTenantMode && tenant?.logo_url ? (
+            <img
+              src={tenant.logo_url}
+              alt={brandTitle}
+              className="h-8 sm:h-9 max-w-[130px] sm:max-w-[160px] object-contain shrink-0 rounded"
+              onError={(e) => {
+                (e.currentTarget as HTMLElement).style.display = 'none';
+              }}
+            />
+          ) : (
+            <div
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-slate-950 flex items-center justify-center font-black shadow-lg shrink-0 transition-colors"
+              style={{ backgroundColor: accentColor }}
+            >
+              <Zap className="w-4 h-4 sm:w-4.5 sm:h-4.5 fill-slate-950 text-slate-950" />
+            </div>
+          )}
           <div>
             <span className="text-base sm:text-lg font-extrabold tracking-tight text-white flex items-center gap-1">
               {isTenantMode && tenant ? (

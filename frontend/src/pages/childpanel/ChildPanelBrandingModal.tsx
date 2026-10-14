@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { ChildPanelData, childPanelService } from '../../services/childPanels';
 import { useTenant } from '../../context/TenantContext';
 import { Button } from '../../components/common/Button';
-import { Card } from '../../components/common/Card';
-import { X, Sparkles, Sliders, Check, Palette, DollarSign, Phone, Mail, HelpCircle } from 'lucide-react';
+import { X, Sparkles, Sliders, Check, Palette, DollarSign, Phone, Mail, HelpCircle, Image as ImageIcon, Upload, Trash2 } from 'lucide-react';
 
 interface ChildPanelBrandingModalProps {
   panel: ChildPanelData;
@@ -46,6 +45,7 @@ export const ChildPanelBrandingModal: React.FC<ChildPanelBrandingModalProps> = (
   const [whatsappSupport, setWhatsappSupport] = useState<string>(
     existing.whatsapp_support || ''
   );
+  const [logoUrl, setLogoUrl] = useState<string>(existing.logo_url || '');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -57,6 +57,25 @@ export const ChildPanelBrandingModal: React.FC<ChildPanelBrandingModalProps> = (
   const exampleRetail = Math.round(exampleWholesale * (1 + markupPercent / 100));
   const exampleProfit = exampleRetail - exampleWholesale;
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      setErrorMsg('Logo file size must be less than 2MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setLogoUrl(reader.result);
+        setErrorMsg(null);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -67,6 +86,7 @@ export const ChildPanelBrandingModal: React.FC<ChildPanelBrandingModalProps> = (
       const updated = await childPanelService.updateBranding(panel.id, {
         site_name: siteName.trim(),
         tagline: tagline.trim(),
+        logo_url: logoUrl.trim() || null,
         theme_color: themeColor,
         default_markup_percent: Number(markupPercent),
         contact_email: contactEmail.trim(),
@@ -154,6 +174,78 @@ export const ChildPanelBrandingModal: React.FC<ChildPanelBrandingModalProps> = (
                 placeholder="e.g. #1 SMM Reseller in Kenya"
                 className="w-full bg-[#121418] border border-[#2b303c] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
               />
+            </div>
+          </div>
+
+          {/* Custom Logo Upload & URL Section */}
+          <div className="p-4 rounded-xl bg-[#121418] border border-[#2b303c] space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+                Child Panel Custom Logo
+              </label>
+              <span className="text-[10px] text-slate-400">PNG, SVG, JPG, WEBP (Max 2MB)</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-[11px] text-slate-400 mb-1">Paste Image URL:</label>
+                  <input
+                    type="url"
+                    value={logoUrl}
+                    onChange={(e) => setLogoUrl(e.target.value)}
+                    placeholder="https://example.com/logo.png"
+                    className="w-full bg-[#181a20] border border-[#2b303c] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+                <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                  <span className="text-[10px] uppercase font-bold text-slate-500">OR</span>
+                  <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#222630] hover:bg-[#2b303c] border border-slate-700/60 text-xs font-bold text-slate-200 transition-colors">
+                    <Upload className="w-3.5 h-3.5 text-amber-400" />
+                    Upload Image
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                  {logoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setLogoUrl('')}
+                      className="inline-flex items-center gap-1 text-[11px] text-rose-400 hover:text-rose-300 font-semibold px-2 py-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Live Logo Preview Box */}
+              <div className="h-24 rounded-xl bg-[#181a20] border border-dashed border-[#2b303c] p-3 flex flex-col items-center justify-center relative overflow-hidden">
+                {logoUrl ? (
+                  <div className="flex flex-col items-center gap-1.5 max-w-full">
+                    <img
+                      src={logoUrl}
+                      alt="Logo Preview"
+                      className="max-h-12 max-w-[150px] object-contain"
+                      onError={() => setErrorMsg('Could not load image from the provided URL/file.')}
+                    />
+                    <span className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
+                      <Check className="w-3 h-3" /> Logo Preview
+                    </span>
+                  </div>
+                ) : (
+                  <div className="text-center text-slate-500">
+                    <ImageIcon className="w-5 h-5 mx-auto mb-1 opacity-40" />
+                    <span className="text-[11px] block font-medium">No logo uploaded</span>
+                    <span className="text-[9px] text-slate-600">Default brand icon will be shown</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

@@ -272,4 +272,77 @@ export interface ChildPanelUser {
 
 export const childPanelsService = childPanelService;
 
+// ─── Service Management Types ─────────────────────────────────────────────────
 
+export interface ChildPanelServiceItem {
+  id: string;
+  platform: string;
+  name: string;
+  description?: string;
+  service_type: string;
+  category: string;
+  wholesale_rate: number;
+  default_client_rate: number;
+  custom_markup_percent: number | null;
+  effective_client_rate: number;
+  min_quantity: number;
+  max_quantity: number;
+  refill_available: boolean;
+  cancel_available: boolean;
+  is_enabled: boolean;
+}
+
+export interface ChildPanelServiceConfigUpdate {
+  is_enabled?: boolean;
+  custom_markup_percent?: number | null;
+}
+
+export interface ChildPanelServiceBulkUpdate {
+  service_ids: string[];
+  is_enabled: boolean;
+}
+
+// ─── Service Management API ───────────────────────────────────────────────────
+
+export const childPanelServiceMgmt = {
+  listServices: async (
+    panelId: string,
+    params?: {
+      platform?: string;
+      search?: string;
+      category?: string;
+      enabled_only?: boolean;
+      skip?: number;
+      limit?: number;
+    }
+  ): Promise<ChildPanelServiceItem[]> => {
+    const response = await apiClient.get<ChildPanelServiceItem[]>(
+      `/child-panels/${panelId}/services`,
+      { params }
+    );
+    return response.data;
+  },
+
+  updateService: async (
+    panelId: string,
+    serviceId: string,
+    body: ChildPanelServiceConfigUpdate
+  ): Promise<ChildPanelServiceItem> => {
+    const response = await apiClient.patch<ChildPanelServiceItem>(
+      `/child-panels/${panelId}/services/${serviceId}`,
+      body
+    );
+    return response.data;
+  },
+
+  bulkUpdate: async (
+    panelId: string,
+    body: ChildPanelServiceBulkUpdate
+  ): Promise<{ updated: number; message: string }> => {
+    const response = await apiClient.post<{ updated: number; message: string }>(
+      `/child-panels/${panelId}/services/bulk`,
+      body
+    );
+    return response.data;
+  },
+};

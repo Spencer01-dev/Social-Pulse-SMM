@@ -12,8 +12,9 @@ from app.api.deps import get_current_active_user, require_roles
 from app.core.database import get_db
 from app.core.security import get_password_hash
 from app.models.child_panel import ChildPanel, ChildPanelStatus
+from app.models.child_panel_service import ChildPanelServiceConfig
 from app.models.order import Order, OrderStatus
-from app.models.service import Service
+from app.models.service import Platform, Service
 from app.models.ticket import Ticket, TicketMessage, TicketPriority, TicketStatus
 from app.models.transaction import PaymentMethod, Transaction, TransactionStatus, TransactionType
 from app.models.user import User, UserRole
@@ -23,6 +24,9 @@ from app.schemas.child_panel import (
     ChildPanelOrderStats,
     ChildPanelPaymentGatewayConfig,
     ChildPanelResponse,
+    ChildPanelServiceBulkUpdate,
+    ChildPanelServiceConfigUpdate,
+    ChildPanelServiceItemResponse,
     ChildPanelStatusUpdate,
     ChildPanelUserBalanceAdjust,
     ChildPanelUserResponse,
@@ -946,6 +950,251 @@ async def update_child_panel_user_status(
     )
 
 
+# =============================================================================
+# SERVICE MANAGEMENT — Panel owner manages which services appear on their panel
+# =============================================================================
+
+_PUBLIC_PLATFORMS = [
+    Platform.TIKTOK,
+    Platform.FACEBOOK,
+    Platform.INSTAGRAM,
+    Platform.WHATSAPP,
+    Platform.TELEGRAM,
+]
+
+
+async def _get_panel_for_owner(
+    panel_id: str,
+    db: AsyncSession,
+    current_user: User
+) -> ChildPanel:
+    """Resolve panel by ID, verifying ownership (or admin bypass)."""
+    try:
+        pid = uuid.UUID(panel_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid panel ID")
+    q = await db.execute(select(ChildPanel).where(ChildPanel.id == pid))
+    panel = q.scalars().first()
+    if not panel:
+        raise HTTPException(status_code=404, detail="Child panel not found")
+    if str(panel.user_id) != str(current_user.id) and current_user.role not in [
+        UserRole.ADMIN, UserRole.SUPER_ADMIN
+    ]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    return panel
+
+
+@router.get("/{panel_id}/services", response_model=List[ChildPanelServiceItemResponse])
+async def list_panel_services(
+    panel_id: str,
+    platform: Optional[str] = None,
+    search: Optional[str] = None,
+    category: Optional[str] = None,
+    enabled_only: bool = False,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(200, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """
+    List all catalog services with this panel's enable/disable state and markup overrides.
+    Shows wholesale cost, computed client rate, and per-service custom markup.
+    """
+    panel = await _get_panel_for_owner(panel_id, db, current_user)
+
+    default_markup = Decimal("0")
+    if panel.branding_json:
+        try:
+            default_markup = Decimal(str(panel.branding_json.get("default_markup_percent", 0)))
+        except Exception:
+            default_markup = Decimal("0")
+
+    svc_query = (
+        select(Service)
+        .where(
+            Service.is_active == True,
+            Service.platform.in_(_PUBLIC_PLATFORMS),
+            Service.provider_rate > Decimal("0.00"),
+        )
+        .order_by(Service.platform, Service.sort_order, Service.name)
+        .offset(skip)
+        .limit(limit)
+    )
+    if platform:
+        try:
+            svc_query = svc_query.where(Service.platform == Platform(platform))
+        except ValueError:
+            pass
+    if category and category != "all":
+        svc_query = svc_query.where(Service.category.ilike(f"%{category}%"))
+    if search:
+        pat = f"%{search.lower()}%"
+        svc_query = svc_query.where(
+            (Service.name.ilike(pat)) |
+            (Service.category.ilike(pat)) |
+            (Service.description.ilike(pat))
+        )
+
+    svc_result = await db.execute(svc_query)
+    services = svc_result.scalars().all()
+
+    svc_ids = [s.id for s in services]
+    if svc_ids:
+        cfg_result = await db.execute(
+            select(ChildPanelServiceConfig).where(
+                ChildPanelServiceConfig.panel_id == panel.id,
+                ChildPanelServiceConfig.service_id.in_(svc_ids)
+            )
+        )
+        configs = {str(c.service_id): c for c in cfg_result.scalars().all()}
+    else:
+        configs = {}
+
+    items = []
+    for s in services:
+        cfg = configs.get(str(s.id))
+        is_enabled = cfg.is_enabled if cfg else True
+        if enabled_only and not is_enabled:
+            continue
+
+        ws = s.wholesale_rate if (s.wholesale_rate and s.wholesale_rate > Decimal("0")) \
+            else round(s.provider_rate * Decimal("1.30"), 2)
+
+        default_client_rate = round(ws * (1 + default_markup / 100), 2) if default_markup > 0 else s.selling_rate
+        custom_pct = cfg.custom_markup_percent if cfg and cfg.custom_markup_percent is not None else None
+        effective_client_rate = round(ws * (1 + custom_pct / 100), 2) if custom_pct is not None else default_client_rate
+
+        items.append(ChildPanelServiceItemResponse(
+            id=s.id,
+            platform=s.platform.value if hasattr(s.platform, "value") else str(s.platform),
+            name=s.name,
+            description=s.description,
+            service_type=s.service_type,
+            category=s.category,
+            wholesale_rate=ws,
+            default_client_rate=default_client_rate,
+            custom_markup_percent=custom_pct,
+            effective_client_rate=effective_client_rate,
+            min_quantity=s.min_quantity,
+            max_quantity=s.max_quantity,
+            refill_available=s.refill_available,
+            cancel_available=s.cancel_available,
+            is_enabled=is_enabled,
+        ))
+
+    return items
+
+
+@router.patch("/{panel_id}/services/{service_id}", response_model=ChildPanelServiceItemResponse)
+async def update_panel_service_config(
+    panel_id: str,
+    service_id: uuid.UUID,
+    body: ChildPanelServiceConfigUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """Toggle enable/disable or set a custom markup for one service on this child panel."""
+    panel = await _get_panel_for_owner(panel_id, db, current_user)
+
+    svc_q = await db.execute(select(Service).where(Service.id == service_id, Service.is_active == True))
+    svc = svc_q.scalars().first()
+    if not svc:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    cfg_q = await db.execute(
+        select(ChildPanelServiceConfig).where(
+            ChildPanelServiceConfig.panel_id == panel.id,
+            ChildPanelServiceConfig.service_id == service_id
+        )
+    )
+    cfg = cfg_q.scalars().first()
+    if not cfg:
+        cfg = ChildPanelServiceConfig(
+            panel_id=panel.id,
+            service_id=service_id,
+            is_enabled=True,
+            custom_markup_percent=None
+        )
+        db.add(cfg)
+
+    if body.is_enabled is not None:
+        cfg.is_enabled = body.is_enabled
+    if "custom_markup_percent" in body.model_fields_set:
+        cfg.custom_markup_percent = body.custom_markup_percent
+
+    await db.commit()
+    await db.refresh(cfg)
+
+    default_markup = Decimal("0")
+    if panel.branding_json:
+        try:
+            default_markup = Decimal(str(panel.branding_json.get("default_markup_percent", 0)))
+        except Exception:
+            pass
+
+    ws = svc.wholesale_rate if (svc.wholesale_rate and svc.wholesale_rate > Decimal("0")) \
+        else round(svc.provider_rate * Decimal("1.30"), 2)
+    default_client_rate = round(ws * (1 + default_markup / 100), 2) if default_markup > 0 else svc.selling_rate
+    custom_pct = cfg.custom_markup_percent
+    effective_client_rate = round(ws * (1 + custom_pct / 100), 2) if custom_pct is not None else default_client_rate
+
+    return ChildPanelServiceItemResponse(
+        id=svc.id,
+        platform=svc.platform.value if hasattr(svc.platform, "value") else str(svc.platform),
+        name=svc.name,
+        description=svc.description,
+        service_type=svc.service_type,
+        category=svc.category,
+        wholesale_rate=ws,
+        default_client_rate=default_client_rate,
+        custom_markup_percent=custom_pct,
+        effective_client_rate=effective_client_rate,
+        min_quantity=svc.min_quantity,
+        max_quantity=svc.max_quantity,
+        refill_available=svc.refill_available,
+        cancel_available=svc.cancel_available,
+        is_enabled=cfg.is_enabled,
+    )
+
+
+@router.post("/{panel_id}/services/bulk", response_model=dict)
+async def bulk_update_panel_services(
+    panel_id: str,
+    body: ChildPanelServiceBulkUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
+    """Bulk enable or disable a list of services for this child panel."""
+    panel = await _get_panel_for_owner(panel_id, db, current_user)
+
+    if not body.service_ids:
+        return {"updated": 0, "message": "No services provided."}
+
+    cfg_q = await db.execute(
+        select(ChildPanelServiceConfig).where(
+            ChildPanelServiceConfig.panel_id == panel.id,
+            ChildPanelServiceConfig.service_id.in_(body.service_ids)
+        )
+    )
+    existing = {str(c.service_id): c for c in cfg_q.scalars().all()}
+
+    updated = 0
+    for svc_id in body.service_ids:
+        cfg = existing.get(str(svc_id))
+        if cfg:
+            cfg.is_enabled = body.is_enabled
+        else:
+            cfg = ChildPanelServiceConfig(
+                panel_id=panel.id,
+                service_id=svc_id,
+                is_enabled=body.is_enabled,
+            )
+            db.add(cfg)
+        updated += 1
+
+    await db.commit()
+    action = "enabled" if body.is_enabled else "disabled"
+    return {"updated": updated, "message": f"{updated} service(s) {action} on your panel."}
 @router.post("/{panel_id}/users/{user_id}/adjust-balance", response_model=ChildPanelUserResponse)
 async def adjust_child_panel_user_balance(
     panel_id: uuid.UUID,

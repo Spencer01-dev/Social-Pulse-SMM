@@ -34,6 +34,15 @@ import {
   Zap,
   Info,
   Save,
+  ToggleLeft,
+  ToggleRight,
+  Layers,
+  Percent,
+  Eye,
+  EyeOff,
+  TrendingUp,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -50,10 +59,12 @@ import {
   ChildPanelTicket,
   ChildPanelTicketDetail,
   ChildPanelUser,
+  ChildPanelServiceItem,
+  childPanelServiceMgmt,
 } from '../../services/childPanels';
 import { ChildPanelBrandingModal } from './ChildPanelBrandingModal';
 
-type ActiveTab = 'orders' | 'tickets' | 'users' | 'payments';
+type ActiveTab = 'orders' | 'tickets' | 'users' | 'payments' | 'services';
 
 export const ChildPanelManagePage: React.FC = () => {
   const { panelId } = useParams<{ panelId?: string }>();
@@ -180,6 +191,111 @@ export const ChildPanelManagePage: React.FC = () => {
     setSearchParams({ tab });
   };
 
+  // ---------------------------------------------------------------------------
+  // TAB 5: SERVICES STATE
+  // ---------------------------------------------------------------------------
+  const [panelServices, setPanelServices] = useState<ChildPanelServiceItem[]>([]);
+  const [loadingServices, setLoadingServices] = useState(false);
+  const [serviceSearch, setServiceSearch] = useState('');
+  const [servicePlatformFilter, setServicePlatformFilter] = useState('all');
+  const [serviceShowDisabled, setServiceShowDisabled] = useState(true);
+  const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
+  const [updatingServiceId, setUpdatingServiceId] = useState<string | null>(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  // Inline markup edit state
+  const [editingMarkupId, setEditingMarkupId] = useState<string | null>(null);
+  const [editingMarkupValue, setEditingMarkupValue] = useState<string>('');
+
+  const loadPanelServices = async () => {
+    if (!activePanel) return;
+    setLoadingServices(true);
+    try {
+      const data = await childPanelServiceMgmt.listServices(activePanel.id, { limit: 200 });
+      setPanelServices(data);
+    } catch (err: any) {
+      showToast('error', 'Failed to load services.');
+    } finally {
+      setLoadingServices(false);
+    }
+  };
+
+  const handleToggleService = async (svc: ChildPanelServiceItem) => {
+    if (!activePanel) return;
+    setUpdatingServiceId(svc.id);
+    try {
+      const updated = await childPanelServiceMgmt.updateService(activePanel.id, svc.id, {
+        is_enabled: !svc.is_enabled,
+      });
+      setPanelServices((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+    } catch (err: any) {
+      showToast('error', 'Failed to update service.');
+    } finally {
+      setUpdatingServiceId(null);
+    }
+  };
+
+  const handleSaveMarkup = async (svc: ChildPanelServiceItem) => {
+    if (!activePanel) return;
+    setUpdatingServiceId(svc.id);
+    const val = editingMarkupValue === '' ? null : parseFloat(editingMarkupValue);
+    try {
+      const updated = await childPanelServiceMgmt.updateService(activePanel.id, svc.id, {
+        custom_markup_percent: val,
+      });
+      setPanelServices((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+      setEditingMarkupId(null);
+      showToast('success', `Markup updated for "${svc.name}"`);
+    } catch (err: any) {
+      showToast('error', 'Failed to save markup.');
+    } finally {
+      setUpdatingServiceId(null);
+    }
+  };
+
+  const handleBulkEnable = async (enable: boolean) => {
+    if (!activePanel || selectedServiceIds.size === 0) return;
+    setBulkLoading(true);
+    try {
+      const res = await childPanelServiceMgmt.bulkUpdate(activePanel.id, {
+        service_ids: Array.from(selectedServiceIds),
+        is_enabled: enable,
+      });
+      showToast('success', res.message);
+      setSelectedServiceIds(new Set());
+      await loadPanelServices();
+    } catch (err: any) {
+      showToast('error', 'Bulk update failed.');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const toggleSelectService = (id: string) => {
+    setSelectedServiceIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (visibleIds: string[]) => {
+    if (visibleIds.every((id) => selectedServiceIds.has(id))) {
+      setSelectedServiceIds((prev) => {
+        const next = new Set(prev);
+        visibleIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    } else {
+      setSelectedServiceIds((prev) => {
+        const next = new Set(prev);
+        visibleIds.forEach((id) => next.add(id));
+        return next;
+      });
+    }
+  };
+
+
   // Fetch initial panels owned by user
   useEffect(() => {
     const fetchPanels = async () => {
@@ -284,6 +400,8 @@ export const ChildPanelManagePage: React.FC = () => {
       loadUsers();
     } else if (activeTab === 'payments') {
       loadGatewayConfig();
+    } else if (activeTab === 'services') {
+      loadPanelServices();
     }
   }, [activePanel, activeTab, orderStatusFilter, ticketStatusFilter]);
 
@@ -602,6 +720,27 @@ export const ChildPanelManagePage: React.FC = () => {
           {gatewayConfig.payhero_channel_id ? (
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Till Active" />
           ) : null}
+        </button>
+
+        <button
+          onClick={() => handleTabChange('services')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+            activeTab === 'services'
+              ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20'
+              : 'text-slate-400 hover:text-white hover:bg-[#181a20]'
+          }`}
+        >
+          <Layers className="w-4 h-4" />
+          <span>Service Management</span>
+          {panelServices.length > 0 && (
+            <span
+              className={`px-1.5 py-0.5 text-[10px] font-black rounded-full ${
+                activeTab === 'services' ? 'bg-slate-950/20 text-slate-950' : 'bg-[#222630] text-amber-300'
+              }`}
+            >
+              {panelServices.filter((s) => s.is_enabled).length}/{panelServices.length}
+            </span>
+          )}
         </button>
       </div>
 
@@ -1641,6 +1780,321 @@ export const ChildPanelManagePage: React.FC = () => {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+
+      {/* ===================================================================== */}
+      {/* TAB 5: SERVICE MANAGEMENT                                              */}
+      {/* ===================================================================== */}
+      {activeTab === 'services' && (
+        <div className="space-y-4">
+
+          {/* Header Stats */}
+          <div className="grid grid-cols-3 gap-3">
+            <Card className="p-3 bg-[#181a20] border-[#2b303c]">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Total Services</span>
+              <span className="text-xl font-black text-white">{panelServices.length}</span>
+            </Card>
+            <Card className="p-3 bg-[#181a20] border-[#2b303c]">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Enabled</span>
+              <span className="text-xl font-black text-emerald-400">
+                {panelServices.filter((s) => s.is_enabled).length}
+              </span>
+            </Card>
+            <Card className="p-3 bg-[#181a20] border-[#2b303c]">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Disabled</span>
+              <span className="text-xl font-black text-rose-400">
+                {panelServices.filter((s) => !s.is_enabled).length}
+              </span>
+            </Card>
+          </div>
+
+          {/* Filters & Bulk Actions Bar */}
+          <Card className="p-3 bg-[#181a20] border-[#2b303c]">
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+              <div className="flex flex-wrap items-center gap-2 flex-1">
+                {/* Search */}
+                <div className="relative flex-1 min-w-[180px] max-w-xs">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search services..."
+                    value={serviceSearch}
+                    onChange={(e) => setServiceSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-2 bg-[#121418] border border-[#2b303c] rounded-xl text-white text-xs focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                {/* Platform filter */}
+                <select
+                  value={servicePlatformFilter}
+                  onChange={(e) => setServicePlatformFilter(e.target.value)}
+                  className="px-3 py-2 bg-[#121418] border border-[#2b303c] rounded-xl text-white text-xs focus:outline-none focus:border-amber-500"
+                >
+                  <option value="all">All Platforms</option>
+                  <option value="tiktok">TikTok</option>
+                  <option value="instagram">Instagram</option>
+                  <option value="facebook">Facebook</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="telegram">Telegram</option>
+                </select>
+
+                {/* Show disabled toggle */}
+                <button
+                  onClick={() => setServiceShowDisabled((v) => !v)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                    serviceShowDisabled
+                      ? 'bg-slate-700/30 border-slate-600/40 text-slate-300'
+                      : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                  }`}
+                >
+                  {serviceShowDisabled ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                  {serviceShowDisabled ? 'Show All' : 'Enabled Only'}
+                </button>
+
+                <button
+                  onClick={loadPanelServices}
+                  className="p-2 rounded-xl bg-[#121418] border border-[#2b303c] text-slate-400 hover:text-white hover:border-amber-500 transition-colors cursor-pointer"
+                  title="Refresh"
+                >
+                  <RefreshCcw className={`w-3.5 h-3.5 ${loadingServices ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+
+              {/* Bulk actions */}
+              {selectedServiceIds.size > 0 && (
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs text-amber-400 font-bold">{selectedServiceIds.size} selected</span>
+                  <button
+                    onClick={() => handleBulkEnable(true)}
+                    disabled={bulkLoading}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <ToggleRight className="w-3.5 h-3.5" />
+                    Enable All
+                  </button>
+                  <button
+                    onClick={() => handleBulkEnable(false)}
+                    disabled={bulkLoading}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500/25 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <ToggleLeft className="w-3.5 h-3.5" />
+                    Disable All
+                  </button>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* Services List */}
+          {loadingServices ? (
+            <div className="flex items-center justify-center h-32 text-slate-400 text-sm">
+              <RefreshCcw className="w-5 h-5 animate-spin mr-2" />
+              Loading catalog services...
+            </div>
+          ) : (() => {
+            // Filter services
+            const filtered = panelServices.filter((s) => {
+              if (!serviceShowDisabled && !s.is_enabled) return false;
+              if (servicePlatformFilter !== 'all' && s.platform !== servicePlatformFilter) return false;
+              if (serviceSearch) {
+                const q = serviceSearch.toLowerCase();
+                return s.name.toLowerCase().includes(q) || s.category.toLowerCase().includes(q);
+              }
+              return true;
+            });
+
+            const visibleIds = filtered.map((s) => s.id);
+            const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedServiceIds.has(id));
+
+            const PLATFORM_COLORS: Record<string, string> = {
+              tiktok: 'text-pink-400 bg-pink-500/10 border-pink-500/20',
+              instagram: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
+              facebook: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+              whatsapp: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+              telegram: 'text-sky-400 bg-sky-500/10 border-sky-500/20',
+            };
+
+            if (filtered.length === 0) {
+              return (
+                <div className="flex flex-col items-center justify-center h-32 text-slate-500 gap-2">
+                  <Layers className="w-8 h-8 opacity-40" />
+                  <p className="text-sm">No services match your filters.</p>
+                </div>
+              );
+            }
+
+            return (
+              <Card className="bg-[#181a20] border-[#2b303c] overflow-hidden">
+                {/* Table Header */}
+                <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[#2b303c] bg-[#13151a]">
+                  <button
+                    onClick={() => toggleSelectAll(visibleIds)}
+                    className="text-slate-400 hover:text-amber-400 transition-colors cursor-pointer"
+                  >
+                    {allSelected ? <CheckSquare className="w-4 h-4 text-amber-400" /> : <Square className="w-4 h-4" />}
+                  </button>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 flex-1">Service Name / Category</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 w-24 text-right hidden md:block">Wholesale</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 w-28 text-right hidden lg:block">Client Rate</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 w-32 text-center">Custom Markup</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 w-20 text-center">Status</span>
+                </div>
+
+                {/* Service Rows */}
+                <div className="divide-y divide-[#2b303c]">
+                  {filtered.map((svc) => {
+                    const isUpdating = updatingServiceId === svc.id;
+                    const isEditingMarkup = editingMarkupId === svc.id;
+                    const platformColor = PLATFORM_COLORS[svc.platform] || 'text-slate-400 bg-slate-500/10 border-slate-500/20';
+
+                    return (
+                      <div
+                        key={svc.id}
+                        className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                          !svc.is_enabled ? 'opacity-50' : ''
+                        } ${selectedServiceIds.has(svc.id) ? 'bg-amber-500/5' : 'hover:bg-[#1d2029]'}`}
+                      >
+                        {/* Checkbox */}
+                        <button
+                          onClick={() => toggleSelectService(svc.id)}
+                          className="text-slate-400 hover:text-amber-400 transition-colors cursor-pointer shrink-0"
+                        >
+                          {selectedServiceIds.has(svc.id) ? (
+                            <CheckSquare className="w-4 h-4 text-amber-400" />
+                          ) : (
+                            <Square className="w-4 h-4" />
+                          )}
+                        </button>
+
+                        {/* Name & category */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-white truncate">{svc.name}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${platformColor}`}>
+                              {svc.platform.toUpperCase()}
+                            </span>
+                            <span className="text-[10px] text-slate-500 truncate">{svc.category}</span>
+                            {svc.refill_available && (
+                              <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-sky-500/10 border border-sky-500/20 text-sky-400">
+                                Refill
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Wholesale rate */}
+                        <div className="w-24 text-right hidden md:block shrink-0">
+                          <span className="text-xs text-slate-400 font-mono">
+                            KES {Number(svc.wholesale_rate).toFixed(2)}
+                          </span>
+                          <p className="text-[9px] text-slate-600">per 1k</p>
+                        </div>
+
+                        {/* Effective client rate */}
+                        <div className="w-28 text-right hidden lg:block shrink-0">
+                          <span className="text-xs text-amber-300 font-bold font-mono">
+                            KES {Number(svc.effective_client_rate).toFixed(2)}
+                          </span>
+                          {svc.custom_markup_percent !== null ? (
+                            <p className="text-[9px] text-emerald-400">custom {Number(svc.custom_markup_percent).toFixed(0)}%</p>
+                          ) : (
+                            <p className="text-[9px] text-slate-500">panel default</p>
+                          )}
+                        </div>
+
+                        {/* Markup editor */}
+                        <div className="w-32 flex items-center justify-center shrink-0">
+                          {isEditingMarkup ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min="0"
+                                max="10000"
+                                step="0.5"
+                                placeholder="e.g. 30"
+                                value={editingMarkupValue}
+                                onChange={(e) => setEditingMarkupValue(e.target.value)}
+                                autoFocus
+                                className="w-16 px-2 py-1 bg-[#121418] border border-amber-500/50 rounded-lg text-white text-xs focus:outline-none focus:border-amber-500"
+                              />
+                              <span className="text-slate-400 text-xs">%</span>
+                              <button
+                                onClick={() => handleSaveMarkup(svc)}
+                                disabled={isUpdating}
+                                className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors cursor-pointer"
+                                title="Save"
+                              >
+                                <Check className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={() => setEditingMarkupId(null)}
+                                className="p-1 rounded-lg bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-colors cursor-pointer"
+                                title="Cancel"
+                              >
+                                <XCircle className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setEditingMarkupId(svc.id);
+                                setEditingMarkupValue(
+                                  svc.custom_markup_percent !== null
+                                    ? String(svc.custom_markup_percent)
+                                    : ''
+                                );
+                              }}
+                              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[#121418] border border-[#2b303c] text-slate-400 hover:text-amber-400 hover:border-amber-500/40 transition-colors text-xs cursor-pointer"
+                              title="Set custom markup"
+                            >
+                              <Percent className="w-3 h-3" />
+                              {svc.custom_markup_percent !== null
+                                ? `${Number(svc.custom_markup_percent).toFixed(0)}%`
+                                : 'Set markup'}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Toggle */}
+                        <div className="w-20 flex items-center justify-center shrink-0">
+                          <button
+                            onClick={() => handleToggleService(svc)}
+                            disabled={isUpdating}
+                            className={`relative w-10 h-5 rounded-full transition-all duration-300 cursor-pointer focus:outline-none ${
+                              isUpdating
+                                ? 'opacity-50 cursor-not-allowed'
+                                : svc.is_enabled
+                                ? 'bg-emerald-500 shadow-md shadow-emerald-500/30'
+                                : 'bg-slate-700'
+                            }`}
+                            title={svc.is_enabled ? 'Disable on your panel' : 'Enable on your panel'}
+                          >
+                            <span
+                              className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-300 ${
+                                svc.is_enabled ? 'translate-x-5' : 'translate-x-0'
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Footer info */}
+                <div className="px-4 py-2.5 border-t border-[#2b303c] bg-[#13151a] flex items-center gap-2">
+                  <Info className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="text-[10px] text-slate-500">
+                    Showing {filtered.length} of {panelServices.length} services.
+                    Disabled services are hidden from your clients.
+                    Custom markup overrides your panel-level default for that specific service.
+                  </span>
+                </div>
+              </Card>
+            );
+          })()}
         </div>
       )}
 
