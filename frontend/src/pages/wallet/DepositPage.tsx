@@ -19,6 +19,7 @@ import { useCurrency } from '../../context/CurrencyContext';
 import { paymentsService } from '../../services/payments';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
+import { trackInitiateCheckout, trackPurchase } from '../../utils/metaPixel';
 
 type CountryTab = 'ke' | 'ng' | 'gh' | 'za' | 'cards';
 
@@ -97,6 +98,12 @@ export const DepositPage: React.FC = () => {
         try {
           const res = await paymentsService.verifyPaystack(pstkRef);
           if (res.success) {
+            trackPurchase({
+              value: res.credited_kes || 0,
+              currency: res.currency_paid || 'KES',
+              order_id: pstkRef,
+              content_name: 'Wallet Deposit',
+            });
             setVerificationResult({
               success: true,
               message: res.message || 'Deposit credited to wallet!',
@@ -156,6 +163,11 @@ export const DepositPage: React.FC = () => {
       const res = await paymentsService.initiateMpesaSTK({
         phone_number: cleaned,
         amount: numAmount,
+      });
+      trackInitiateCheckout({
+        value: numAmount,
+        currency: 'KES',
+        content_name: 'M-Pesa STK Push Deposit',
       });
       setCheckoutId(res.checkout_request_id);
 
@@ -239,6 +251,11 @@ export const DepositPage: React.FC = () => {
         amount,
         currency,
         callback_url: window.location.origin + '/wallet/deposit',
+      });
+      trackInitiateCheckout({
+        value: amount,
+        currency,
+        content_name: `Paystack ${currency} Deposit`,
       });
       if (res.is_simulator) {
         setSimulatorModal({

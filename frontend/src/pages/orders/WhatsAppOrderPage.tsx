@@ -18,6 +18,7 @@ import { useAuth } from '../../context/AuthContext';
 import { servicesService } from '../../services/services';
 import { ordersService } from '../../services/orders';
 import { CustomerService } from '../../types';
+import { trackPurchase, trackLead } from '../../utils/metaPixel';
 
 interface CountryPreset {
   id: string; // provider_service_id or service id
@@ -217,6 +218,18 @@ export const WhatsAppOrderPage: React.FC = () => {
         target_link: targetLink.trim(),
         quantity: 1,
         custom_comments: dripFeed ? 'Drip-feed requested' : undefined,
+      });
+
+      trackPurchase({
+        value: priceKsh,
+        currency: 'KES',
+        order_id: order?.id,
+        content_name: `WhatsApp Number: ${selectedPreset.name}`,
+      });
+      trackLead({
+        content_name: `WhatsApp Number: ${selectedPreset.name}`,
+        value: priceKsh,
+        currency: 'KES',
       });
 
       await refreshUserProfile();

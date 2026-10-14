@@ -441,7 +441,7 @@ async def purge_delix_and_orphans(
 
     res_wholesale = await db.execute(text("""
         UPDATE services 
-        SET wholesale_rate = ROUND(provider_rate * 1.32625, 2) 
+        SET wholesale_rate = ROUND(provider_rate * 1.30, 2) 
         WHERE (wholesale_rate IS NULL OR wholesale_rate <= 0.001) AND provider_rate > 0;
     """))
 

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Lock, Mail, User, Phone, ArrowRight, AlertCircle, Zap } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/common/Button';
+import { trackCompleteRegistration } from '../../utils/metaPixel';
 
 export const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -38,6 +39,7 @@ export const RegisterPage: React.FC = () => {
         phone_number: phoneNumber.trim() || undefined,
         password,
       });
+      trackCompleteRegistration({ method: 'email' });
       navigate('/', { replace: true });
     } catch (err: any) {
       const detail = err.response?.data?.detail;

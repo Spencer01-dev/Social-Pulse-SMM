@@ -94,10 +94,25 @@ async def list_public_services(
     services = result.scalars().all()
 
     clean_services = []
+    tenant_markup_percent = Decimal("0")
+    if tenant_domain:
+        panel_q = await db.execute(
+            select(ChildPanel).where(ChildPanel.domain == tenant_domain)
+        )
+        panel_record = panel_q.scalars().first()
+        if panel_record and panel_record.branding_json:
+            try:
+                tenant_markup_percent = Decimal(str(panel_record.branding_json.get("default_markup_percent", 0)))
+            except Exception:
+                tenant_markup_percent = Decimal("0")
+
     for s in services:
-        # Child panels sell at the same retail price as the parent panel.
-        # Their margin = selling_rate - wholesale_rate (deducted from their parent balance)
-        effective_rate = s.selling_rate
+        ws = s.wholesale_rate if (s.wholesale_rate and s.wholesale_rate > Decimal("0")) else round(s.provider_rate * Decimal("1.30"), 2)
+        if tenant_markup_percent > Decimal("0"):
+            # Child panel client price: wholesale_rate marked up by tenant's configured margin
+            effective_rate = round(ws * (Decimal("1") + (tenant_markup_percent / Decimal("100"))), 2)
+        else:
+            effective_rate = s.selling_rate
 
         clean_services.append(
             CustomerServiceResponse(
@@ -109,7 +124,7 @@ async def list_public_services(
                 service_type=s.service_type,
                 category=s.category,
                 rate=effective_rate,
-                wholesale_rate=s.wholesale_rate,
+                wholesale_rate=ws,
                 min_quantity=s.min_quantity,
                 max_quantity=s.max_quantity,
                 refill_available=s.refill_available,

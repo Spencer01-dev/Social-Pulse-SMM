@@ -41,6 +41,7 @@ import { ordersService } from '../../services/orders';
 import { CustomerService, PlatformType } from '../../types';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
+import { trackPurchase } from '../../utils/metaPixel';
 
 interface PlatformOption {
   id: PlatformType | 'all';
@@ -342,7 +343,7 @@ export const NewOrderPage: React.FC = () => {
   // Calculate live charge — unified retail pricing for all users and child panels
   const numQuantity = typeof quantity === 'number' ? quantity : 0;
   const effectiveRate = currentService
-    ? (isTenantMode ? calculateMarkedUpPrice(Number(currentService.rate)) : Number(currentService.rate))
+    ? (isTenantMode ? calculateMarkedUpPrice(Number(currentService.rate), Number(currentService.wholesale_rate || 0)) : Number(currentService.rate))
     : 0;
   const calculatedCharge = currentService
     ? isPackage
@@ -394,6 +395,13 @@ export const NewOrderPage: React.FC = () => {
         target_link: targetLink.trim(),
         quantity: numQuantity,
         custom_comments: customComments ? customComments.trim() : undefined,
+      });
+
+      trackPurchase({
+        value: calculatedCharge,
+        currency: 'KES',
+        order_id: order?.id,
+        content_name: currentService.name,
       });
 
       await refreshUserProfile();
@@ -883,7 +891,7 @@ export const NewOrderPage: React.FC = () => {
                     <div className="mt-2 flex items-baseline gap-1.5">
                       <span className="text-base font-extrabold text-white">
                         {(isTenantMode
-                          ? calculateMarkedUpPrice(Number(service.rate)).toFixed(4)
+                          ? calculateMarkedUpPrice(Number(service.rate), Number(service.wholesale_rate || 0)).toFixed(4)
                           : Number(service.rate).toFixed(4))} KES
                       </span>
                       <span className="text-xs text-slate-400">

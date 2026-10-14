@@ -11,6 +11,7 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { WhatsAppChannelPopup } from './components/common/WhatsAppChannelPopup';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { MetaPixelTracker } from './components/common/MetaPixelTracker';
 
 // Lazy loaded customer routes
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then(m => ({ default: m.ProfilePage })));
@@ -47,6 +48,7 @@ export const App: React.FC = () => {
       <CurrencyProvider>
         <TenantProvider>
           <BrowserRouter>
+            <MetaPixelTracker />
             <TenantSimulationBanner />
             <WhatsAppChannelPopup />
             <ErrorBoundary>

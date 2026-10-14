@@ -134,12 +134,12 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const calculateMarkedUpPrice = useCallback(
-    (retailPrice: number, _wholesaleRate?: number): number => {
-      // Child panels sell at the exact same retail price as the parent panel.
-      // Their profit comes from the wholesale gap:
-      //   Customer pays selling_rate (3.86) → same as parent
-      //   Wholesale deduction from child panel balance = wholesale_rate (3.29)
-      //   Child panel profit = 3.86 - 3.29 = 0.57 per 1,000
+    (retailPrice: number, wholesaleRate?: number): number => {
+      // If child panel has configured their custom markup %, calculate price over wholesale rate (1.30x provider rate)
+      if (tenant?.default_markup_percent && tenant.default_markup_percent > 0) {
+        const base = wholesaleRate && wholesaleRate > 0 ? wholesaleRate : retailPrice;
+        return Number((base * (1 + tenant.default_markup_percent / 100)).toFixed(2));
+      }
       return retailPrice;
     },
     [tenant]

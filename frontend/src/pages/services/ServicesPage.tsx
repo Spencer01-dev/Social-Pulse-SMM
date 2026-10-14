@@ -373,7 +373,7 @@ export const ServicesPage: React.FC = () => {
                       <span className="text-lg font-extrabold text-amber-400">
                         {formatCurrency(
                           isTenantMode
-                            ? calculateMarkedUpPrice(Number(service.rate))
+                            ? calculateMarkedUpPrice(Number(service.rate), Number(service.wholesale_rate || 0))
                             : Number(service.rate)
                         )}
                       </span>

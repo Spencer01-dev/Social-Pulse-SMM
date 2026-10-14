@@ -75,9 +75,23 @@ async def create_order(
             )
             panel = tenant_q.scalars().first()
 
-    # Universal retail price: child panels sell at the same price as the parent panel.
-    # Child panel profit = selling_rate - wholesale_rate (deducted from their parent balance)
+    # Determine retail charge rate:
+    # If customer is ordering on a Child Panel with a custom markup percent configured,
+    # charge the customer that marked up price over wholesale_rate (1.30x provider rate).
+    # Otherwise, default to standard platform retail rate (selling_rate).
     charge_rate = service.selling_rate
+    if panel and panel.branding_json:
+        try:
+            panel_markup = Decimal(str(panel.branding_json.get("default_markup_percent", 0)))
+            if panel_markup > Decimal("0"):
+                ws_base = (
+                    service.wholesale_rate 
+                    if (service.wholesale_rate is not None and service.wholesale_rate > Decimal("0")) 
+                    else round(service.provider_rate * Decimal("1.30"), 2)
+                )
+                charge_rate = round(ws_base * (Decimal("1") + (panel_markup / Decimal("100"))), 2)
+        except Exception:
+            charge_rate = service.selling_rate
 
     # 3. Validate quantity boundaries & determine package vs per-1000 pricing
     is_package = (
@@ -138,8 +152,8 @@ async def create_order(
     if panel and panel.user_id and panel.user_id != current_user.id:
         wholesale_rate = (
             service.wholesale_rate 
-            if (service.wholesale_rate is not None and service.wholesale_rate > 0) 
-            else service.selling_rate
+            if (service.wholesale_rate is not None and service.wholesale_rate > Decimal("0")) 
+            else round(service.provider_rate * Decimal("1.30"), 2)
         )
         if is_package:
             wholesale_cost = round(wholesale_rate * Decimal(order_in.quantity), 2)

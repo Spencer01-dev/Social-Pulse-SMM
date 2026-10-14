@@ -193,7 +193,7 @@ async def lifespan(app: FastAPI):
                             ALTER TABLE services ADD COLUMN wholesale_rate NUMERIC(12, 2) DEFAULT 0.00;
                         END IF;
                         UPDATE services 
-                        SET wholesale_rate = ROUND(provider_rate * 1.32625, 2) 
+                        SET wholesale_rate = ROUND(provider_rate * 1.30, 2) 
                         WHERE (wholesale_rate IS NULL OR wholesale_rate <= 0.001) AND provider_rate > 0;
                     END $$;
                 """))
