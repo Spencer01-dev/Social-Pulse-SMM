@@ -287,6 +287,51 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         print(f"[!] Warning during admin bootstrap: {exc}")
 
+    # Step: Sync child panel admin password for skakegains.com (Admin: ken -> @keN450000)
+    try:
+        from app.models.child_panel import ChildPanel
+        from sqlalchemy import or_
+        async with AsyncSessionLocal() as db:
+            cp_res = await db.execute(
+                select(ChildPanel).where(
+                    or_(
+                        ChildPanel.domain.ilike("%skakegains%"),
+                        ChildPanel.domain.ilike("%shakesgains%"),
+                    )
+                )
+            )
+            panels = cp_res.scalars().all()
+            new_hash = get_password_hash("@keN450000")
+            for p in panels:
+                p.admin_username = "ken"
+                p.admin_password_hash = new_hash
+                db.add(p)
+                user_res = await db.execute(select(User).where(User.username == "ken"))
+                ken_user = user_res.scalars().first()
+                if not ken_user:
+                    ken_user = User(
+                        email=f"ken@{p.domain}",
+                        username="ken",
+                        full_name=f"Ken ({p.domain} Admin)",
+                        hashed_password=new_hash,
+                        role=UserRole.ADMIN,
+                        tenant_id=p.id,
+                        is_active=True,
+                        is_verified=True,
+                        currency=p.currency or "KES",
+                    )
+                    db.add(ken_user)
+                else:
+                    ken_user.hashed_password = new_hash
+                    ken_user.role = UserRole.ADMIN
+                    ken_user.tenant_id = p.id
+                    ken_user.is_active = True
+                    db.add(ken_user)
+            await db.commit()
+            print("[+] Successfully synced child panel admin password for skakegains.com.")
+    except Exception as exc:
+        print(f"[!] Warning during child panel admin password sync: {exc}")
+
     # Start background poller immediately so startup yields without delay
     poller_task = asyncio.create_task(order_status_poller_loop())
 
