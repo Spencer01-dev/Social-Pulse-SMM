@@ -153,3 +153,9 @@ class ChildPanelServiceBulkUpdate(BaseModel):
     """Bulk enable/disable a list of service IDs."""
     service_ids: list[uuid.UUID]
     is_enabled: bool
+
+
+class ChildPanelAdminCredentialsUpdate(BaseModel):
+    """Update admin username and/or reset admin password for a child panel."""
+    admin_username: Optional[str] = Field(None, min_length=3, max_length=50)
+    admin_password: Optional[str] = Field(None, min_length=6, max_length=100)

@@ -4,7 +4,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import JWTError, jwt
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_active_user
@@ -127,6 +127,32 @@ async def login_json(
 
     result = await db.execute(query)
     user = result.scalars().first()
+
+    # If user not found in standard accounts, verify against ChildPanel admin credentials
+    if not user:
+        cp_query = await db.execute(
+            select(ChildPanel).where(func.lower(ChildPanel.admin_username) == identifier)
+        )
+        panel = cp_query.scalars().first()
+        if panel and verify_password(credentials.password, panel.admin_password_hash):
+            admin_email = f"{identifier}@{panel.domain}"
+            user_q = await db.execute(select(User).where(User.username == identifier))
+            user = user_q.scalars().first()
+            if not user:
+                user = User(
+                    email=admin_email,
+                    username=identifier,
+                    full_name=f"{identifier.capitalize()} ({panel.domain} Admin)",
+                    hashed_password=panel.admin_password_hash,
+                    role=UserRole.ADMIN,
+                    tenant_id=panel.id,
+                    is_active=True,
+                    is_verified=True,
+                    currency=panel.currency or "KES",
+                )
+                db.add(user)
+                await db.commit()
+                await db.refresh(user)
 
     if not user or not verify_password(credentials.password, user.hashed_password):
         raise HTTPException(

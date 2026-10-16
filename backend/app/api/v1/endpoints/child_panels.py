@@ -19,6 +19,7 @@ from app.models.ticket import Ticket, TicketMessage, TicketPriority, TicketStatu
 from app.models.transaction import PaymentMethod, Transaction, TransactionStatus, TransactionType
 from app.models.user import User, UserRole
 from app.schemas.child_panel import (
+    ChildPanelAdminCredentialsUpdate,
     ChildPanelCreate,
     ChildPanelOrderResponse,
     ChildPanelOrderStats,
@@ -202,6 +203,51 @@ async def renew_child_panel(
         }
     )
     db.add(tx)
+
+    await db.commit()
+    await db.refresh(panel)
+    return panel
+
+
+@router.patch("/{panel_id}/admin-credentials", response_model=ChildPanelResponse)
+async def update_child_panel_admin_credentials(
+    panel_id: uuid.UUID,
+    payload: ChildPanelAdminCredentialsUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """
+    Update administrator username and/or reset administrator password for a child panel.
+    Only the panel owner or a platform super_admin can perform this action.
+    """
+    query = await db.execute(select(ChildPanel).where(ChildPanel.id == panel_id))
+    panel = query.scalars().first()
+    if not panel:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Child panel not found.")
+
+    if panel.user_id != current_user.id and current_user.role != UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to manage this child panel.")
+
+    old_username = panel.admin_username
+    if payload.admin_username and payload.admin_username.strip():
+        panel.admin_username = payload.admin_username.strip()
+
+    if payload.admin_password and payload.admin_password.strip():
+        panel.admin_password_hash = get_password_hash(payload.admin_password.strip())
+
+    db.add(panel)
+
+    # If a linked User record exists for this child panel admin, update their username/password as well
+    user_q = await db.execute(
+        select(User).where(or_(User.username == old_username, User.tenant_id == panel.id))
+    )
+    admin_user_record = user_q.scalars().first()
+    if admin_user_record:
+        if payload.admin_username and payload.admin_username.strip():
+            admin_user_record.username = payload.admin_username.strip()
+        if payload.admin_password and payload.admin_password.strip():
+            admin_user_record.hashed_password = panel.admin_password_hash
+        db.add(admin_user_record)
 
     await db.commit()
     await db.refresh(panel)
