@@ -1016,15 +1016,14 @@ async def list_panel_services(
             Service.platform.in_(_PUBLIC_PLATFORMS),
             Service.provider_rate > Decimal("0.00"),
         )
-        .order_by(Service.platform, Service.sort_order, Service.name)
+        .order_by(Service.sort_order, Service.name)
         .offset(skip)
         .limit(limit)
     )
     if platform:
-        try:
-            svc_query = svc_query.where(Service.platform == Platform(platform))
-        except ValueError:
-            pass
+        # Compare against the stored string value directly (case-insensitive)
+        platform_lower = platform.lower().strip()
+        svc_query = svc_query.where(Service.platform == platform_lower)
     if category and category != "all":
         svc_query = svc_query.where(Service.category.ilike(f"%{category}%"))
     if search:

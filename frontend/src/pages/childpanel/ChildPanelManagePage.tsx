@@ -210,8 +210,22 @@ export const ChildPanelManagePage: React.FC = () => {
     if (!activePanel) return;
     setLoadingServices(true);
     try {
-      const data = await childPanelServiceMgmt.listServices(activePanel.id, { limit: 200 });
-      setPanelServices(data);
+      // Load all platforms in parallel to avoid the 500-limit cutting off some platforms
+      const platforms = ['tiktok', 'instagram', 'facebook', 'whatsapp', 'telegram'];
+      const results = await Promise.all(
+        platforms.map((p) =>
+          childPanelServiceMgmt.listServices(activePanel.id, { platform: p, limit: 500 })
+        )
+      );
+      // Merge all into a flat deduplicated list
+      const allServices = results.flat();
+      const seen = new Set<string>();
+      const unique = allServices.filter((s) => {
+        if (seen.has(s.id)) return false;
+        seen.add(s.id);
+        return true;
+      });
+      setPanelServices(unique);
     } catch (err: any) {
       showToast('error', 'Failed to load services.');
     } finally {
