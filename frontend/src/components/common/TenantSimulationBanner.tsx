@@ -4,10 +4,12 @@ import { Globe, X, Sparkles, Sliders, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const TenantSimulationBanner: React.FC = () => {
-  const { isTenantMode, tenant, exitTenantMode } = useTenant();
+  const { isTenantMode, tenant, isSimulation, exitTenantMode } = useTenant();
   const navigate = useNavigate();
 
-  if (!isTenantMode || !tenant) {
+  // IMPORTANT: Only render the simulation preview banner when testing on localhost or main platform!
+  // On real, live custom child panel domains (e.g. skakegains.com), NEVER display this banner or exit button.
+  if (!isTenantMode || !tenant || !isSimulation) {
     return null;
   }
 

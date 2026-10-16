@@ -25,6 +25,7 @@ interface TenantContextType {
   isTenantMode: boolean;
   tenant: TenantData | null;
   isLoading: boolean;
+  isSimulation: boolean;
   enterTenantMode: (domain: string) => Promise<boolean>;
   exitTenantMode: () => void;
   calculateMarkedUpPrice: (retailPrice: number, wholesaleRate?: number) => number;
@@ -116,6 +117,10 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const exitTenantMode = () => {
+    // If the visitor is browsing on a real custom domain (e.g. skakegains.com), never exit to SocialPulse!
+    if (!isMainDomain(window.location.hostname)) {
+      return;
+    }
     setTenant(null);
     sessionStorage.removeItem(TENANT_STORAGE_KEY);
     applyTenantTheme(null);
@@ -174,12 +179,15 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     resolveTenantForDomain(targetDomain);
   }, [resolveTenantForDomain]);
 
+  const isSimulation = Boolean(tenant && tenant.is_custom_tenant && isMainDomain(window.location.hostname));
+
   return (
     <TenantContext.Provider
       value={{
         isTenantMode: Boolean(tenant && tenant.is_custom_tenant),
         tenant,
         isLoading,
+        isSimulation,
         enterTenantMode,
         exitTenantMode,
         calculateMarkedUpPrice,
