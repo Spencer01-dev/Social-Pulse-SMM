@@ -2,7 +2,7 @@ import uuid
 from decimal import Decimal
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.endpoints.tenant import MAIN_PLATFORM_DOMAINS
@@ -98,8 +98,17 @@ async def list_public_services(
     tenant_markup_percent = Decimal("0")
     panel_record = None
     if tenant_domain:
+        td_clean = tenant_domain.strip().lower().replace("https://", "").replace("http://", "").rstrip("/")
+        td_no_www = td_clean[4:] if td_clean.startswith("www.") else td_clean
+        td_with_www = f"www.{td_no_www}"
         panel_q = await db.execute(
-            select(ChildPanel).where(ChildPanel.domain == tenant_domain)
+            select(ChildPanel).where(
+                or_(
+                    ChildPanel.domain == td_clean,
+                    ChildPanel.domain == td_no_www,
+                    ChildPanel.domain == td_with_www,
+                )
+            )
         )
         panel_record = panel_q.scalars().first()
         if panel_record and panel_record.branding_json:

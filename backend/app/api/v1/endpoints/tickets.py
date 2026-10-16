@@ -1,7 +1,7 @@
 import uuid
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
-from sqlalchemy import desc, select
+from sqlalchemy import desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -45,10 +45,18 @@ async def create_support_ticket(
                 .replace("http://", "")
                 .rstrip("/")
             )
-            is_main = any(clean_tenant_domain == d or clean_tenant_domain.endswith(f".{d}") for d in MAIN_PLATFORM_DOMAINS)
+            clean_no_www = clean_tenant_domain[4:] if clean_tenant_domain.startswith("www.") else clean_tenant_domain
+            clean_with_www = f"www.{clean_no_www}"
+            is_main = any(clean_no_www == d or clean_no_www.endswith(f".{d}") for d in MAIN_PLATFORM_DOMAINS)
             if not is_main:
                 tenant_q = await db.execute(
-                    select(ChildPanel).where(ChildPanel.domain == clean_tenant_domain)
+                    select(ChildPanel).where(
+                        or_(
+                            ChildPanel.domain == clean_tenant_domain,
+                            ChildPanel.domain == clean_no_www,
+                            ChildPanel.domain == clean_with_www,
+                        )
+                    )
                 )
                 panel = tenant_q.scalars().first()
                 if panel:

@@ -169,7 +169,8 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // 2. Custom domain for a child panel (e.g. mypanel.com)
     const storedDomain = sessionStorage.getItem(TENANT_STORAGE_KEY);
-    const targetDomain = storedDomain || currentHost;
+    const cleanHost = currentHost.startsWith('www.') ? currentHost.slice(4) : currentHost;
+    const targetDomain = storedDomain || cleanHost;
     resolveTenantForDomain(targetDomain);
   }, [resolveTenantForDomain]);
 

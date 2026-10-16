@@ -56,8 +56,18 @@ async def resolve_tenant_panel(
     raw_domain = x_tenant_domain or request.headers.get("x-tenant-domain") or request.headers.get("X-Tenant-Domain")
     if raw_domain:
         clean = raw_domain.strip().lower().replace("https://", "").replace("http://", "").rstrip("/")
-        if not any(clean == d or clean.endswith(f".{d}") for d in MAIN_PLATFORM_DOMAINS):
-            q = await db.execute(select(ChildPanel).where(ChildPanel.domain == clean))
+        clean_no_www = clean[4:] if clean.startswith("www.") else clean
+        clean_with_www = f"www.{clean_no_www}"
+        if not any(clean_no_www == d or clean_no_www.endswith(f".{d}") for d in MAIN_PLATFORM_DOMAINS):
+            q = await db.execute(
+                select(ChildPanel).where(
+                    or_(
+                        ChildPanel.domain == clean,
+                        ChildPanel.domain == clean_no_www,
+                        ChildPanel.domain == clean_with_www,
+                    )
+                )
+            )
             panel = q.scalars().first()
             if panel:
                 return panel

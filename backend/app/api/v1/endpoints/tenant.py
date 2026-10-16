@@ -1,6 +1,6 @@
 from typing import Any, Optional
 from fastapi import APIRouter, Depends, Header, Query
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -42,9 +42,11 @@ async def resolve_tenant(
         .replace("http://", "")
         .rstrip("/")
     )
+    clean_no_www = clean_domain[4:] if clean_domain.startswith("www.") else clean_domain
+    clean_with_www = f"www.{clean_no_www}"
 
     # Check if primary platform
-    is_main = any(clean_domain == d or clean_domain.endswith(f".{d}") for d in MAIN_PLATFORM_DOMAINS)
+    is_main = any(clean_no_www == d or clean_no_www.endswith(f".{d}") for d in MAIN_PLATFORM_DOMAINS)
     if is_main:
         return {
             "is_custom_tenant": False,
@@ -59,9 +61,15 @@ async def resolve_tenant(
             "contact_email": "support@socialpulse.io"
         }
 
-    # Query child panels by custom domain
+    # Query child panels by custom domain (flexible matching for root vs www)
     query = await db.execute(
-        select(ChildPanel).where(ChildPanel.domain == clean_domain)
+        select(ChildPanel).where(
+            or_(
+                ChildPanel.domain == clean_domain,
+                ChildPanel.domain == clean_no_www,
+                ChildPanel.domain == clean_with_www
+            )
+        )
     )
     panel = query.scalars().first()
 

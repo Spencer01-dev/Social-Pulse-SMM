@@ -21,10 +21,18 @@ import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { useAuth } from '../context/AuthContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { useTenant } from '../context/TenantContext';
 
 export const DashboardHome: React.FC = () => {
   const { user } = useAuth();
   const { formatCurrency } = useCurrency();
+  const { isTenantMode, tenant } = useTenant();
+
+  const brandName = isTenantMode && tenant?.site_name ? tenant.site_name : 'SocialPulse';
+  const brandTagline = isTenantMode && tenant?.tagline
+    ? tenant.tagline
+    : 'The premier social media marketing platform for creators, brands, and agencies with instant automated fulfillment, verified high retention services, and real time live tracking.';
+  const brandColor = isTenantMode && tenant?.theme_color ? tenant.theme_color : '#f59e0b';
 
   const stats = [
     {
@@ -94,10 +102,10 @@ export const DashboardHome: React.FC = () => {
               <span>Premier Social Growth Platform</span>
             </div>
             <h1 className="text-xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight leading-tight">
-              Scale Your Reach with <span className="text-[#f59e0b]">SocialPulse</span>
+              Scale Your Reach with <span style={{ color: brandColor }}>{brandName}</span>
             </h1>
             <p className="mt-2.5 sm:mt-3 text-slate-300 text-xs sm:text-sm md:text-base leading-relaxed">
-              The premier social media marketing platform for creators, brands, and agencies with instant automated fulfillment, verified high retention services, and real time live tracking.
+              {brandTagline}
             </p>
           </div>
 
@@ -232,7 +240,7 @@ export const DashboardHome: React.FC = () => {
 
       {/* Platform Features Grid */}
       <Card
-        title="Why Choose SocialPulse"
+        title={`Why Choose ${brandName}`}
         subtitle="Built for reliability, maximum retention, and seamless campaign execution"
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
