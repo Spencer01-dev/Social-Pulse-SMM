@@ -47,7 +47,7 @@ function hexToRgb(hex: string): string {
   return '245, 158, 11';
 }
 
-const MAIN_PLATFORM_DOMAINS = [
+export const MAIN_PLATFORM_DOMAINS = [
   'socialpulse.io',
   'www.socialpulse.io',
   'socialpulsesmm.com',
@@ -59,30 +59,153 @@ const MAIN_PLATFORM_DOMAINS = [
   '127.0.0.1'
 ];
 
-function isMainDomain(hostname: string): boolean {
-  const clean = hostname.split(':')[0].toLowerCase().trim();
+export function isMainDomain(hostname: string): boolean {
+  if (!hostname) return true;
+  const clean = hostname.split(':')[0].toLowerCase().trim().replace(/^www\./, '');
   return MAIN_PLATFORM_DOMAINS.some(d => clean === d || clean.endsWith(`.${d}`));
 }
 
+export function isCustomDomain(hostname: string): boolean {
+  return !isMainDomain(hostname);
+}
+
+export const SKAKEGAINS_PRESET: TenantData = {
+  is_custom_tenant: true,
+  tenant_id: 'd4391dfb-b89e-439a-9ee1-04ae56fcb9fe',
+  domain: 'skakegains.com',
+  status: 'active',
+  is_active: true,
+  site_name: 'Skakegains SMM',
+  tagline: 'More Followers • More Likes',
+  logo_url: '/skakegains-logo.png',
+  theme_color: '#10b981',
+  currency: 'KES',
+  contact_email: 'support@skakegains.com',
+  whatsapp_support: '+254703917794',
+  default_markup_percent: 25,
+  nameserver1: 'ns1.socialpulse.io',
+  nameserver2: 'ns2.socialpulse.io'
+};
+
+export function getInitialTenant(): { initialTenant: TenantData | null; isCustomHost: boolean } {
+  if (typeof window === 'undefined') {
+    return { initialTenant: null, isCustomHost: false };
+  }
+
+  const currentHost = window.location.hostname.split(':')[0].toLowerCase().trim().replace(/^www\./, '');
+  const isMain = isMainDomain(currentHost);
+  const params = new URLSearchParams(window.location.search);
+  const tenantParam = params.get('tenant');
+  const storedDomain = sessionStorage.getItem(TENANT_STORAGE_KEY);
+
+  const target = tenantParam || storedDomain || (!isMain ? currentHost : null);
+  if (!target) {
+    return { initialTenant: null, isCustomHost: false };
+  }
+
+  const cleanTarget = target.toLowerCase().trim().replace(/^www\./, '');
+
+  // 1. If it matches skakegains / shakegains
+  if (cleanTarget.includes('skakegains') || cleanTarget.includes('shakegains')) {
+    return { initialTenant: SKAKEGAINS_PRESET, isCustomHost: true };
+  }
+
+  // 2. Persistent local storage cache
+  try {
+    const cached = localStorage.getItem(`tenant_cache_${cleanTarget}`);
+    if (cached) {
+      const parsed = JSON.parse(cached) as TenantData;
+      if (parsed && parsed.is_custom_tenant) {
+        return { initialTenant: parsed, isCustomHost: true };
+      }
+    }
+  } catch {
+    // Ignore cache error
+  }
+
+  // 3. For any other custom child panel domain
+  if (!isMain) {
+    const brand = cleanTarget.split('.')[0];
+    const brandTitle = brand.charAt(0).toUpperCase() + brand.slice(1) + ' SMM';
+    return {
+      initialTenant: {
+        is_custom_tenant: true,
+        tenant_id: null,
+        domain: cleanTarget,
+        status: 'active',
+        is_active: true,
+        site_name: brandTitle,
+        tagline: 'Premium Social Media Growth Panel',
+        logo_url: null,
+        theme_color: '#10b981',
+        currency: 'KES',
+        contact_email: `support@${cleanTarget}`,
+        default_markup_percent: 25,
+      },
+      isCustomHost: true,
+    };
+  }
+
+  return { initialTenant: null, isCustomHost: false };
+}
+
+// Immediate synchronous theme execution on module load
+if (typeof window !== 'undefined') {
+  const { initialTenant } = getInitialTenant();
+  if (initialTenant && initialTenant.is_custom_tenant) {
+    document.title = `${initialTenant.site_name} | Premium SMM Panel`;
+    const color = initialTenant.theme_color || '#10b981';
+    document.documentElement.style.setProperty('--tenant-accent', color);
+    document.documentElement.style.setProperty('--tenant-accent-rgb', hexToRgb(color));
+    document.documentElement.setAttribute('data-tenant-active', 'true');
+    const faviconElements = document.querySelectorAll<HTMLLinkElement>(
+      "link[rel*='icon'], link[rel='apple-touch-icon'], link[rel='shortcut icon']"
+    );
+    const iconUrl = initialTenant.logo_url || '/skakegains-logo.png';
+    faviconElements.forEach((el) => {
+      el.href = iconUrl;
+    });
+  }
+}
+
 export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [tenant, setTenant] = useState<TenantData | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [initialState] = useState(() => getInitialTenant());
+  const [tenant, setTenant] = useState<TenantData | null>(initialState.initialTenant);
+  const [isLoading, setIsLoading] = useState<boolean>(!initialState.initialTenant && initialState.isCustomHost);
 
   const applyTenantTheme = (tenantData: TenantData | null) => {
+    const faviconElements = document.querySelectorAll<HTMLLinkElement>(
+      "link[rel*='icon'], link[rel='apple-touch-icon'], link[rel='shortcut icon']"
+    );
+
     if (tenantData && tenantData.is_custom_tenant) {
       document.title = `${tenantData.site_name} | Premium SMM Panel`;
-      const color = tenantData.theme_color || '#f59e0b';
+      const color = tenantData.theme_color || '#10b981';
       const rgb = hexToRgb(color);
       document.documentElement.style.setProperty('--tenant-accent', color);
       document.documentElement.style.setProperty('--tenant-accent-rgb', rgb);
       document.documentElement.setAttribute('data-tenant-active', 'true');
       apiClient.defaults.headers.common['X-Tenant-Domain'] = tenantData.domain;
+
+      // Update favicon in browser search bar, tab, and bookmarks
+      const iconUrl = tenantData.logo_url || '/skakegains-logo.png';
+      faviconElements.forEach((el) => {
+        el.href = iconUrl;
+      });
     } else {
       document.title = 'SocialPulse | Wholesale SMM Platform';
       document.documentElement.removeAttribute('data-tenant-active');
       document.documentElement.style.removeProperty('--tenant-accent');
       document.documentElement.style.removeProperty('--tenant-accent-rgb');
       delete apiClient.defaults.headers.common['X-Tenant-Domain'];
+
+      // Restore default platform favicons
+      faviconElements.forEach((el) => {
+        if (el.getAttribute('sizes') === '32x32') el.href = '/favicon-32x32.png';
+        else if (el.getAttribute('sizes') === '16x16') el.href = '/favicon-16x16.png';
+        else if (el.rel.includes('apple-touch-icon')) el.href = '/apple-touch-icon.png';
+        else el.href = '/favicon.ico';
+      });
     }
   };
 
@@ -93,6 +216,11 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (data && data.is_custom_tenant) {
         setTenant(data);
         sessionStorage.setItem(TENANT_STORAGE_KEY, data.domain);
+        try {
+          localStorage.setItem(`tenant_cache_${data.domain.toLowerCase().trim()}`, JSON.stringify(data));
+        } catch {
+          // ignore storage error
+        }
         applyTenantTheme(data);
         return true;
       } else {
@@ -103,14 +231,17 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     } catch (err) {
       console.error('Failed to resolve tenant for domain:', domainToResolve, err);
-      setTenant(null);
-      sessionStorage.removeItem(TENANT_STORAGE_KEY);
-      applyTenantTheme(null);
+      // If we already have a synchronous preset (e.g. skakegains), retain it rather than erasing
+      if (!tenant) {
+        setTenant(null);
+        sessionStorage.removeItem(TENANT_STORAGE_KEY);
+        applyTenantTheme(null);
+      }
       return false;
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [tenant]);
 
   const enterTenantMode = async (domain: string): Promise<boolean> => {
     return await resolveTenantForDomain(domain);
@@ -159,7 +290,8 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const tenantParam = params.get('tenant');
 
     if (tenantParam) {
-      resolveTenantForDomain(tenantParam);
+      const normalizedDomain = tenantParam.includes('shake') ? 'skakegains.com' : tenantParam;
+      resolveTenantForDomain(normalizedDomain);
       return;
     }
 
@@ -172,14 +304,31 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
-    // 2. Custom domain for a child panel (e.g. mypanel.com)
-    const storedDomain = sessionStorage.getItem(TENANT_STORAGE_KEY);
+    // 2. Custom domain for a child panel (e.g. skakegains.com)
+    let storedDomain = sessionStorage.getItem(TENANT_STORAGE_KEY);
+    if (storedDomain && storedDomain.includes('shake')) {
+      storedDomain = 'skakegains.com';
+    }
     const cleanHost = currentHost.startsWith('www.') ? currentHost.slice(4) : currentHost;
-    const targetDomain = storedDomain || cleanHost;
+    let targetDomain = storedDomain || cleanHost;
+    if (targetDomain.includes('shake')) {
+      targetDomain = 'skakegains.com';
+    }
     resolveTenantForDomain(targetDomain);
   }, [resolveTenantForDomain]);
 
   const isSimulation = Boolean(tenant && tenant.is_custom_tenant && isMainDomain(window.location.hostname));
+
+  // If visitor is browsing on a custom child panel domain and tenant data hasn't loaded yet,
+  // NEVER render SocialPulse layout. Render a clean domain loader.
+  if (initialState.isCustomHost && !tenant) {
+    return (
+      <div className="min-h-screen bg-[#0B0F19] flex flex-col items-center justify-center space-y-4">
+        <div className="w-10 h-10 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
+        <span className="text-sm font-semibold text-slate-400">Loading {window.location.hostname}...</span>
+      </div>
+    );
+  }
 
   return (
     <TenantContext.Provider

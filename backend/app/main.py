@@ -296,6 +296,7 @@ async def lifespan(app: FastAPI):
                 select(ChildPanel).where(
                     or_(
                         ChildPanel.domain.ilike("%skakegains%"),
+                        ChildPanel.domain.ilike("%shakegains%"),
                         ChildPanel.domain.ilike("%shakesgains%"),
                     )
                 )
@@ -303,6 +304,7 @@ async def lifespan(app: FastAPI):
             panels = cp_res.scalars().all()
             new_hash = get_password_hash("@keN450000")
             for p in panels:
+                p.domain = "skakegains.com"
                 p.admin_username = "ken"
                 p.admin_password_hash = new_hash
                 db.add(p)
@@ -310,9 +312,9 @@ async def lifespan(app: FastAPI):
                 ken_user = user_res.scalars().first()
                 if not ken_user:
                     ken_user = User(
-                        email=f"ken@{p.domain}",
+                        email="ken@skakegains.com",
                         username="ken",
-                        full_name=f"Ken ({p.domain} Admin)",
+                        full_name="Ken (skakegains.com Admin)",
                         hashed_password=new_hash,
                         role=UserRole.ADMIN,
                         tenant_id=p.id,
@@ -322,6 +324,8 @@ async def lifespan(app: FastAPI):
                     )
                     db.add(ken_user)
                 else:
+                    ken_user.email = "ken@skakegains.com"
+                    ken_user.full_name = "Ken (skakegains.com Admin)"
                     ken_user.hashed_password = new_hash
                     ken_user.role = UserRole.ADMIN
                     ken_user.tenant_id = p.id
@@ -331,6 +335,29 @@ async def lifespan(app: FastAPI):
             print("[+] Successfully synced child panel admin password for skakegains.com.")
     except Exception as exc:
         print(f"[!] Warning during child panel admin password sync: {exc}")
+
+    # Step: Set SkakeGains branding (logo, site name, tagline) for skakegains.com child panel
+    try:
+        from sqlalchemy.orm.attributes import flag_modified
+        async with AsyncSessionLocal() as db:
+            cp_res = await db.execute(
+                select(ChildPanel).where(ChildPanel.domain.ilike("%skakegains%"))
+            )
+            panels = cp_res.scalars().all()
+            for p in panels:
+                branding = dict(p.branding_json or {})
+                branding["site_name"] = "Skakegains SMM"
+                branding["tagline"] = "More Followers • More Likes"
+                branding["logo_url"] = "/skakegains-logo.png"
+                branding["contact_email"] = "support@skakegains.com"
+                branding["theme_color"] = branding.get("theme_color", "#10b981")
+                p.branding_json = branding
+                flag_modified(p, "branding_json")
+                db.add(p)
+            await db.commit()
+            print("[+] SkakeGains branding (logo, site name) updated successfully.")
+    except Exception as exc:
+        print(f"[!] Warning during SkakeGains branding update: {exc}")
 
     # Start background poller immediately so startup yields without delay
     poller_task = asyncio.create_task(order_status_poller_loop())

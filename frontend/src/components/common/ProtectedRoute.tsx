@@ -17,9 +17,15 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0B0F19]">
+      <div className="min-h-[55vh] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+          <div
+            className="w-10 h-10 border-4 rounded-full animate-spin"
+            style={{
+              borderColor: 'rgba(var(--tenant-accent-rgb, 16, 185, 129), 0.2)',
+              borderTopColor: 'var(--tenant-accent, #10b981)',
+            }}
+          />
           <span className="text-sm font-medium text-slate-400">Authenticating session...</span>
         </div>
       </div>

@@ -591,8 +591,16 @@ export const ChildPanelManagePage: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
-              <Globe className="w-6 h-6 text-amber-400" />
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
+              {activePanel.branding_json?.logo_url ? (
+                <img
+                  src={activePanel.branding_json.logo_url}
+                  alt={activePanel.domain}
+                  className="w-7 h-7 rounded-lg object-contain shadow-sm bg-black/40 p-0.5"
+                />
+              ) : (
+                <Globe className="w-6 h-6 text-amber-400" />
+              )}
               <span>{activePanel.domain}</span>
             </h1>
             {/* Panel Switcher Dropdown if user owns multiple panels */}
@@ -1830,7 +1838,15 @@ export const ChildPanelManagePage: React.FC = () => {
               <div className="flex flex-wrap items-center gap-2 flex-1">
                 {/* Search */}
                 <div className="relative flex-1 min-w-[180px] max-w-xs">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  {activePanel?.branding_json?.logo_url ? (
+                    <img
+                      src={activePanel.branding_json.logo_url}
+                      alt="Logo"
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded object-contain"
+                    />
+                  ) : (
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  )}
                   <input
                     type="text"
                     placeholder="Search services..."

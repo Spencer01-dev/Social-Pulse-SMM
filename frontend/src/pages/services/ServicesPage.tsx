@@ -225,7 +225,15 @@ export const ServicesPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="sm:col-span-2 relative">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-            <Search className="w-4 h-4" />
+            {isTenantMode && tenant?.logo_url ? (
+              <img
+                src={tenant.logo_url}
+                alt={tenant.site_name || 'Logo'}
+                className="w-5 h-5 rounded object-contain shadow-sm"
+              />
+            ) : (
+              <Search className="w-4 h-4" />
+            )}
           </div>
           <input
             type="text"

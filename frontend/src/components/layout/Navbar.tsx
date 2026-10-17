@@ -5,7 +5,7 @@ import { Button } from '../common/Button';
 import { CurrencySwitcher } from '../common/CurrencySwitcher';
 import { useAuth } from '../../context/AuthContext';
 import { useCurrency } from '../../context/CurrencyContext';
-import { useTenant } from '../../context/TenantContext';
+import { useTenant, isMainDomain } from '../../context/TenantContext';
 
 interface NavbarProps {
   onToggleSidebar?: () => void;
@@ -22,8 +22,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
     navigate('/login');
   };
 
-  const accentColor = isTenantMode && tenant ? tenant.theme_color || '#f59e0b' : '#f59e0b';
-  const brandTitle = isTenantMode && tenant ? tenant.site_name : 'SocialPulse';
+  const isCustomHost = !isMainDomain(window.location.hostname);
+  const isChildPanel = isTenantMode || isCustomHost;
+  const accentColor = isChildPanel && tenant ? tenant.theme_color || '#10b981' : isChildPanel ? '#10b981' : '#f59e0b';
+  const brandTitle = isChildPanel ? (tenant?.site_name || 'Skakegains SMM') : 'SocialPulse';
+  const logoUrl = isChildPanel ? (tenant?.logo_url || '/skakegains-logo.png') : null;
 
   return (
     <header className="sticky top-0 z-40 h-14 sm:h-16 glass-header px-3 sm:px-6 flex items-center justify-between border-b border-[#2b303c] w-full">
@@ -38,26 +41,26 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
 
         {/* Brand Logo */}
         <Link to="/" className="flex items-center gap-2">
-          {isTenantMode && tenant?.logo_url ? (
+          {isChildPanel && logoUrl ? (
             <img
-              src={tenant.logo_url}
+              src={logoUrl}
               alt={brandTitle}
               className="h-8 sm:h-9 max-w-[130px] sm:max-w-[160px] object-contain shrink-0 rounded"
               onError={(e) => {
                 (e.currentTarget as HTMLElement).style.display = 'none';
               }}
             />
-          ) : (
+          ) : !isChildPanel ? (
             <div
               className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-slate-950 flex items-center justify-center font-black shadow-lg shrink-0 transition-colors"
               style={{ backgroundColor: accentColor }}
             >
               <Zap className="w-4 h-4 sm:w-4.5 sm:h-4.5 fill-slate-950 text-slate-950" />
             </div>
-          )}
+          ) : null}
           <div>
             <span className="text-base sm:text-lg font-extrabold tracking-tight text-white flex items-center gap-1">
-              {isTenantMode && tenant ? (
+              {isChildPanel ? (
                 <span>{brandTitle}</span>
               ) : (
                 <>

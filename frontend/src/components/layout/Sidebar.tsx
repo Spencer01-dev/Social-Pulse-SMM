@@ -25,7 +25,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useTenant } from '../../context/TenantContext';
+import { useTenant, isMainDomain } from '../../context/TenantContext';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -38,8 +38,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
-  const accentColor = isTenantMode && tenant ? tenant.theme_color || '#f59e0b' : '#f59e0b';
-  const brandTitle = isTenantMode && tenant ? tenant.site_name : 'SocialPulse';
+  const isCustomHost = !isMainDomain(window.location.hostname);
+  const isChildPanel = isTenantMode || isCustomHost;
+  const accentColor = isChildPanel && tenant ? tenant.theme_color || '#10b981' : isChildPanel ? '#10b981' : '#f59e0b';
+  const brandTitle = isChildPanel ? (tenant?.site_name || 'Skakegains SMM') : 'SocialPulse';
+  const logoUrl = isChildPanel ? (tenant?.logo_url || '/skakegains-logo.png') : null;
 
   const handleLogout = () => {
     logout();
@@ -55,7 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { name: 'Services', href: '/services', icon: Layers },
     { name: 'Tickets', href: '/support', icon: LifeBuoy },
     { name: 'Api', href: '/api-docs', icon: Code2 },
-    ...(!isTenantMode
+    ...(!isChildPanel
       ? [
           { name: 'Child panel', href: '/child-panel', icon: Sparkles },
           { name: 'Panel Admin Hub', href: '/child-panel/manage', icon: ShieldCheck, badge: 'Owner' },
@@ -100,23 +103,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         {/* Mobile Header with Close Button */}
         <div className="flex items-center justify-between p-4 border-b border-[#2b303c] lg:hidden">
           <div className="flex items-center gap-2.5">
-            {isTenantMode && tenant?.logo_url ? (
+            {isChildPanel && logoUrl ? (
               <img
-                src={tenant.logo_url}
+                src={logoUrl}
                 alt={brandTitle}
                 className="h-7 max-w-[120px] object-contain shrink-0 rounded"
                 onError={(e) => {
                   (e.currentTarget as HTMLElement).style.display = 'none';
                 }}
               />
-            ) : (
+            ) : !isChildPanel ? (
               <div
                 className="w-8 h-8 rounded-xl text-slate-950 flex items-center justify-center font-black transition-colors"
                 style={{ backgroundColor: accentColor }}
               >
                 <Zap className="w-4 h-4 fill-slate-950 text-slate-950" />
               </div>
-            )}
+            ) : null}
             <span className="font-extrabold text-white text-sm">{brandTitle}</span>
           </div>
           <button

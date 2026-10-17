@@ -11,15 +11,15 @@
 
     <!-- Open Graph / Social Sharing Image -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="SocialPulse | Next Gen SMM Reseller Platform" />
-    <meta property="og:description" content="Wholesale Social Media Marketing Reseller and Child Panel SaaS Platform." />
+    <meta property="og:title" content="Premium SMM Panel" />
+    <meta property="og:description" content="Premium Social Media Marketing Growth Panel." />
     <meta property="og:image" content="https://www.socialpulsesmm.com/socialpulse-logo.png" />
     <meta property="og:url" content="https://www.socialpulsesmm.com" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://www.socialpulsesmm.com/socialpulse-logo.png" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="SocialPulse Premium Social Media Marketing Reseller and SaaS Platform" />
+    <meta name="description" content="Premium Social Media Marketing Panel" />
     <!-- Preconnect to Backend API and CDNs -->
     <link rel="preconnect" href="https://social-pulse-smm-0geu.onrender.com" />
     <link rel="dns-prefetch" href="https://social-pulse-smm-0geu.onrender.com" />
@@ -30,7 +30,42 @@
     <noscript>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap">
     </noscript>
-    <title>SocialPulse | Next Gen SMM Reseller Platform</title>
+    <title>Loading...</title>
+    <!-- Early domain detection: prevents SocialPulse branding flash on child panel domains -->
+    <script>
+      (function() {
+        var h = location.hostname.toLowerCase().split(':')[0].replace(/^www\./, '');
+        var mainDomains = ['socialpulse.io','socialpulsesmm.com','social-pulse-smm.vercel.app','social-pulse-smm.onrender.com','social-pulse-smm-0geu.onrender.com','localhost','127.0.0.1'];
+        var isMain = mainDomains.indexOf(h) !== -1;
+        var params = new URLSearchParams(window.location.search);
+        var tenantParam = params.get('tenant') || (window.sessionStorage ? sessionStorage.getItem('active_tenant_domain') : null);
+        var isChildPanel = !isMain || Boolean(tenantParam);
+
+        if (isChildPanel) {
+          var target = (tenantParam || h).toLowerCase().replace(/^www\./, '');
+          var brand = 'Skakegains SMM';
+          if (target.indexOf('skakegains') !== -1 || target.indexOf('shakegains') !== -1) {
+            brand = 'Skakegains SMM';
+          } else {
+            var b = target.split('.')[0];
+            brand = b.charAt(0).toUpperCase() + b.slice(1) + ' SMM';
+          }
+          document.title = brand + ' | Premium SMM Panel';
+          document.documentElement.style.setProperty('--tenant-accent', '#10b981');
+          document.documentElement.style.setProperty('--tenant-accent-rgb', '16, 185, 129');
+          document.documentElement.setAttribute('data-tenant-active', 'true');
+          
+          var earlyIcons = document.querySelectorAll("link[rel*='icon'], link[rel='apple-touch-icon'], link[rel='shortcut icon']");
+          earlyIcons.forEach(function(el) { el.href = '/skakegains-logo.png'; });
+        } else {
+          document.title = 'SocialPulse | Wholesale SMM Platform';
+          var ogTitle = document.querySelector('meta[property="og:title"]');
+          if (ogTitle) ogTitle.setAttribute('content', 'SocialPulse | Wholesale SMM Platform');
+          var ogDesc = document.querySelector('meta[property="og:description"]');
+          if (ogDesc) ogDesc.setAttribute('content', 'Wholesale Social Media Marketing Reseller and Child Panel SaaS Platform.');
+        }
+      })();
+    </script>
   </head>
   <body class="bg-[#0B0F19] text-slate-100 font-sans antialiased selection:bg-brand-500 selection:text-white min-h-screen">
     <!-- Meta Pixel noscript fallback -->
@@ -43,3 +78,4 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
+
