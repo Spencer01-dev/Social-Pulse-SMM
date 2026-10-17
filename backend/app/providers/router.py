@@ -8,6 +8,7 @@ from app.models.service import Service
 from app.providers.base import ProviderInterface, ProviderOrderResponse
 from app.providers.jap import JustAnotherPanelProvider
 from app.providers.secsers import SecsersProvider
+from app.providers.resellersmm import ResellerSMMProvider
 from app.providers.generic_smm import GenericSMMProvider
 from app.providers.mock import MockProvider
 from app.core.config import settings
@@ -85,6 +86,11 @@ class SmartProviderRouter:
                     client = SecsersProvider(
                         api_url=provider_record.api_url or settings.SECSERS_API_URL,
                         api_key=p_key or settings.SECSERS_API_KEY
+                    )
+                elif provider_record.slug in ["resellersmm", "reseller_smm", "reseller-smm", "resellersmm.com"]:
+                    client = ResellerSMMProvider(
+                        api_url=provider_record.api_url or settings.RESELLERSMM_API_URL,
+                        api_key=p_key or settings.RESELLERSMM_API_KEY
                     )
                 else:
                     client = GenericSMMProvider(

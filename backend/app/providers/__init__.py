@@ -8,6 +8,7 @@ from app.providers.base import (
 )
 from app.providers.jap import JustAnotherPanelProvider
 from app.providers.secsers import SecsersProvider
+from app.providers.resellersmm import ResellerSMMProvider
 from app.providers.manager import get_provider
 from app.providers.mock import MockProvider
 
@@ -19,6 +20,8 @@ __all__ = [
     "ProviderOrderStatus",
     "JustAnotherPanelProvider",
     "SecsersProvider",
+    "ResellerSMMProvider",
     "MockProvider",
     "get_provider",
 ]
+

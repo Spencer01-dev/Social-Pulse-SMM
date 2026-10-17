@@ -3,6 +3,7 @@ from app.core.config import settings
 from app.providers.base import ProviderInterface
 from app.providers.jap import JustAnotherPanelProvider
 from app.providers.secsers import SecsersProvider
+from app.providers.resellersmm import ResellerSMMProvider
 from app.providers.generic_smm import GenericSMMProvider
 from app.providers.mock import MockProvider
 
@@ -27,6 +28,12 @@ def get_provider(slug: str = "jap", api_url: Optional[str] = None, api_key: Opti
         return SecsersProvider(
             api_url=api_url or settings.SECSERS_API_URL,
             api_key=api_key or settings.SECSERS_API_KEY,
+        )
+
+    if slug_clean in ["resellersmm", "reseller_smm", "reseller-smm", "resellersmm.com"]:
+        return ResellerSMMProvider(
+            api_url=api_url or settings.RESELLERSMM_API_URL,
+            api_key=api_key or settings.RESELLERSMM_API_KEY,
         )
 
     # Generic SMM v2 Provider fallback

@@ -100,6 +100,10 @@ async def sync_services_from_provider(
             p_name = "Secsers"
             p_url = settings.SECSERS_API_URL
             p_currency = "USD"
+        elif provider_slug in ["resellersmm", "reseller_smm", "reseller-smm", "resellersmm.com"]:
+            p_name = "ResellerSMM"
+            p_url = settings.RESELLERSMM_API_URL
+            p_currency = "USD"
         else:
             p_name = provider_slug.capitalize()
             p_url = settings.JAP_API_URL
