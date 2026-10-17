@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCurrency } from '../../context/CurrencyContext';
+import { useTenant } from '../../context/TenantContext';
 import { paymentsService } from '../../services/payments';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -26,7 +27,25 @@ type CountryTab = 'ke' | 'ng' | 'gh' | 'za' | 'cards';
 export const DepositPage: React.FC = () => {
   const { user, refreshUserProfile } = useAuth();
   const { convertToKes, formatCurrency } = useCurrency();
+  const { isTenantMode, tenant } = useTenant();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Dynamic branding and payment channel details
+  const isSkakegains = isTenantMode && (
+    tenant?.domain?.toLowerCase().includes('skakegains') ||
+    tenant?.domain?.toLowerCase().includes('shakegains') ||
+    tenant?.site_name?.toLowerCase().includes('skakegains') ||
+    tenant?.site_name?.toLowerCase().includes('shakegains')
+  );
+  const brandName = isTenantMode ? (tenant?.site_name || 'Skakegains SMM') : 'SocialPulse';
+  const walletBadge = isTenantMode ? `${brandName.toUpperCase()} WALLET` : 'SOCIALPULSE MULTI-CURRENCY WALLET';
+  const paymentAccountName = isTenantMode
+    ? (tenant?.payment_account_name || (isSkakegains ? 'shakegains' : tenant?.site_name || 'shakegains'))
+    : 'PICNIC TECHNOLOGIES';
+  const paymentPaybill = isTenantMode ? (tenant?.payment_paybill || '997960') : '997960';
+  const paymentAccountNumber = isTenantMode
+    ? (tenant?.payment_account_number || (isSkakegains ? '0010542' : '0010542'))
+    : '0010529';
 
   // Tab State
   const [activeTab, setActiveTab] = useState<CountryTab>('ke');
@@ -451,7 +470,7 @@ export const DepositPage: React.FC = () => {
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-extrabold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
                 <Wallet className="w-3.5 h-3.5" />
-                SocialPulse Multi-Currency Wallet
+                {walletBadge}
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Deposit Funds</h1>
@@ -593,10 +612,10 @@ export const DepositPage: React.FC = () => {
                 <div>
                   <h3 className="text-base font-extrabold text-white">Check Your Phone</h3>
                   <p className="text-xs text-slate-300 mt-2">
-                    Enter your M-Pesa PIN on your phone to complete deposit of <strong className="text-amber-400">KES {mpesaAmountKes}</strong> to <strong className="text-emerald-400">PICNIC TECHNOLOGIES</strong>.
+                    Enter your M-Pesa PIN on your phone to complete deposit of <strong className="text-amber-400">KES {mpesaAmountKes}</strong> to <strong className="text-emerald-400 uppercase">{paymentAccountName}</strong>.
                   </p>
                   <p className="text-[11px] text-slate-400 mt-1">
-                    Paybill: <span className="font-mono text-slate-200">997960</span> | Acc: <span className="font-mono text-slate-200">0010529</span>
+                    Paybill: <span className="font-mono text-slate-200">{paymentPaybill}</span> | Acc: <span className="font-mono text-slate-200">{paymentAccountNumber}</span>
                   </p>
                 </div>
                 <div className="text-xs font-mono text-amber-400 animate-pulse">Auto-detecting payment confirmation... ({countdown}s)</div>
@@ -609,8 +628,8 @@ export const DepositPage: React.FC = () => {
                       <Smartphone className="w-5 h-5 text-emerald-400" />
                     </div>
                     <div>
-                      <span className="font-bold text-white text-xs block">PICNIC TECHNOLOGIES</span>
-                      <span className="text-[10px] text-slate-400">Paybill: 997960 • Acc: 0010529</span>
+                      <span className="font-bold text-white text-xs block uppercase">{paymentAccountName}</span>
+                      <span className="text-[10px] text-slate-400">Paybill: {paymentPaybill} • Acc: {paymentAccountNumber}</span>
                     </div>
                   </div>
                   <span className="inline-flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold font-mono">

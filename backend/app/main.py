@@ -286,19 +286,26 @@ async def lifespan(app: FastAPI):
                 await conn.execute(text("""
                     UPDATE child_panels
                     SET metadata_json = jsonb_set(
-                        COALESCE(metadata_json, '{}'::jsonb),
-                        '{payment_gateway}',
-                        jsonb_build_object(
-                            'gateway_provider', 'payhero',
-                            'is_active', true,
-                            'payhero_channel_id', '14160',
-                            'payhero_account_name', 'shakegains',
-                            'payhero_api_key', 'b9Ie1kxUZwFNfZS4hMQw',
-                            'payhero_api_secret', COALESCE(metadata_json->'payment_gateway'->>'payhero_api_secret', '')
-                        )
+                        jsonb_set(
+                            jsonb_set(
+                                COALESCE(metadata_json, '{}'::jsonb),
+                                '{payment_gateway}',
+                                jsonb_build_object(
+                                    'gateway_provider', 'payhero',
+                                    'is_active', true,
+                                    'payhero_channel_id', '14160',
+                                    'payhero_account_name', 'shakegains',
+                                    'payhero_account_number', '0010542',
+                                    'payhero_paybill', '997960',
+                                    'payhero_api_key', 'b9Ie1kxUZwFNfZS4hMQw',
+                                    'payhero_api_secret', COALESCE(metadata_json->'payment_gateway'->>'payhero_api_secret', '')
+                                )
+                            ),
+                            '{payment_account_name}', '"shakegains"'
+                        ),
+                        '{payment_account_number}', '"0010542"'
                     )
-                    WHERE domain = 'skakegains.com'
-                      AND (metadata_json IS NULL OR metadata_json->'payment_gateway'->>'payhero_channel_id' IS NULL);
+                    WHERE domain ILIKE '%skakegains%' OR domain ILIKE '%shakegains%';
                 """))
                 print("[+] skakegains.com PayHero gateway initialized.")
             except Exception as e:

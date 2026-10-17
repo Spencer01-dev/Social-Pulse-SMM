@@ -19,6 +19,9 @@ export interface TenantData {
   nameserver1?: string;
   nameserver2?: string;
   expires_at?: string | null;
+  payment_account_name?: string;
+  payment_paybill?: string;
+  payment_account_number?: string;
 }
 
 interface TenantContextType {
@@ -84,7 +87,10 @@ export const SKAKEGAINS_PRESET: TenantData = {
   whatsapp_support: '+254703917794',
   default_markup_percent: 25,
   nameserver1: 'ns1.socialpulse.io',
-  nameserver2: 'ns2.socialpulse.io'
+  nameserver2: 'ns2.socialpulse.io',
+  payment_account_name: 'shakegains',
+  payment_paybill: '997960',
+  payment_account_number: '0010542'
 };
 
 export function getInitialTenant(): { initialTenant: TenantData | null; isCustomHost: boolean } {
@@ -127,6 +133,7 @@ export function getInitialTenant(): { initialTenant: TenantData | null; isCustom
   if (!isMain) {
     const brand = cleanTarget.split('.')[0];
     const brandTitle = brand.charAt(0).toUpperCase() + brand.slice(1) + ' SMM';
+    const isTargetSkake = cleanTarget.includes('shakegains') || cleanTarget.includes('skakegains');
     return {
       initialTenant: {
         is_custom_tenant: true,
@@ -141,6 +148,9 @@ export function getInitialTenant(): { initialTenant: TenantData | null; isCustom
         currency: 'KES',
         contact_email: `support@${cleanTarget}`,
         default_markup_percent: 25,
+        payment_account_name: isTargetSkake ? 'shakegains' : brandTitle,
+        payment_paybill: '997960',
+        payment_account_number: isTargetSkake ? '0010542' : '0010529',
       },
       isCustomHost: true,
     };

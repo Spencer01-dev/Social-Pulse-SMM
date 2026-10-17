@@ -84,11 +84,20 @@ async def resolve_tenant(
             "logo_url": None,
             "theme_color": "#f59e0b",
             "currency": "KES",
-            "contact_email": "support@socialpulse.io"
+            "contact_email": "support@socialpulse.io",
+            "payment_account_name": "PICNIC TECHNOLOGIES",
+            "payment_paybill": "997960",
+            "payment_account_number": "0010529"
         }
 
     branding = panel.branding_json or {}
     brand_name = panel.domain.split(".")[0].capitalize()
+    is_skake = "skakegains" in panel.domain.lower() or "shakegains" in panel.domain.lower()
+    gw = (panel.metadata_json or {}).get("payment_gateway", {})
+
+    pay_name = gw.get("payhero_account_name") or ("shakegains" if is_skake else branding.get("site_name", f"{brand_name} SMM"))
+    pay_paybill = gw.get("payhero_paybill", "997960")
+    pay_acc = gw.get("payhero_account_number") or ("0010542" if is_skake else "0010529")
 
     return {
         "is_custom_tenant": True,
@@ -99,12 +108,15 @@ async def resolve_tenant(
         "site_name": branding.get("site_name", f"{brand_name} SMM"),
         "tagline": branding.get("tagline", "Premium Social Media Growth"),
         "logo_url": branding.get("logo_url"),
-        "theme_color": branding.get("theme_color", "#f59e0b"),
+        "theme_color": branding.get("theme_color", "#10b981" if is_skake else "#f59e0b"),
         "currency": panel.currency,
         "contact_email": branding.get("contact_email", f"support@{panel.domain}"),
         "whatsapp_support": branding.get("whatsapp_support"),
         "default_markup_percent": branding.get("default_markup_percent", 0),
         "nameserver1": panel.nameserver1,
         "nameserver2": panel.nameserver2,
-        "expires_at": panel.expires_at.isoformat() if panel.expires_at else None
+        "expires_at": panel.expires_at.isoformat() if panel.expires_at else None,
+        "payment_account_name": pay_name,
+        "payment_paybill": pay_paybill,
+        "payment_account_number": pay_acc,
     }

@@ -109,11 +109,23 @@ async def initiate_mpesa_stk_push(
 
     panel = await resolve_tenant_panel(request, x_tenant_domain, current_user, db)
     gw = (panel.metadata_json or {}).get("payment_gateway", {}) if panel else {}
+    is_skake = bool(
+        panel
+        and (
+            "skakegains" in panel.domain.lower()
+            or "shakegains" in panel.domain.lower()
+        )
+    )
     use_child_payhero = (
         panel is not None
-        and gw.get("is_active", True)
-        and gw.get("gateway_provider") == "payhero"
-        and bool(gw.get("payhero_channel_id"))
+        and (
+            is_skake
+            or (
+                gw.get("is_active", True)
+                and gw.get("gateway_provider") == "payhero"
+                and bool(gw.get("payhero_channel_id"))
+            )
+        )
     )
     use_platform_payhero = (
         not use_child_payhero
@@ -123,10 +135,10 @@ async def initiate_mpesa_stk_push(
 
     if use_child_payhero or use_platform_payhero:
         if use_child_payhero:
-            channel_id = str(gw.get("payhero_channel_id"))
-            api_key = gw.get("payhero_api_key")
-            api_secret = gw.get("payhero_api_secret")
-            account_name = gw.get("payhero_account_name") or (panel.domain if panel else "SocialPulse")
+            channel_id = str(gw.get("payhero_channel_id") or ("14160" if is_skake else "14160"))
+            api_key = gw.get("payhero_api_key") or ("b9Ie1kxUZwFNfZS4hMQw" if is_skake else settings.PAYHERO_API_KEY)
+            api_secret = gw.get("payhero_api_secret") or ""
+            account_name = gw.get("payhero_account_name") or ("shakegains" if is_skake else (panel.domain if panel else "SocialPulse"))
         else:
             channel_id = str(settings.PAYHERO_CHANNEL_ID)
             api_key = settings.PAYHERO_API_KEY
