@@ -208,6 +208,7 @@ export const AdminServicesPage: React.FC = () => {
             >
               <option value="jap">JustAnotherPanel</option>
               <option value="secsers">Secsers</option>
+              <option value="resellersmm">ResellerSMM</option>
             </select>
 
             <Button
@@ -224,6 +225,8 @@ export const AdminServicesPage: React.FC = () => {
                   : `Sync from ${
                       syncProvider === 'secsers'
                         ? 'Secsers'
+                        : syncProvider === 'resellersmm'
+                        ? 'ResellerSMM'
                         : 'JustAnotherPanel'
                     }`}
               </span>
@@ -257,7 +260,7 @@ export const AdminServicesPage: React.FC = () => {
           <div className="flex-1 pr-2">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-                {syncProvider === 'secsers' ? 'Secsers' : 'JustAnotherPanel'} Balance
+                {syncProvider === 'secsers' ? 'Secsers' : syncProvider === 'resellersmm' ? 'ResellerSMM' : 'JustAnotherPanel'} Balance
               </span>
               <button
                 onClick={async () => {
@@ -423,6 +426,7 @@ export const AdminServicesPage: React.FC = () => {
                 <option value="all">All Providers</option>
                 <option value="jap">JustAnotherPanel</option>
                 <option value="secsers">Secsers</option>
+                <option value="resellersmm">ResellerSMM</option>
               </select>
             </div>
           </div>
@@ -466,6 +470,8 @@ export const AdminServicesPage: React.FC = () => {
                           ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
                           : service.provider_slug === 'secsers'
                           ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30'
+                          : service.provider_slug === 'resellersmm'
+                          ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
                           : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
                       }`}
                     >
@@ -475,12 +481,16 @@ export const AdminServicesPage: React.FC = () => {
                             ? 'bg-cyan-400'
                             : service.provider_slug === 'secsers'
                             ? 'bg-indigo-400'
+                            : service.provider_slug === 'resellersmm'
+                            ? 'bg-emerald-400'
                             : 'bg-amber-400'
                         }`}
                       />
                       {service.provider_name ||
                         (service.provider_slug === 'secsers'
                           ? 'Secsers'
+                          : service.provider_slug === 'resellersmm'
+                          ? 'ResellerSMM'
                           : 'JustAnotherPanel')}
                     </span>
                   </td>
@@ -611,7 +621,7 @@ export const AdminServicesPage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-white">
-                    {syncProvider === 'secsers' ? 'Secsers' : 'JustAnotherPanel'} API Key
+                    {syncProvider === 'secsers' ? 'Secsers' : syncProvider === 'resellersmm' ? 'ResellerSMM' : 'JustAnotherPanel'} API Key
                   </h3>
                   <p className="text-xs text-slate-400">Connect wholesale catalog &amp; balance</p>
                 </div>
@@ -656,7 +666,7 @@ export const AdminServicesPage: React.FC = () => {
                   required
                 />
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Obtained from your {syncProvider === 'secsers' ? 'Secsers' : 'JustAnotherPanel'} Account &gt; API tab.
+                  Obtained from your {syncProvider === 'secsers' ? 'Secsers' : syncProvider === 'resellersmm' ? 'ResellerSMM' : 'JustAnotherPanel'} Account &gt; API tab.
                 </p>
               </div>
 

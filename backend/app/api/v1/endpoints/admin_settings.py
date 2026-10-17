@@ -32,6 +32,11 @@ async def get_platform_settings(
                 "api_url": settings.SECSERS_API_URL,
                 "has_api_key": bool(settings.SECSERS_API_KEY),
             },
+            "resellersmm": {
+                "name": "ResellerSMM",
+                "api_url": settings.RESELLERSMM_API_URL,
+                "has_api_key": bool(settings.RESELLERSMM_API_KEY),
+            },
         },
         "payments": {
             "mpesa": {

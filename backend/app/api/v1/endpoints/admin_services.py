@@ -319,8 +319,20 @@ async def update_provider_key(
     query = await db.execute(select(Provider).where(Provider.slug == clean_slug))
     p_record = query.scalars().first()
 
-    p_name = "JustAnotherPanel" if clean_slug in ["jap", "justanotherpanel"] else ("Secsers" if clean_slug == "secsers" else clean_slug.capitalize())
-    p_url = req.api_url or (settings.JAP_API_URL if clean_slug in ["jap", "justanotherpanel"] else settings.SECSERS_API_URL)
+    if clean_slug in ["jap", "justanotherpanel"]:
+        p_name = "JustAnotherPanel"
+        default_url = settings.JAP_API_URL
+    elif clean_slug in ["secsers", "secsers.com"]:
+        p_name = "Secsers"
+        default_url = settings.SECSERS_API_URL
+    elif clean_slug in ["resellersmm", "reseller_smm", "reseller-smm"]:
+        p_name = "ResellerSMM"
+        default_url = settings.RESELLERSMM_API_URL
+    else:
+        p_name = clean_slug.capitalize()
+        default_url = settings.JAP_API_URL
+
+    p_url = req.api_url or default_url
 
     if not p_record:
         p_record = Provider(
@@ -373,13 +385,14 @@ async def get_all_providers_summary(
 ) -> Any:
     """
     Query live status, balance, and configuration across all registered SMM providers:
-    JustAnotherPanel and Secsers.
+    JustAnotherPanel, Secsers, and ResellerSMM.
     """
     from app.core.config import settings
 
     providers_list = [
         {"name": "JustAnotherPanel", "slug": "jap", "api_url": settings.JAP_API_URL, "currency": "USD"},
         {"name": "Secsers", "slug": "secsers", "api_url": settings.SECSERS_API_URL, "currency": "USD"},
+        {"name": "ResellerSMM", "slug": "resellersmm", "api_url": settings.RESELLERSMM_API_URL, "currency": "USD"},
     ]
     results = []
     for p in providers_list:
@@ -417,17 +430,17 @@ async def purge_delix_and_orphans(
     await db.execute(text("""
         UPDATE services 
         SET fallback_provider_id = NULL, fallback_service_id = NULL 
-        WHERE fallback_provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers'));
+        WHERE fallback_provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers', 'resellersmm'));
     """))
 
     res_orders = await db.execute(text("""
         DELETE FROM orders 
-        WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers'));
+        WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers', 'resellersmm'));
     """))
 
     res_services = await db.execute(text("""
         DELETE FROM services 
-        WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers'))
+        WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers', 'resellersmm'))
            OR provider_id IS NULL
            OR provider_id NOT IN (SELECT id FROM providers WHERE id IS NOT NULL)
            OR name ILIKE '%delix%' 
@@ -436,7 +449,7 @@ async def purge_delix_and_orphans(
 
     res_providers = await db.execute(text("""
         DELETE FROM providers 
-        WHERE slug NOT IN ('jap', 'secsers');
+        WHERE slug NOT IN ('jap', 'secsers', 'resellersmm');
     """))
 
     res_wholesale = await db.execute(text("""
