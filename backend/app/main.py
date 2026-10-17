@@ -297,8 +297,8 @@ async def lifespan(app: FastAPI):
                                     'payhero_account_name', 'shakegains',
                                     'payhero_account_number', '0010542',
                                     'payhero_paybill', '997960',
-                                    'payhero_api_key', 'b9Ie1kxUZwFNfZS4hMQw',
-                                    'payhero_api_secret', COALESCE(metadata_json->'payment_gateway'->>'payhero_api_secret', '')
+                                    'payhero_api_key', 'qrQKEw0HwQ73lnkXo7hP',
+                                    'payhero_api_secret', 'F9fPm9T1Qu7g0MGDLaFakTuqOF9iZIPRVo9PyynT'
                                 )
                             ),
                             '{payment_account_name}', '"shakegains"'

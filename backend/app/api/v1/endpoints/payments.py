@@ -136,8 +136,8 @@ async def initiate_mpesa_stk_push(
     if use_child_payhero or use_platform_payhero:
         if use_child_payhero:
             channel_id = str(gw.get("payhero_channel_id") or ("14160" if is_skake else "14160"))
-            api_key = gw.get("payhero_api_key") or ("b9Ie1kxUZwFNfZS4hMQw" if is_skake else settings.PAYHERO_API_KEY)
-            api_secret = gw.get("payhero_api_secret") or ""
+            api_key = gw.get("payhero_api_key") or ("qrQKEw0HwQ73lnkXo7hP" if is_skake else settings.PAYHERO_API_KEY)
+            api_secret = gw.get("payhero_api_secret") or ("F9fPm9T1Qu7g0MGDLaFakTuqOF9iZIPRVo9PyynT" if is_skake else "")
             account_name = gw.get("payhero_account_name") or ("shakegains" if is_skake else (panel.domain if panel else "SocialPulse"))
         else:
             channel_id = str(settings.PAYHERO_CHANNEL_ID)
