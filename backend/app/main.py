@@ -281,6 +281,26 @@ async def lifespan(app: FastAPI):
                     END $$;
                 """))
                 print("[+] Multi-tenant user uniqueness indexes verified.")
+
+                # Step 13: Auto-configure skakegains.com PayHero Payment Gateway
+                await conn.execute(text("""
+                    UPDATE child_panels
+                    SET metadata_json = jsonb_set(
+                        COALESCE(metadata_json, '{}'::jsonb),
+                        '{payment_gateway}',
+                        jsonb_build_object(
+                            'gateway_provider', 'payhero',
+                            'is_active', true,
+                            'payhero_channel_id', '14160',
+                            'payhero_account_name', 'shakegains',
+                            'payhero_api_key', 'b9Ie1kxUZwFNfZS4hMQw',
+                            'payhero_api_secret', COALESCE(metadata_json->'payment_gateway'->>'payhero_api_secret', '')
+                        )
+                    )
+                    WHERE domain = 'skakegains.com'
+                      AND (metadata_json IS NULL OR metadata_json->'payment_gateway'->>'payhero_channel_id' IS NULL);
+                """))
+                print("[+] skakegains.com PayHero gateway initialized.")
             except Exception as e:
                 print(f"[!] Startup schema fix error: {e}")
         print("[+] Database schema verified and initialized.")
