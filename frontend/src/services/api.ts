@@ -23,13 +23,24 @@ const apiClient: AxiosInstance = axios.create({
   timeout: 45000,
 });
 
-// Request interceptor to attach JWT auth token
+// Request interceptor to attach JWT auth token and active tenant domain
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // Automatically attach active tenant domain if on a custom host or stored in session
+    if (typeof window !== 'undefined' && config.headers) {
+      const hostname = window.location.hostname.split(':')[0].toLowerCase().trim().replace(/^www\./, '');
+      const storedDomain = sessionStorage.getItem('active_tenant_domain');
+      const domainToSend = storedDomain || hostname;
+      if (domainToSend && !config.headers['X-Tenant-Domain']) {
+        config.headers['X-Tenant-Domain'] = domainToSend;
+      }
+    }
+
     return config;
   },
   (error) => Promise.reject(error)

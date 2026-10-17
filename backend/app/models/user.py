@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Boolean, Column, Enum, ForeignKey, Numeric, String
+from sqlalchemy import Boolean, Column, Enum, ForeignKey, Index, Numeric, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from app.models.base import TimeStampedUUIDModel
 
@@ -13,11 +13,17 @@ class UserRole(str, enum.Enum):
 
 class User(TimeStampedUUIDModel):
     __tablename__ = "users"
+    __table_args__ = (
+        Index("ix_users_email_main", func.lower(Column("email")), unique=True, postgresql_where=Column("tenant_id").is_(None)),
+        Index("ix_users_username_main", func.lower(Column("username")), unique=True, postgresql_where=Column("tenant_id").is_(None)),
+        Index("ix_users_email_tenant", func.lower(Column("email")), Column("tenant_id"), unique=True, postgresql_where=Column("tenant_id").isnot(None)),
+        Index("ix_users_username_tenant", func.lower(Column("username")), Column("tenant_id"), unique=True, postgresql_where=Column("tenant_id").isnot(None)),
+    )
 
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("child_panels.id", ondelete="SET NULL"), nullable=True, index=True)
 
-    email = Column(String(255), unique=True, index=True, nullable=False)
-    username = Column(String(100), unique=True, index=True, nullable=False)
+    email = Column(String(255), index=True, nullable=False)
+    username = Column(String(100), index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     
     role = Column(

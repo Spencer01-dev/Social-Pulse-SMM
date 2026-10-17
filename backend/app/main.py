@@ -248,7 +248,39 @@ async def lifespan(app: FastAPI):
                         END IF;
                     END $$;
                 """))
-                print("[+] Live dummy funds purged: All account balances reset to 0.00 KES.")
+                # Step 12: Multi-tenant user email/username uniqueness migration
+                await conn.execute(text("""
+                    DO $$
+                    BEGIN
+                        -- Drop global unique indexes if they exist
+                        IF EXISTS (SELECT 1 FROM pg_indexes WHERE tablename='users' AND indexname='ix_users_email') THEN
+                            DROP INDEX IF EXISTS ix_users_email;
+                        END IF;
+                        IF EXISTS (SELECT 1 FROM pg_indexes WHERE tablename='users' AND indexname='ix_users_username') THEN
+                            DROP INDEX IF EXISTS ix_users_username;
+                        END IF;
+
+                        -- Drop unique constraints if defined as constraints
+                        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'users'::regclass AND conname = 'users_email_key') THEN
+                            ALTER TABLE users DROP CONSTRAINT users_email_key;
+                        END IF;
+                        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'users'::regclass AND conname = 'users_username_key') THEN
+                            ALTER TABLE users DROP CONSTRAINT users_username_key;
+                        END IF;
+
+                        -- Create tenant-scoped unique indexes
+                        CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email_main ON users (LOWER(email)) WHERE tenant_id IS NULL;
+                        CREATE UNIQUE INDEX IF NOT EXISTS ix_users_username_main ON users (LOWER(username)) WHERE tenant_id IS NULL;
+
+                        CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email_tenant ON users (LOWER(email), tenant_id) WHERE tenant_id IS NOT NULL;
+                        CREATE UNIQUE INDEX IF NOT EXISTS ix_users_username_tenant ON users (LOWER(username), tenant_id) WHERE tenant_id IS NOT NULL;
+
+                        -- Lookup indexes for fast queries
+                        CREATE INDEX IF NOT EXISTS ix_users_email_lookup ON users (LOWER(email));
+                        CREATE INDEX IF NOT EXISTS ix_users_username_lookup ON users (LOWER(username));
+                    END $$;
+                """))
+                print("[+] Multi-tenant user uniqueness indexes verified.")
             except Exception as e:
                 print(f"[!] Startup schema fix error: {e}")
         print("[+] Database schema verified and initialized.")

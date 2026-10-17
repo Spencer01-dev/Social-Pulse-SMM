@@ -34,30 +34,9 @@ async def register(
 ) -> Any:
     """
     Register a new customer account on SocialPulse or a custom child panel.
+    Uniqueness of email and username is scoped per-tenant.
     """
-    # Check if email or username already registered
-    result = await db.execute(
-        select(User).where(
-            or_(
-                User.email == user_in.email.lower(),
-                User.username == user_in.username.lower()
-            )
-        )
-    )
-    existing_user = result.scalars().first()
-    if existing_user:
-        if existing_user.email.lower() == user_in.email.lower():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="An account with this email already exists."
-            )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="This username is already taken. Please choose another."
-            )
-
-    # Resolve child panel tenant context if registered on a custom child panel domain
+    # 1. Resolve child panel tenant context if registered on a custom child panel domain
     tenant_id = None
     raw_domain = x_tenant_domain or request.headers.get("x-tenant-domain") or request.headers.get("X-Tenant-Domain")
     if raw_domain:
@@ -86,14 +65,40 @@ async def register(
             if panel:
                 tenant_id = panel.id
 
+    # 2. Check if email or username is already registered within THIS TENANT
+    conditions = [
+        or_(
+            func.lower(User.email) == user_in.email.lower().strip(),
+            func.lower(User.username) == user_in.username.lower().strip()
+        )
+    ]
+    if tenant_id:
+        conditions.append(User.tenant_id == tenant_id)
+    else:
+        conditions.append(User.tenant_id.is_(None))
+
+    result = await db.execute(select(User).where(*conditions))
+    existing_user = result.scalars().first()
+    if existing_user:
+        if existing_user.email.lower() == user_in.email.lower().strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="An account with this email already exists."
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This username is already taken. Please choose another."
+            )
+
     # Check if this is the very first user in the database -> automatically make SUPER_ADMIN
     count_result = await db.execute(select(User))
     first_user = count_result.scalars().first()
     assigned_role = UserRole.SUPER_ADMIN if first_user is None else UserRole.CUSTOMER
 
     user = User(
-        email=user_in.email.lower(),
-        username=user_in.username.lower(),
+        email=user_in.email.lower().strip(),
+        username=user_in.username.lower().strip(),
         full_name=user_in.full_name,
         phone_number=user_in.phone_number,
         hashed_password=get_password_hash(user_in.password),
@@ -114,29 +119,74 @@ async def register(
 @router.post("/login", response_model=Token)
 async def login_json(
     credentials: UserLogin,
+    request: Request = None,
+    x_tenant_domain: Optional[str] = Header(None, alias="X-Tenant-Domain"),
     db: AsyncSession = Depends(get_db)
 ) -> Any:
     """
-    Authenticate with JSON payload (email or username + password). Returns access and refresh tokens.
+    Authenticate with JSON payload (email or username + password). Scoped per-tenant.
     """
     identifier = credentials.email_or_username.lower().strip()
+
+    # Resolve child panel tenant context if logging in on a custom child panel domain
+    tenant_id = None
+    if request:
+        raw_domain = x_tenant_domain or request.headers.get("x-tenant-domain") or request.headers.get("X-Tenant-Domain")
+        if raw_domain:
+            clean_tenant_domain = (
+                raw_domain.split(":")[0]
+                .strip()
+                .lower()
+                .replace("https://", "")
+                .replace("http://", "")
+                .rstrip("/")
+            )
+            clean_no_www = clean_tenant_domain[4:] if clean_tenant_domain.startswith("www.") else clean_tenant_domain
+            clean_with_www = f"www.{clean_no_www}"
+            is_main = any(clean_no_www == d or clean_no_www.endswith(f".{d}") for d in MAIN_PLATFORM_DOMAINS)
+            if not is_main:
+                tenant_q = await db.execute(
+                    select(ChildPanel).where(
+                        or_(
+                            ChildPanel.domain == clean_tenant_domain,
+                            ChildPanel.domain == clean_no_www,
+                            ChildPanel.domain == clean_with_www,
+                        )
+                    )
+                )
+                panel = tenant_q.scalars().first()
+                if panel:
+                    tenant_id = panel.id
+
+    # Lookup user scoped to the tenant
+    lookup_conditions = []
     if "@" in identifier:
-        query = select(User).where(User.email == identifier)
+        lookup_conditions.append(func.lower(User.email) == identifier)
     else:
-        query = select(User).where(User.username == identifier)
+        lookup_conditions.append(func.lower(User.username) == identifier)
+
+    if tenant_id:
+        query = select(User).where(User.tenant_id == tenant_id, *lookup_conditions)
+    else:
+        query = select(User).where(User.tenant_id.is_(None), *lookup_conditions)
 
     result = await db.execute(query)
     user = result.scalars().first()
 
-    # If user not found in standard accounts, verify against ChildPanel admin credentials
-    if not user:
+    # If user not found in standard tenant accounts, verify against ChildPanel admin credentials
+    if not user and tenant_id:
         cp_query = await db.execute(
-            select(ChildPanel).where(func.lower(ChildPanel.admin_username) == identifier)
+            select(ChildPanel).where(
+                ChildPanel.id == tenant_id,
+                func.lower(ChildPanel.admin_username) == identifier
+            )
         )
         panel = cp_query.scalars().first()
         if panel and verify_password(credentials.password, panel.admin_password_hash):
             admin_email = f"{identifier}@{panel.domain}"
-            user_q = await db.execute(select(User).where(User.username == identifier))
+            user_q = await db.execute(
+                select(User).where(User.tenant_id == panel.id, func.lower(User.username) == identifier)
+            )
             user = user_q.scalars().first()
             if not user:
                 user = User(
@@ -190,7 +240,7 @@ async def login_form(
         email_or_username=form_data.username,
         password=form_data.password
     )
-    return await login_json(credentials=credentials, db=db)
+    return await login_json(credentials=credentials, request=None, x_tenant_domain=None, db=db)
 
 
 @router.post("/refresh", response_model=Token)
