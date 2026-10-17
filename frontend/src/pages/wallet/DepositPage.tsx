@@ -208,6 +208,8 @@ export const DepositPage: React.FC = () => {
           msg = 'Incorrect phone number. Please enter a valid M-Pesa number (e.g. 0712345678).';
         } else if (detail.toLowerCase().includes('blocked for spamming') || detail.toLowerCase().includes('rate limit')) {
           msg = 'PayHero Security Notice: Multiple rapid deposit requests were initiated in a short period. Please wait 3–5 minutes for the cooldown to reset, or contact PayHero support via WhatsApp to unblock.';
+        } else if (detail.toLowerCase().includes('merchant account inactive')) {
+          msg = 'PayHero Notice: The merchant account (shakegains) is pending activation or requires service wallet tokens. Please log into app.payhero.co.ke and top up your Service Wallet float (e.g. KES 50) on the dashboard.';
         } else {
           msg = detail;
         }

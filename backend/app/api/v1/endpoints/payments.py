@@ -166,6 +166,11 @@ async def initiate_mpesa_stk_push(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail="Payment rate limit reached: PayHero has temporarily placed a security cooldown due to repeated push attempts. Please wait a few minutes, or reach out to PayHero Support to unblock your channel."
                 )
+            if "merchant account inactive" in err_str.lower():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="PayHero Account Inactive: Your PayHero account (shakegains) is currently pending activation or has zero service tokens. Please log into app.payhero.co.ke, top up your Service Wallet tokens (e.g. KES 50) on your PayHero dashboard to enable STK push."
+                )
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=f"Failed to initiate Till STK Push via PayHero: {err_str}"
