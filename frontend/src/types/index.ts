@@ -91,6 +91,7 @@ export interface User {
   is_active: boolean;
   is_verified: boolean;
   api_key?: string;
+  tenant_id?: string | null;
   created_at: string;
   updated_at: string;
 }

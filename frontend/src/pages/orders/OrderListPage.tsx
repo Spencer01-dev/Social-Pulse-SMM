@@ -22,6 +22,7 @@ import { CustomerOrder, OrderStatus } from '../../types';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { useAuth } from '../../context/AuthContext';
+import { useTenant } from '../../context/TenantContext';
 import { formatExternalUrl } from '../../utils/url';
 
 interface TableVisualSettings {
@@ -44,8 +45,9 @@ const DEFAULT_SETTINGS: TableVisualSettings = {
 
 export const OrderListPage: React.FC = () => {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
-  const [viewAll, setViewAll] = useState(isAdmin);
+  const { isTenantMode } = useTenant();
+  const isPlatformSuperAdmin = (user?.role === 'super_admin' || user?.role === 'admin') && !user?.tenant_id && !isTenantMode;
+  const [viewAll, setViewAll] = useState(false);
 
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus | 'all'>('all');
@@ -153,7 +155,7 @@ export const OrderListPage: React.FC = () => {
       const data = await ordersService.getMyOrders({
         status: selectedStatus !== 'all' ? selectedStatus : undefined,
         search: search || undefined,
-        all_orders: isAdmin ? viewAll : undefined,
+        all_orders: isPlatformSuperAdmin && viewAll ? true : undefined,
       });
       setOrders(data);
     } catch (err) {
@@ -270,8 +272,8 @@ export const OrderListPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Admin Scope Switcher Banner */}
-      {isAdmin && (
+      {/* Admin Scope Switcher Banner (Platform Super Admin only) */}
+      {isPlatformSuperAdmin && (
         <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0" />

@@ -282,16 +282,18 @@ async def create_order(
 
 @router.get("", response_model=List[CustomerOrderResponse])
 async def list_my_orders(
+    request: Request,
     status: Optional[OrderStatus] = None,
     search: Optional[str] = None,
-    all_orders: bool = Query(False, description="If admin, view all orders across platform"),
+    all_orders: bool = Query(False, description="If admin, view all orders across platform or tenant"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
+    x_tenant_domain: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ) -> Any:
     """
-    List orders with filters and search. Admins can view all orders.
+    List orders with filters and search. Strictly enforces tenant boundary isolation.
     """
     query = (
         select(Order)
@@ -301,9 +303,61 @@ async def list_my_orders(
         .limit(limit)
     )
 
+    # 1. Resolve effective tenant ID: check user account first, then incoming domain header
+    effective_tenant_id = current_user.tenant_id
+    if not effective_tenant_id and request:
+        raw_domain = x_tenant_domain or request.headers.get("x-tenant-domain") or request.headers.get("X-Tenant-Domain")
+        if raw_domain:
+            clean_tenant_domain = (
+                raw_domain.split(":")[0]
+                .strip()
+                .lower()
+                .replace("https://", "")
+                .replace("http://", "")
+                .rstrip("/")
+            )
+            clean_no_www = clean_tenant_domain[4:] if clean_tenant_domain.startswith("www.") else clean_tenant_domain
+            clean_with_www = f"www.{clean_no_www}"
+            is_main = any(clean_no_www == d or clean_no_www.endswith(f".{d}") for d in MAIN_PLATFORM_DOMAINS)
+            if not is_main:
+                tenant_q = await db.execute(
+                    select(ChildPanel).where(
+                        or_(
+                            ChildPanel.domain == clean_tenant_domain,
+                            ChildPanel.domain == clean_no_www,
+                            ChildPanel.domain == clean_with_www,
+                        )
+                    )
+                )
+                panel = tenant_q.scalars().first()
+                if panel:
+                    effective_tenant_id = panel.id
+
     is_admin = current_user.role in [UserRole.ADMIN, UserRole.SUPER_ADMIN]
-    if not (is_admin and all_orders):
-        query = query.where(Order.user_id == current_user.id)
+
+    # 2. Strict tenant boundary filtering:
+    if effective_tenant_id:
+        # User is in child panel context (e.g. skakegains.com)
+        if is_admin and all_orders:
+            # Child panel admin viewing all orders of this specific child panel
+            query = query.where(Order.tenant_id == effective_tenant_id)
+        else:
+            # Child panel user viewing only their own orders placed on this panel
+            query = query.where(
+                Order.user_id == current_user.id,
+                Order.tenant_id == effective_tenant_id
+            )
+    else:
+        # User is in main platform context (SocialPulse)
+        if current_user.role == UserRole.SUPER_ADMIN and all_orders:
+            # Super admin viewing all main platform orders
+            query = query.where(Order.tenant_id.is_(None))
+        else:
+            # Main platform customer viewing only their own personal orders
+            query = query.where(
+                Order.user_id == current_user.id,
+                Order.tenant_id.is_(None)
+            )
 
     if status:
         query = query.where(Order.status == status)
