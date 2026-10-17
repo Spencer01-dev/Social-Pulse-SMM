@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   PlusCircle,
   ListOrdered,
@@ -36,6 +36,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { user, isAuthenticated, logout } = useAuth();
   const { isTenantMode, tenant } = useTenant();
   const navigate = useNavigate();
+  const location = useLocation();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const isCustomHost = !isMainDomain(window.location.hostname);
@@ -70,9 +71,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
   const childPanelStaffNav = [
     { name: 'Orders Monitor', href: '/child-panel/manage?tab=orders', icon: Package },
+    { name: 'Services & Markups', href: '/child-panel/manage?tab=services', icon: Sliders },
+    { name: 'Payment Settings', href: '/child-panel/manage?tab=payments', icon: CreditCard, badge: 'Till' },
     { name: 'Support Helpdesk', href: '/child-panel/manage?tab=tickets', icon: Headphones },
     { name: 'User Management', href: '/child-panel/manage?tab=users', icon: Users },
-    { name: 'Panel Hub', href: '/child-panel/manage', icon: Sliders },
   ];
 
   const adminNav = [
@@ -216,7 +218,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             </div>
           )}
 
-          {isTenantMode && isAuthenticated && (
+          {isTenantMode && isAuthenticated && isAdmin && (
             <div className="pt-2 border-t border-[#2b303c]">
               <span
                 className="px-3 text-[10px] font-black uppercase tracking-wider block mb-2"
@@ -227,20 +229,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               <nav className="space-y-1">
                 {childPanelStaffNav.map((item) => {
                   const Icon = item.icon;
+                  const itemTab = item.href.includes('tab=') ? item.href.split('tab=')[1] : 'orders';
+                  const currentTab = new URLSearchParams(location.search).get('tab') || 'orders';
+                  const isCurrentActive = location.pathname.startsWith('/child-panel/manage') && currentTab === itemTab;
+
                   return (
                     <NavLink
                       key={item.name}
                       to={item.href}
                       onClick={() => onClose()}
-                      className={({ isActive }) =>
-                        `flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
-                          isActive
-                            ? 'text-slate-950 shadow-lg'
-                            : 'text-slate-400 hover:text-slate-200 hover:bg-[#222630]'
-                        }`
-                      }
-                      style={({ isActive }) =>
-                        isActive
+                      className={`flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                        isCurrentActive
+                          ? 'text-slate-950 shadow-lg'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-[#222630]'
+                      }`}
+                      style={
+                        isCurrentActive
                           ? {
                               backgroundColor: accentColor,
                               boxShadow: `0 10px 15px -3px ${accentColor}40`,
@@ -252,6 +256,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                         <Icon className="w-3.5 h-3.5" />
                         <span>{item.name}</span>
                       </div>
+                      {item.badge && (
+                        <span
+                          className={`px-1.5 py-0.5 text-[9px] font-black uppercase rounded border ${
+                            isCurrentActive
+                              ? 'bg-slate-950/20 text-slate-950 border-slate-950/30'
+                              : 'bg-[#2b303c] text-emerald-300 border-emerald-500/30'
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
                     </NavLink>
                   );
                 })}

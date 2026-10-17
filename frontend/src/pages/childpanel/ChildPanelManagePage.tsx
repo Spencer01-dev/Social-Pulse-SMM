@@ -72,11 +72,21 @@ export const ChildPanelManagePage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { formatCurrency } = useCurrency();
-  const { enterTenantMode } = useTenant();
+  const { tenant, enterTenantMode } = useTenant();
 
   // Active tab state
   const initialTab = (searchParams.get('tab') as ActiveTab) || 'orders';
   const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab);
+
+  // Synchronize activeTab whenever searchParams changes (e.g. from sidebar clicks)
+  useEffect(() => {
+    const tabParam = searchParams.get('tab') as ActiveTab;
+    if (tabParam && ['orders', 'tickets', 'users', 'payments', 'services'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    } else if (!tabParam) {
+      setActiveTab('orders');
+    }
+  }, [searchParams]);
 
   // Panels list & active selected panel
   const [panels, setPanels] = useState<ChildPanelData[]>([]);
@@ -310,16 +320,33 @@ export const ChildPanelManagePage: React.FC = () => {
   };
 
 
-  // Fetch initial panels owned by user
+  // Fetch initial panels owned by user or tenant
   useEffect(() => {
     const fetchPanels = async () => {
       setLoadingPanels(true);
       try {
-        const myPanels = await childPanelService.getMyPanels();
+        let myPanels = await childPanelService.getMyPanels();
+
+        // If user is accessing from a tenant panel or is a tenant admin, ensure panel is included
+        const fallbackTenantId = panelId || tenant?.tenant_id || (user as any)?.tenant_id;
+        if (fallbackTenantId && !myPanels.some((p) => p.id === fallbackTenantId)) {
+          try {
+            const singlePanel = await childPanelService.getPanel(fallbackTenantId);
+            if (singlePanel) {
+              myPanels = [singlePanel, ...myPanels];
+            }
+          } catch (e) {
+            // Keep myPanels as is if fallback fails
+          }
+        }
+
         setPanels(myPanels);
         if (myPanels.length > 0) {
           if (panelId) {
             const match = myPanels.find((p) => p.id === panelId);
+            setActivePanel(match || myPanels[0]);
+          } else if (fallbackTenantId) {
+            const match = myPanels.find((p) => p.id === fallbackTenantId);
             setActivePanel(match || myPanels[0]);
           } else {
             setActivePanel(myPanels[0]);
@@ -332,7 +359,7 @@ export const ChildPanelManagePage: React.FC = () => {
       }
     };
     fetchPanels();
-  }, [panelId]);
+  }, [panelId, tenant?.tenant_id, (user as any)?.tenant_id]);
 
   // Load orders data when activePanel or order filters change
   const loadOrders = async () => {

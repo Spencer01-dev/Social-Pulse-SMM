@@ -136,10 +136,17 @@ async def list_my_child_panels(
 ) -> Any:
     """
     List all child panels owned by the current authenticated user.
+    Also includes panels where the user is the designated tenant admin
+    (auto-created admin accounts have tenant_id pointing to the panel).
     """
+    conditions = [ChildPanel.user_id == current_user.id]
+    # If the user has a tenant_id, also match panels where they are the tenant admin
+    if current_user.tenant_id:
+        conditions.append(ChildPanel.id == current_user.tenant_id)
+
     query = (
         select(ChildPanel)
-        .where(ChildPanel.user_id == current_user.id)
+        .where(or_(*conditions))
         .order_by(desc(ChildPanel.created_at))
     )
     result = await db.execute(query)
@@ -399,6 +406,20 @@ async def get_panel_and_verify_owner(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied. You must be the owner or administrator of this child panel."
         )
+    return panel
+
+
+@router.get("/{panel_id}", response_model=ChildPanelResponse)
+async def get_child_panel_by_id(
+    panel_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """
+    Get single child panel by ID.
+    Accessible to panel owner, designated tenant admin, or platform admins.
+    """
+    panel = await get_panel_and_verify_owner(panel_id, db, current_user)
     return panel
 
 

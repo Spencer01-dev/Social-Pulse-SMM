@@ -53,6 +53,11 @@ export const childPanelService = {
     return response.data;
   },
 
+  getPanel: async (panelId: string): Promise<ChildPanelData> => {
+    const response = await apiClient.get<ChildPanelData>(`/child-panels/${panelId}`);
+    return response.data;
+  },
+
   renewPanel: async (panelId: string): Promise<ChildPanelData> => {
     const response = await apiClient.post<ChildPanelData>(`/child-panels/${panelId}/renew`);
     return response.data;
