@@ -356,24 +356,13 @@ async def lifespan(app: FastAPI):
                       );
                 """))
 
-                # Deactivate ResellerSMM TikTok Likes and Bot Followers in favor of JAP
-                await conn.execute(text("""
-                    UPDATE services 
-                    SET is_active = FALSE 
-                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'resellersmm')
-                      AND (
-                          (platform = 'tiktok' AND (name ILIKE '%like%' OR category ILIKE '%like%'))
-                          OR (platform = 'instagram' AND (name ILIKE '%bot%' OR name ILIKE '%high drop%' OR name ILIKE '%no refill%') AND (name ILIKE '%follower%' OR category ILIKE '%follower%'))
-                      );
-                """))
-
-                # Ensure ResellerSMM services are active for Views, Reels, Telegram, Nigerian/African
+                # Ensure ResellerSMM services are active for TikTok (Views, Likes, Followers), Instagram Reels/Views, Telegram, Nigerian/African
                 await conn.execute(text("""
                     UPDATE services 
                     SET is_active = TRUE 
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'resellersmm')
                       AND (
-                          (platform = 'tiktok' AND (name ILIKE '%view%' OR category ILIKE '%view%'))
+                          platform = 'tiktok'
                           OR (platform = 'instagram' AND (name ILIKE '%view%' OR category ILIKE '%view%' OR name ILIKE '%reel%' OR category ILIKE '%reel%'))
                           OR (platform = 'telegram' AND (name ILIKE '%member%' OR category ILIKE '%member%'))
                           OR (name ILIKE '%nigeria%' OR category ILIKE '%nigeria%' OR name ILIKE '%africa%' OR category ILIKE '%africa%')
@@ -651,25 +640,47 @@ async def lifespan(app: FastAPI):
     # Start background poller immediately so startup yields without delay
     poller_task = asyncio.create_task(order_status_poller_loop())
 
-    # Background service sync only if services table is completely empty
+    # Background service sync: ensure ResellerSMM services are loaded if missing
     async def initial_services_check():
         try:
             from sqlalchemy import select, func
+            from app.models.provider import Provider
             from app.models.service import Service
             from app.workers.service_sync import sync_services_from_provider
             async with AsyncSessionLocal() as db:
-                count_res = await db.execute(select(func.count(Service.id)))
-                service_count = count_res.scalar() or 0
-                if service_count == 0:
-                    print("[*] No services found in DB. Starting background initial sync...")
+                # 1. Ensure ResellerSMM provider exists
+                res_prov_res = await db.execute(select(Provider).where(Provider.slug == "resellersmm"))
+                reseller_prov = res_prov_res.scalars().first()
+                if not reseller_prov:
+                    reseller_prov = Provider(
+                        name="ResellerSMM",
+                        slug="resellersmm",
+                        api_url=settings.RESELLERSMM_API_URL,
+                        api_key_encrypted=settings.RESELLERSMM_API_KEY,
+                        is_active=True,
+                        currency="USD",
+                        balance=Decimal("0.00")
+                    )
+                    db.add(reseller_prov)
+                    await db.commit()
+                    await db.refresh(reseller_prov)
+
+                # 2. Check if ResellerSMM has services
+                res_cnt = await db.execute(
+                    select(func.count(Service.id)).where(Service.provider_id == reseller_prov.id)
+                )
+                reseller_service_count = res_cnt.scalar() or 0
+
+                if reseller_service_count == 0:
+                    print("[*] ResellerSMM services missing from DB. Starting background sync for ResellerSMM...")
                     total, created, updated = await sync_services_from_provider(db, provider_slug="resellersmm")
-                    print(f"[+] Initial service sync complete: {total} fetched, {created} created, {updated} updated.")
+                    print(f"[+] ResellerSMM initial sync complete: {total} fetched, {created} created, {updated} updated.")
                     from app.core.cache import clear_all_cache
                     clear_all_cache()
                 else:
-                    print(f"[*] Services already initialized ({service_count} active in DB). Skipping blocking sync.")
+                    print(f"[*] ResellerSMM services already initialized ({reseller_service_count} in DB).")
         except Exception as exc:
-            print(f"[!] Warning during background service check: {exc}")
+            print(f"[!] Warning during background ResellerSMM service check: {exc}")
 
     asyncio.create_task(initial_services_check())
     yield
