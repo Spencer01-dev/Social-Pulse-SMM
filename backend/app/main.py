@@ -455,6 +455,11 @@ async def lifespan(app: FastAPI):
                     WHERE domain ILIKE '%skakegains%' OR domain ILIKE '%shakegains%';
                 """))
 
+                # Reset ken admin parent balance to 0.00 until real top-up
+                await conn.execute(text("""
+                    UPDATE users SET balance = 0.00 WHERE LOWER(username) = 'ken';
+                """))
+
                 from app.core.cache import clear_all_cache
                 clear_all_cache()
                 print("[+] Step 14: Dual-Provider catalog curated & rates calibrated (lowest price 18.70 KES everywhere).")
@@ -528,7 +533,7 @@ async def lifespan(app: FastAPI):
                         hashed_password=new_hash,
                         role=UserRole.CUSTOMER,
                         tenant_id=None,
-                        balance=Decimal("98500.00"),
+                        balance=Decimal("0.00"),
                         is_active=True,
                         is_verified=True,
                         currency=p.currency or "KES",
@@ -539,6 +544,7 @@ async def lifespan(app: FastAPI):
                     ken_parent.email = "ken@skakegains.com"
                     ken_parent.hashed_password = new_hash
                     ken_parent.is_active = True
+                    ken_parent.balance = Decimal("0.00")
                     db.add(ken_parent)
 
                 # Link child panel ownership to parent ken
