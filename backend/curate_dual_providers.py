@@ -161,11 +161,47 @@ async def curate_dual_provider_catalog():
             WHERE provider_id = :res_id AND platform = 'telegram' AND name ILIKE '%member%' AND provider_rate < 0.50;
         """), {"res_id": reseller_prov.id})
 
-        # TikTok Likes (from JAP): sell at 21.00 KES (ws 16.00 KES) for budget likes
+        # TikTok Likes Calibration to BEAT Delix Gains on every tier:
+        # Delix tier 1: TT Likes [Max 100K] = 18.4 Ksh -> SocialPulse sells at 17.90 KES (ws: 16.50 KES)
         await db.execute(text("""
             UPDATE services
-            SET selling_rate = 21.00, wholesale_rate = 16.00, markup_type = 'manual'
-            WHERE provider_id = :jap_id AND platform = 'tiktok' AND name ILIKE '%like%' AND provider_rate BETWEEN 10.00 AND 18.00;
+            SET selling_rate = 17.90, wholesale_rate = 16.50, markup_type = 'manual'
+            WHERE provider_id = :jap_id AND platform = 'tiktok' AND provider_service_id = '9423';
+        """), {"jap_id": jap_prov.id})
+
+        # Delix tier 2: TT Likes [Max 10M] = 27.5 Ksh -> SocialPulse sells at 26.00 KES (ws: 23.50 KES)
+        await db.execute(text("""
+            UPDATE services
+            SET selling_rate = 26.00, wholesale_rate = 23.50, markup_type = 'manual'
+            WHERE provider_id = :jap_id AND platform = 'tiktok' AND provider_service_id = '9301';
+        """), {"jap_id": jap_prov.id})
+
+        # Delix tier 3: TT Likes Fast [Max 5K - 500K] = 35.0 Ksh -> SocialPulse sells at 33.00 KES (ws: 28.00 KES)
+        await db.execute(text("""
+            UPDATE services
+            SET selling_rate = 33.00, wholesale_rate = 28.00, markup_type = 'manual'
+            WHERE provider_id = :jap_id AND platform = 'tiktok' AND provider_service_id IN ('10385', '9179');
+        """), {"jap_id": jap_prov.id})
+
+        # Delix tier 4: TT Likes 30-Day Refill = 38.0 Ksh -> SocialPulse sells at 36.00 KES (ws: 33.00 KES)
+        await db.execute(text("""
+            UPDATE services
+            SET selling_rate = 36.00, wholesale_rate = 33.00, markup_type = 'manual'
+            WHERE provider_id = :jap_id AND platform = 'tiktok' AND (provider_service_id = '10173' OR (name ILIKE '%like%' AND name ILIKE '%30d%'));
+        """), {"jap_id": jap_prov.id})
+
+        # Delix tier 5: TT Likes 60-Day Refill = 41.0 Ksh -> SocialPulse sells at 39.00 KES (ws: 37.00 KES)
+        await db.execute(text("""
+            UPDATE services
+            SET selling_rate = 39.00, wholesale_rate = 37.00, markup_type = 'manual'
+            WHERE provider_id = :jap_id AND platform = 'tiktok' AND (provider_service_id = '9397' OR (name ILIKE '%like%' AND name ILIKE '%60d%'));
+        """), {"jap_id": jap_prov.id})
+
+        # TikTok Live Likes (super budget options: KES 3.20 - 4.50)
+        await db.execute(text("""
+            UPDATE services
+            SET selling_rate = 3.20, wholesale_rate = 2.30, markup_type = 'manual'
+            WHERE provider_id = :jap_id AND platform = 'tiktok' AND provider_service_id = '8063';
         """), {"jap_id": jap_prov.id})
 
         # Instagram Bot Followers (from JAP): sell at 35.00 - 45.00 KES (ws 25.00 - 32.00 KES)
