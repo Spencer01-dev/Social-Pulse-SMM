@@ -1,5 +1,8 @@
+import logging
 import secrets
 import uuid
+
+logger = logging.getLogger("socialpulse.child_panels")
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, List, Optional
@@ -517,6 +520,19 @@ async def list_child_panel_orders(
     result = await db.execute(query)
     orders = result.scalars().all()
 
+    # Automatically live-sync any active orders to ensure start_count and COMPLETED statuses are updated ASAP
+    active_orders = [
+        o for o in orders 
+        if o.status in [OrderStatus.PENDING, OrderStatus.PROCESSING, OrderStatus.IN_PROGRESS] and o.provider_order_id
+    ]
+    if active_orders:
+        from app.workers.order_tasks import sync_single_order
+        for ao in active_orders[:8]:
+            try:
+                await sync_single_order(db, ao)
+            except Exception as sync_err:
+                logger.warning(f"Error live-syncing active child panel order {ao.id}: {sync_err}")
+
     out = []
     for o in orders:
         panel_profit = (o.charge - o.wholesale_cost) if (o.wholesale_cost and o.wholesale_cost > Decimal("0.00")) else o.profit
@@ -539,6 +555,50 @@ async def list_child_panel_orders(
             )
         )
     return out
+
+
+@router.post("/{panel_id}/orders/{order_id}/sync")
+async def sync_child_panel_order(
+    panel_id: uuid.UUID,
+    order_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """Sync single child panel order with upstream provider immediately."""
+    panel = await get_panel_and_verify_owner(panel_id, db, current_user)
+    result = await db.execute(
+        select(Order)
+        .options(selectinload(Order.service), selectinload(Order.provider), selectinload(Order.user))
+        .where(Order.id == order_id, Order.tenant_id == panel.id)
+    )
+    order = result.scalars().first()
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found on this child panel.")
+
+    from app.workers.order_tasks import sync_single_order
+    changed, updated_order = await sync_single_order(db, order)
+    panel_profit = (updated_order.charge - updated_order.wholesale_cost) if (updated_order.wholesale_cost and updated_order.wholesale_cost > Decimal("0.00")) else updated_order.profit
+
+    return {
+        "success": True,
+        "message": f"Order status updated: {updated_order.status.value}",
+        "order": ChildPanelOrderResponse(
+            id=updated_order.id,
+            order_number=updated_order.order_number,
+            user_id=updated_order.user_id,
+            username=updated_order.user.username if updated_order.user else "Customer",
+            service_id=updated_order.service_id,
+            service_name=updated_order.service.name if updated_order.service else "Service",
+            target_link=updated_order.target_link,
+            quantity=updated_order.quantity,
+            charge=updated_order.charge,
+            profit=panel_profit,
+            status=updated_order.status.value if hasattr(updated_order.status, "value") else str(updated_order.status),
+            remains=updated_order.remains,
+            start_count=updated_order.start_count,
+            created_at=updated_order.created_at
+        )
+    }
 
 
 @router.get("/{panel_id}/orders/stats", response_model=ChildPanelOrderStats)

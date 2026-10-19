@@ -201,6 +201,7 @@ async def create_order(
     provider_order_id = None
     initial_status = OrderStatus.PENDING
     error_msg = None
+    dispatched_provider_id = service.provider_id
 
     try:
         from app.providers.router import SmartProviderRouter
@@ -212,6 +213,11 @@ async def create_order(
             comments=order_in.custom_comments
         )
         provider_order_id = p_order_id
+        if p_id:
+            try:
+                dispatched_provider_id = uuid.UUID(p_id)
+            except Exception:
+                pass
         initial_status = OrderStatus.IN_PROGRESS if p_order_id else OrderStatus.PROCESSING
     except Exception as exc:
         error_msg = f"Provider failover exhausted: {str(exc)}"
@@ -226,7 +232,7 @@ async def create_order(
         user_id=current_user.id,
         tenant_id=tenant_id,
         service_id=service.id,
-        provider_id=service.provider_id,
+        provider_id=dispatched_provider_id,
         provider_order_id=provider_order_id,
         target_link=target_link_clean,
         quantity=order_in.quantity,
@@ -264,6 +270,14 @@ async def create_order(
 
     await db.commit()
     await db.refresh(order)
+
+    # 10. Immediate initial sync pass to capture start_count from upstream provider
+    if provider_order_id:
+        try:
+            from app.workers.order_tasks import sync_single_order
+            await sync_single_order(db, order)
+        except Exception as e:
+            logger.info(f"Initial sync pass for new order #{order.id}: {e}")
 
     return CustomerOrderResponse(
         id=order.id,

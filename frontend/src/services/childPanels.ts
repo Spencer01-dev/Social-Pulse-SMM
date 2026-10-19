@@ -103,6 +103,16 @@ export const childPanelService = {
     return response.data;
   },
 
+  syncPanelOrder: async (
+    panelId: string,
+    orderId: string
+  ): Promise<{ success: boolean; message: string; order: ChildPanelOrder }> => {
+    const response = await apiClient.post<{ success: boolean; message: string; order: ChildPanelOrder }>(
+      `/child-panels/${panelId}/orders/${orderId}/sync`
+    );
+    return response.data;
+  },
+
   getPanelTickets: async (
     panelId: string,
     params?: { status?: string; priority?: string }

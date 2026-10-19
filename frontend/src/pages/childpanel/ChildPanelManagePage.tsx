@@ -113,6 +113,7 @@ export const ChildPanelManagePage: React.FC = () => {
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
   const [orderSearch, setOrderSearch] = useState<string>('');
   const [cancelingOrderId, setCancelingOrderId] = useState<string | null>(null);
+  const [syncingOrderId, setSyncingOrderId] = useState<string | null>(null);
 
   // ---------------------------------------------------------------------------
   // TAB 2: TICKETS STATE
@@ -362,9 +363,9 @@ export const ChildPanelManagePage: React.FC = () => {
   }, [panelId, tenant?.tenant_id, (user as any)?.tenant_id]);
 
   // Load orders data when activePanel or order filters change
-  const loadOrders = async () => {
+  const loadOrders = async (silent = false) => {
     if (!activePanel) return;
-    setLoadingOrders(true);
+    if (!silent) setLoadingOrders(true);
     try {
       const [ordersData, statsData] = await Promise.all([
         childPanelService.getPanelOrders(activePanel.id, {
@@ -376,11 +377,26 @@ export const ChildPanelManagePage: React.FC = () => {
       setOrders(ordersData);
       setOrderStats(statsData);
     } catch (err: any) {
-      showToast('error', err.response?.data?.detail || 'Failed to load panel orders.');
+      if (!silent) showToast('error', err.response?.data?.detail || 'Failed to load panel orders.');
     } finally {
-      setLoadingOrders(false);
+      if (!silent) setLoadingOrders(false);
     }
   };
+
+  // Auto-refresh orders every 8 seconds if activeTab is 'orders' and any order is active (pending/processing/in_progress)
+  useEffect(() => {
+    if (activeTab !== 'orders' || !activePanel) return;
+    const hasActiveOrders = orders.some((o) =>
+      ['pending', 'processing', 'in_progress'].includes((o.status || '').toLowerCase())
+    );
+    if (!hasActiveOrders) return;
+
+    const timer = setInterval(() => {
+      loadOrders(true);
+    }, 8000);
+
+    return () => clearInterval(timer);
+  }, [activeTab, activePanel, orders]);
 
   // Load tickets data when activePanel or ticket filters change
   const loadTickets = async () => {
@@ -461,6 +477,28 @@ export const ChildPanelManagePage: React.FC = () => {
       showToast('error', err.response?.data?.detail || 'Failed to cancel order.');
     } finally {
       setCancelingOrderId(null);
+    }
+  };
+
+  // Immediate Single-Order Upstream Provider Status & Start Count Sync
+  const handleSyncOrder = async (orderId: string) => {
+    if (!activePanel || syncingOrderId) return;
+    setSyncingOrderId(orderId);
+    try {
+      const res = await childPanelService.syncPanelOrder(activePanel.id, orderId);
+      if (res.order) {
+        setOrders((prev) =>
+          prev.map((o) => (o.id === orderId ? { ...o, ...res.order } : o))
+        );
+        showToast('success', res.message || 'Order status & start count updated.');
+        // Refresh financial & order volume metrics
+        const stats = await childPanelService.getPanelOrderStats(activePanel.id);
+        setOrderStats(stats);
+      }
+    } catch (err: any) {
+      showToast('error', err.response?.data?.detail || 'Failed to sync order.');
+    } finally {
+      setSyncingOrderId(null);
     }
   };
 
@@ -856,7 +894,7 @@ export const ChildPanelManagePage: React.FC = () => {
               />
             </div>
 
-            <Button variant="outline" size="sm" onClick={loadOrders} isLoading={loadingOrders} leftIcon={<RefreshCcw className="w-3 h-3" />}>
+            <Button variant="outline" size="sm" onClick={() => loadOrders(false)} isLoading={loadingOrders} leftIcon={<RefreshCcw className="w-3 h-3" />}>
               Refresh
             </Button>
           </div>
@@ -871,6 +909,7 @@ export const ChildPanelManagePage: React.FC = () => {
                     <th className="py-3 px-4">Customer</th>
                     <th className="py-3 px-4">Service</th>
                     <th className="py-3 px-4">Target Link</th>
+                    <th className="py-3 px-4 text-center">Start Count</th>
                     <th className="py-3 px-4 text-right">Quantity</th>
                     <th className="py-3 px-4 text-right">Charge</th>
                     <th className="py-3 px-4 text-right">Your Profit</th>
@@ -882,14 +921,14 @@ export const ChildPanelManagePage: React.FC = () => {
                 <tbody className="divide-y divide-[#2b303c]/60 font-medium">
                   {loadingOrders ? (
                     <tr>
-                      <td colSpan={10} className="py-8 text-center text-slate-500">
+                      <td colSpan={11} className="py-8 text-center text-slate-500">
                         <div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                         Loading orders...
                       </td>
                     </tr>
                   ) : orders.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="py-8 text-center text-slate-500">
+                      <td colSpan={11} className="py-8 text-center text-slate-500">
                         No orders found for this child panel matching the filter.
                       </td>
                     </tr>
@@ -926,8 +965,26 @@ export const ChildPanelManagePage: React.FC = () => {
                             </button>
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-white">
-                          {Number(o.quantity).toLocaleString()}
+                        <td className="py-3 px-4 text-center font-mono">
+                          {o.start_count && o.start_count > 0 ? (
+                            <span className="font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded text-xs inline-block">
+                              {Number(o.start_count).toLocaleString()}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 text-[11px] font-mono">
+                              {o.status === 'completed' ? '0' : 'Tracking...'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono">
+                          <span className="font-bold text-white block">
+                            {Number(o.quantity).toLocaleString()}
+                          </span>
+                          {o.remains !== undefined && o.remains > 0 && o.status !== 'completed' && (
+                            <span className="text-[10px] text-amber-400 block font-sans font-medium">
+                              Remains: {Number(o.remains).toLocaleString()}
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-right font-mono font-bold text-white">
                           Ksh {Number(o.charge).toFixed(2)}
@@ -954,16 +1011,29 @@ export const ChildPanelManagePage: React.FC = () => {
                           {new Date(o.created_at).toLocaleDateString()} {new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </td>
                         <td className="py-3 px-4 text-right whitespace-nowrap">
-                          {o.status !== 'completed' && o.status !== 'canceled' && (
-                            <button
-                              onClick={() => handleCancelOrder(o.id, o.order_number)}
-                              disabled={cancelingOrderId === o.id}
-                              className="px-2 py-1 rounded bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-400 hover:text-rose-300 text-[10px] font-bold transition-colors cursor-pointer"
-                              title="Cancel order and refund customer wallet"
-                            >
-                              {cancelingOrderId === o.id ? 'Refunding...' : 'Cancel & Refund'}
-                            </button>
-                          )}
+                          <div className="flex items-center justify-end gap-1.5">
+                            {o.status !== 'completed' && o.status !== 'canceled' && (
+                              <button
+                                onClick={() => handleSyncOrder(o.id)}
+                                disabled={syncingOrderId === o.id}
+                                className="px-2 py-1 rounded bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/25 text-cyan-400 hover:text-cyan-300 text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1"
+                                title="Check live completion status & start count from upstream provider"
+                              >
+                                <RefreshCcw className={`w-2.5 h-2.5 ${syncingOrderId === o.id ? 'animate-spin' : ''}`} />
+                                {syncingOrderId === o.id ? 'Checking...' : 'Sync'}
+                              </button>
+                            )}
+                            {o.status !== 'completed' && o.status !== 'canceled' && (
+                              <button
+                                onClick={() => handleCancelOrder(o.id, o.order_number)}
+                                disabled={cancelingOrderId === o.id}
+                                className="px-2 py-1 rounded bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-400 hover:text-rose-300 text-[10px] font-bold transition-colors cursor-pointer"
+                                title="Cancel order and refund customer wallet"
+                              >
+                                {cancelingOrderId === o.id ? 'Refunding...' : 'Cancel & Refund'}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))

@@ -25,7 +25,7 @@ def map_provider_status(provider_status_str: str) -> OrderStatus:
         return OrderStatus.PROCESSING
     elif "progress" in s:
         return OrderStatus.IN_PROGRESS
-    elif "complete" in s or "success" in s or "done" in s:
+    elif "complete" in s or "success" in s or "done" in s or "finish" in s:
         return OrderStatus.COMPLETED
     elif "partial" in s:
         return OrderStatus.PARTIAL
@@ -62,12 +62,28 @@ async def sync_active_orders(db: AsyncSession) -> Tuple[int, int]:
     total_updated = 0
 
     for order in active_orders:
-        provider_slug = order.provider.slug if order.provider else "jap"
+        provider_slug = "jap"
+        if order.provider and order.provider.slug:
+            provider_slug = order.provider.slug
+        elif order.provider_id:
+            p_res = await db.execute(select(Provider).where(Provider.id == order.provider_id))
+            p_obj = p_res.scalars().first()
+            if p_obj and p_obj.slug:
+                provider_slug = p_obj.slug
+
         provider_client = get_provider(slug=provider_slug)
 
         try:
             status_data = await provider_client.get_order_status(order.provider_order_id)
             new_status = map_provider_status(status_data.status)
+
+            # If upstream provider reports remains is 0, mark completed ASAP
+            if (
+                status_data.remains == 0
+                and status_data.start_count is not None
+                and new_status not in [OrderStatus.CANCELED, OrderStatus.PARTIAL, OrderStatus.FAILED]
+            ):
+                new_status = OrderStatus.COMPLETED
 
             changed = False
             if status_data.start_count is not None and order.start_count != status_data.start_count:
@@ -115,12 +131,28 @@ async def sync_single_order(db: AsyncSession, order: Order) -> Tuple[bool, Order
     if not order.provider_order_id:
         return False, order
 
-    provider_slug = order.provider.slug if order.provider else "jap"
+    provider_slug = "jap"
+    if order.provider and order.provider.slug:
+        provider_slug = order.provider.slug
+    elif order.provider_id:
+        p_res = await db.execute(select(Provider).where(Provider.id == order.provider_id))
+        p_obj = p_res.scalars().first()
+        if p_obj and p_obj.slug:
+            provider_slug = p_obj.slug
+
     provider_client = get_provider(slug=provider_slug)
 
     try:
         status_data = await provider_client.get_order_status(order.provider_order_id)
         new_status = map_provider_status(status_data.status)
+
+        # If upstream provider reports remains is 0, mark completed ASAP
+        if (
+            status_data.remains == 0
+            and status_data.start_count is not None
+            and new_status not in [OrderStatus.CANCELED, OrderStatus.PARTIAL, OrderStatus.FAILED]
+        ):
+            new_status = OrderStatus.COMPLETED
 
         changed = False
         if status_data.start_count is not None and order.start_count != status_data.start_count:

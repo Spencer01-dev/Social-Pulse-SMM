@@ -38,7 +38,7 @@ async def order_status_poller_loop():
         except Exception as e:
             logger.error(f"[!] Error in automated order status poller: {e}")
 
-        await asyncio.sleep(15)
+        await asyncio.sleep(8)
 
 
 @asynccontextmanager
