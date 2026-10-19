@@ -611,27 +611,9 @@ async def cancel_child_panel_order(
     order.status = OrderStatus.CANCELED
     order.error_message = "Canceled by Child Panel administrator"
 
-    # Refund customer balance
-    if order.charge > 0 and order.user:
-        balance_before = order.user.balance
-        balance_after = balance_before + order.charge
-        order.user.balance = balance_after
-        db.add(order.user)
-
-        refund_tx = Transaction(
-            user_id=order.user.id,
-            order_id=order.id,
-            type=TransactionType.ORDER_REFUND,
-            amount=order.charge,
-            balance_before=balance_before,
-            balance_after=balance_after,
-            currency=order.currency or "KES",
-            payment_method=PaymentMethod.INTERNAL,
-            payment_reference=f"PANEL-REFUND-{str(order.id)[:8]}",
-            status=TransactionStatus.COMPLETED,
-            description=f"Child Panel Admin canceled & refunded Order #{str(order.order_number or order.id)[:8]}",
-        )
-        db.add(refund_tx)
+    # Idempotent Dual-Entry Refund (Customer retail + Panel owner wholesale + admin balance sync)
+    from app.services.refund_service import refund_order
+    await refund_order(db, order, reason="Child Panel Admin canceled")
 
     db.add(order)
     await db.commit()

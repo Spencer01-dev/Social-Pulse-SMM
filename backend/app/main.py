@@ -609,6 +609,28 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         print(f"[!] Warning during SkakeGains branding update: {exc}")
 
+    # Step: Retroactive Cancel/Refund Reconciliation for any unrefunded canceled orders
+    try:
+        from app.models.order import Order, OrderStatus
+        from app.services.refund_service import refund_order
+        async with AsyncSessionLocal() as db:
+            canceled_orders_res = await db.execute(
+                select(Order).where(Order.status.in_([OrderStatus.CANCELED, OrderStatus.FAILED]))
+            )
+            canceled_orders = canceled_orders_res.scalars().all()
+            reconciled_count = 0
+            for cord in canceled_orders:
+                res = await refund_order(db, cord, reason="Retroactive cancel refund reconciliation")
+                if res["customer_refunded"] or res["owner_refunded"]:
+                    reconciled_count += 1
+            if reconciled_count > 0:
+                await db.commit()
+                print(f"[+] Reconciled refunds for {reconciled_count} canceled orders.")
+            else:
+                print("[+] All canceled orders already fully refunded and reconciled.")
+    except Exception as exc:
+        print(f"[!] Warning during retroactive cancel refund reconciliation: {exc}")
+
     # Start background poller immediately so startup yields without delay
     poller_task = asyncio.create_task(order_status_poller_loop())
 

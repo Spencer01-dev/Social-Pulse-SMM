@@ -133,28 +133,8 @@ async def override_order_status(
 
     # Auto-refund if admin overrides status to Canceled or Failed
     if update_in.status in [OrderStatus.CANCELED, OrderStatus.FAILED] and old_status not in [OrderStatus.CANCELED, OrderStatus.FAILED]:
-        if order.charge > 0 and order.user:
-            from app.models.transaction import PaymentMethod, Transaction, TransactionStatus, TransactionType
-            from decimal import Decimal
-            balance_before = order.user.balance
-            balance_after = balance_before + order.charge
-            order.user.balance = balance_after
-            db.add(order.user)
-
-            refund_tx = Transaction(
-                user_id=order.user.id,
-                order_id=order.id,
-                type=TransactionType.ORDER_REFUND,
-                amount=order.charge,
-                balance_before=balance_before,
-                balance_after=balance_after,
-                currency=order.currency or "KES",
-                payment_method=PaymentMethod.INTERNAL,
-                payment_reference=f"ADMIN-REFUND-{str(order.id)[:8]}",
-                status=TransactionStatus.COMPLETED,
-                description=f"Admin canceled & refunded Order #{str(order.id)[:8]}",
-            )
-            db.add(refund_tx)
+        from app.services.refund_service import refund_order
+        await refund_order(db, order, reason="Admin status override")
 
     db.add(order)
     await db.commit()

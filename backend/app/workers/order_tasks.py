@@ -86,42 +86,13 @@ async def sync_active_orders(db: AsyncSession) -> Tuple[int, int]:
 
                 # Automated Double-Entry Refund for Canceled or Partial orders
                 if new_status in [OrderStatus.CANCELED, OrderStatus.PARTIAL]:
-                    refund_amount = Decimal("0.00")
-                    if new_status == OrderStatus.CANCELED:
-                        refund_amount = order.charge
-                    elif new_status == OrderStatus.PARTIAL and order.quantity > 0:
-                        unfulfilled_ratio = Decimal(order.remains) / Decimal(order.quantity)
-                        refund_amount = round(order.charge * unfulfilled_ratio, 2)
-
-                    if refund_amount > 0 and order.user:
-                        balance_before = order.user.balance
-                        balance_after = balance_before + refund_amount
-                        order.user.balance = balance_after
-                        db.add(order.user)
-
-                        # Create double-entry audit transaction ledger entry
-                        refund_tx = Transaction(
-                            user_id=order.user.id,
-                            order_id=order.id,
-                            type=TransactionType.ORDER_REFUND,
-                            amount=refund_amount,
-                            balance_before=balance_before,
-                            balance_after=balance_after,
-                            currency=order.currency or "KES",
-                            payment_method=PaymentMethod.INTERNAL,
-                            payment_reference=f"REFUND-{str(order.id)[:8]}",
-                            status=TransactionStatus.COMPLETED,
-                            description=f"Automated refund for {new_status.value} Order #{str(order.id)[:8]} ({order.remains} unfulfilled)",
-                            metadata_json={
-                                "order_id": str(order.id),
-                                "provider_order_id": order.provider_order_id,
-                                "unfulfilled_units": order.remains,
-                                "total_quantity": order.quantity,
-                                "status": new_status.value,
-                            }
-                        )
-                        db.add(refund_tx)
-                        logger.info(f"[+] Auto-refund processed for Order #{str(order.id)[:8]}: {order.currency} {refund_amount} credited to user {order.user.email}")
+                    from app.services.refund_service import refund_order
+                    await refund_order(
+                        db=db,
+                        order=order,
+                        reason=f"Provider {new_status.value}",
+                        partial_remains=order.remains
+                    )
 
             if changed:
                 total_updated += 1
@@ -166,40 +137,13 @@ async def sync_single_order(db: AsyncSession, order: Order) -> Tuple[bool, Order
             logger.info(f"[*] Single sync: Order #{str(order.id)[:8]} transitioned: {old_status.value} -> {new_status.value}")
 
             if new_status in [OrderStatus.CANCELED, OrderStatus.PARTIAL]:
-                refund_amount = Decimal("0.00")
-                if new_status == OrderStatus.CANCELED:
-                    refund_amount = order.charge
-                elif new_status == OrderStatus.PARTIAL and order.quantity > 0:
-                    unfulfilled_ratio = Decimal(order.remains) / Decimal(order.quantity)
-                    refund_amount = round(order.charge * unfulfilled_ratio, 2)
-
-                if refund_amount > 0 and order.user:
-                    balance_before = order.user.balance
-                    balance_after = balance_before + refund_amount
-                    order.user.balance = balance_after
-                    db.add(order.user)
-
-                    refund_tx = Transaction(
-                        user_id=order.user.id,
-                        order_id=order.id,
-                        type=TransactionType.ORDER_REFUND,
-                        amount=refund_amount,
-                        balance_before=balance_before,
-                        balance_after=balance_after,
-                        currency=order.currency or "KES",
-                        payment_method=PaymentMethod.INTERNAL,
-                        payment_reference=f"REFUND-{str(order.id)[:8]}",
-                        status=TransactionStatus.COMPLETED,
-                        description=f"Automated refund for {new_status.value} Order #{str(order.id)[:8]} ({order.remains} unfulfilled)",
-                        metadata_json={
-                            "order_id": str(order.id),
-                            "provider_order_id": order.provider_order_id,
-                            "unfulfilled_units": order.remains,
-                            "total_quantity": order.quantity,
-                            "status": new_status.value,
-                        }
-                    )
-                    db.add(refund_tx)
+                from app.services.refund_service import refund_order
+                await refund_order(
+                    db=db,
+                    order=order,
+                    reason=f"Provider single-sync {new_status.value}",
+                    partial_remains=order.remains
+                )
 
         if changed:
             db.add(order)
