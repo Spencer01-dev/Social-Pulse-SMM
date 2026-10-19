@@ -125,7 +125,21 @@ async def curate_dual_provider_catalog():
         """), {"res_id": reseller_prov.id})
         print(f"[+] Ensured ResellerSMM services are active for Views, Telegram, Nigerian/African ({res_r_act.rowcount} active).")
 
-        # Rule C: Pricing calibration to equalize or beat Delix Gains:
+        # Rule C: Baseline Pricing Formula (30% SocialPulse Wholesale / 100% Retail / 70% Child Panel Profit)
+        # 1. SocialPulse sells wholesale to Child Panels at +30% (wholesale_rate = provider_rate * 1.30)
+        # 2. SocialPulse sells retail to Customers at +100% (selling_rate = provider_rate * 2.00)
+        # 3. Child panels sell to their customers at the identical retail price (+100%), keeping the remaining 70% profit!
+        res_base = await db.execute(text("""
+            UPDATE services
+            SET wholesale_rate = ROUND(provider_rate * 1.30, 2),
+                selling_rate = ROUND(provider_rate * 2.00, 2),
+                markup_type = 'percentage',
+                markup_value = 100.00
+            WHERE markup_type != 'manual' AND provider_rate > 0;
+        """))
+        print(f"[+] Applied baseline 30% wholesale / 100% retail pricing to {res_base.rowcount} services.")
+
+        # Rule D: Pricing calibration to equalize or beat Delix Gains:
         # Ultra-cheap TikTok views (from ResellerSMM): sell at 0.85 KES (ws 0.50 KES)
         await db.execute(text("""
             UPDATE services

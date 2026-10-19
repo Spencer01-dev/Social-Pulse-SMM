@@ -80,7 +80,7 @@ def calculate_selling_rate(
 async def sync_services_from_provider(
     db: AsyncSession,
     provider_slug: str = "resellersmm",
-    default_markup_percent: Decimal = Decimal("80.00")
+    default_markup_percent: Decimal = Decimal("100.00")
 ) -> Tuple[int, int, int]:
     """
     Fetch services from provider and atomic upsert into PostgreSQL.

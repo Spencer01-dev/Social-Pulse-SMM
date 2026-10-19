@@ -198,9 +198,14 @@ export const AdminServicesPage: React.FC = () => {
           </Button>
 
           <div className="flex items-center gap-2">
-            <span className="px-3 py-2 bg-slate-950/80 border border-emerald-500/30 rounded-xl text-emerald-400 text-xs font-semibold">
-              ResellerSMM (Exclusive Provider)
-            </span>
+            <select
+              value={syncProvider}
+              onChange={(e) => setSyncProvider(e.target.value)}
+              className="px-3 py-1.5 bg-slate-950/80 border border-amber-500/30 rounded-xl text-amber-400 text-xs font-semibold focus:outline-none focus:border-amber-400 cursor-pointer"
+            >
+              <option value="resellersmm">ResellerSMM</option>
+              <option value="jap">JustAnotherPanel (JAP)</option>
+            </select>
 
             <Button
               variant="primary"
@@ -213,7 +218,7 @@ export const AdminServicesPage: React.FC = () => {
               <span>
                 {syncing
                   ? 'Syncing...'
-                  : 'Sync from ResellerSMM'}
+                  : `Sync from ${syncProvider === 'jap' ? 'JAP' : 'ResellerSMM'}`}
               </span>
             </Button>
           </div>
@@ -243,40 +248,72 @@ export const AdminServicesPage: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="flex items-center justify-between">
           <div className="flex-1 pr-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-                ResellerSMM Live Balance
-              </span>
-              <button
-                onClick={async () => {
-                  setLoadingBalance(true);
-                  try {
-                    const b = await servicesService.getProviderBalance(syncProvider);
-                    setProviderBalance(b);
-                  } catch (e) {
-                    console.error(e);
-                  } finally {
-                    setLoadingBalance(false);
-                  }
-                }}
-                title="Refresh Live Balance"
-                className="text-slate-400 hover:text-amber-400 transition-colors"
-              >
-                <RefreshCw className={`w-3 h-3 ${loadingBalance ? 'animate-spin' : ''}`} />
-              </button>
-              <button
-                onClick={() => {
-                  setKeyInput('4181c34178be65d635d0ea70687c285c');
-                  setKeyModalFeedback(null);
-                  setShowKeyModal(true);
-                }}
-                title="Configure Provider API Key"
-                className="text-slate-400 hover:text-amber-400 transition-colors"
-              >
-                <Key className="w-3 h-3" />
-              </button>
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+                  Live Balance
+                </span>
+                <button
+                  onClick={async () => {
+                    setLoadingBalance(true);
+                    try {
+                      const b = await servicesService.getProviderBalance(syncProvider);
+                      setProviderBalance(b);
+                    } catch (e) {
+                      console.error(e);
+                    } finally {
+                      setLoadingBalance(false);
+                    }
+                  }}
+                  title="Refresh Live Balance"
+                  className="text-slate-400 hover:text-amber-400 transition-colors"
+                >
+                  <RefreshCw className={`w-3 h-3 ${loadingBalance ? 'animate-spin' : ''}`} />
+                </button>
+                <button
+                  onClick={() => {
+                    setKeyInput(syncProvider === 'jap' ? '4181c34178be65d635d0ea70687c285c' : 'f6f545ec5a398c1ba36edb4495962bd8');
+                    setKeyModalFeedback(null);
+                    setShowKeyModal(true);
+                  }}
+                  title="Configure Provider API Key"
+                  className="text-slate-400 hover:text-amber-400 transition-colors"
+                >
+                  <Key className="w-3 h-3" />
+                </button>
+              </div>
+
+              {/* Provider Toggle Pill */}
+              <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setSyncProvider('resellersmm')}
+                  className={`px-2 py-0.5 text-[10px] rounded-md font-semibold transition-colors ${
+                    syncProvider === 'resellersmm'
+                      ? 'bg-amber-500 text-slate-950 shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  ResellerSMM
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSyncProvider('jap')}
+                  className={`px-2 py-0.5 text-[10px] rounded-md font-semibold transition-colors ${
+                    syncProvider === 'jap'
+                      ? 'bg-amber-500 text-slate-950 shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  JAP
+                </button>
+              </div>
             </div>
+
             <div className="mt-1">
+              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">
+                {syncProvider === 'jap' ? 'JustAnotherPanel' : 'ResellerSMM'}
+              </span>
               {loadingBalance ? (
                 <span className="text-sm font-medium text-amber-400 animate-pulse">Connecting...</span>
               ) : providerBalance?.status === 'offline' ? (
@@ -291,7 +328,7 @@ export const AdminServicesPage: React.FC = () => {
                     </span>
                     <button
                       onClick={() => {
-                        setKeyInput('4181c34178be65d635d0ea70687c285c');
+                        setKeyInput(syncProvider === 'jap' ? '4181c34178be65d635d0ea70687c285c' : 'f6f545ec5a398c1ba36edb4495962bd8');
                         setKeyModalFeedback(null);
                         setShowKeyModal(true);
                       }}
@@ -406,10 +443,11 @@ export const AdminServicesPage: React.FC = () => {
               <select
                 value={providerFilter}
                 onChange={(e) => setProviderFilter(e.target.value)}
-                className="px-3 py-1.5 bg-slate-950/80 border border-slate-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-blue-500 cursor-pointer"
+                className="px-3 py-1.5 bg-slate-950/80 border border-slate-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-amber-500 cursor-pointer"
               >
-                <option value="all">All (ResellerSMM)</option>
+                <option value="all">All Providers</option>
                 <option value="resellersmm">ResellerSMM</option>
+                <option value="jap">JustAnotherPanel (JAP)</option>
               </select>
             </div>
           </div>
@@ -638,7 +676,7 @@ export const AdminServicesPage: React.FC = () => {
             <form onSubmit={handleSaveProviderKey} className="space-y-4 mt-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Provider Reseller API Key
+                  {syncProvider === 'jap' ? 'JustAnotherPanel (JAP)' : 'ResellerSMM'} API Key
                 </label>
                 <input
                   type="text"
@@ -649,7 +687,9 @@ export const AdminServicesPage: React.FC = () => {
                   required
                 />
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Obtained from your ResellerSMM Account &gt; API tab.
+                  {syncProvider === 'jap'
+                    ? 'Obtained from your JustAnotherPanel Account > API tab.'
+                    : 'Obtained from your ResellerSMM Account > API tab.'}
                 </p>
               </div>
 
