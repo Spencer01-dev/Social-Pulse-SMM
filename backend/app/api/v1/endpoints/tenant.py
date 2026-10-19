@@ -112,6 +112,7 @@ async def resolve_tenant(
         "currency": panel.currency,
         "contact_email": branding.get("contact_email", f"support@{panel.domain}"),
         "whatsapp_support": branding.get("whatsapp_support"),
+        "whatsapp_channel_url": branding.get("whatsapp_channel_url"),
         "default_markup_percent": branding.get("default_markup_percent", 0),
         "nameserver1": panel.nameserver1,
         "nameserver2": panel.nameserver2,

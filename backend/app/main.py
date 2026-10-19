@@ -410,6 +410,7 @@ async def lifespan(app: FastAPI):
                 branding["logo_url"] = "/skakegains-logo.png"
                 branding["contact_email"] = "support@skakegains.com"
                 branding["theme_color"] = branding.get("theme_color", "#10b981")
+                branding["whatsapp_channel_url"] = "https://whatsapp.com/channel/0029Vb8c54F0bIdka4i2Xh2M"
                 p.branding_json = branding
                 flag_modified(p, "branding_json")
                 db.add(p)
@@ -432,7 +433,7 @@ async def lifespan(app: FastAPI):
                 service_count = count_res.scalar() or 0
                 if service_count == 0:
                     print("[*] No services found in DB. Starting background initial sync...")
-                    total, created, updated = await sync_services_from_provider(db, provider_slug="jap")
+                    total, created, updated = await sync_services_from_provider(db, provider_slug="resellersmm")
                     print(f"[+] Initial service sync complete: {total} fetched, {created} created, {updated} updated.")
                     from app.core.cache import clear_all_cache
                     clear_all_cache()

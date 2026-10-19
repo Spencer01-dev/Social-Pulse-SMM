@@ -1180,12 +1180,7 @@ export const NewOrderPage: React.FC = () => {
                     KES {calculatedCharge.toFixed(2)}
                   </span>
                 </div>
-                {isTenantMode && tenant && (
-                  <div className="text-[10px] text-amber-400/90 flex items-center justify-between">
-                    <span>Retail Price ({tenant.site_name || tenant.domain})</span>
-                    <span>+{tenant.default_markup_percent}% markup applied</span>
-                  </div>
-                )}
+
                 <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800/80">
                   <span className="text-slate-400">Available Balance:</span>
                   <span className={`font-bold ${hasInsufficientBalance ? 'text-rose-400' : 'text-slate-200'}`}>

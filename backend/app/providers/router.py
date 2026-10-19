@@ -55,18 +55,16 @@ class SmartProviderRouter:
         active_providers = query.scalars().all()
 
         if not active_providers:
-            # Fallback to configured JustAnotherPanel provider
-            jap_key = settings.JAP_API_KEY
-            if jap_key:
-                active_providers = [
-                    Provider(
-                        name="JustAnotherPanel",
-                        slug="jap",
-                        api_url=settings.JAP_API_URL,
-                        is_active=True,
-                        currency="USD"
-                    )
-                ]
+            # Fallback to configured ResellerSMM provider
+            active_providers = [
+                Provider(
+                    name="ResellerSMM",
+                    slug="resellersmm",
+                    api_url=settings.RESELLERSMM_API_URL,
+                    is_active=True,
+                    currency="USD"
+                )
+            ]
 
         last_error = None
 

@@ -32,7 +32,7 @@ export const AdminServicesPage: React.FC = () => {
   } | null>(null);
 
   const [search, setSearch] = useState('');
-  const [syncProvider, setSyncProvider] = useState('jap');
+  const [syncProvider, setSyncProvider] = useState('resellersmm');
   const [providerFilter, setProviderFilter] = useState<string>('all');
   const [platformFilter, setPlatformFilter] = useState<string>('all');
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
@@ -198,18 +198,9 @@ export const AdminServicesPage: React.FC = () => {
           </Button>
 
           <div className="flex items-center gap-2">
-            <select
-              value={syncProvider}
-              onChange={(e) => {
-                setSyncProvider(e.target.value);
-                setProviderBalance(null);
-              }}
-              className="px-3 py-2 bg-slate-950/80 border border-amber-500/30 rounded-xl text-white text-xs font-semibold focus:outline-none focus:border-amber-500 cursor-pointer"
-            >
-              <option value="jap">JustAnotherPanel</option>
-              <option value="secsers">Secsers</option>
-              <option value="resellersmm">ResellerSMM</option>
-            </select>
+            <span className="px-3 py-2 bg-slate-950/80 border border-emerald-500/30 rounded-xl text-emerald-400 text-xs font-semibold">
+              ResellerSMM (Exclusive Provider)
+            </span>
 
             <Button
               variant="primary"
@@ -222,13 +213,7 @@ export const AdminServicesPage: React.FC = () => {
               <span>
                 {syncing
                   ? 'Syncing...'
-                  : `Sync from ${
-                      syncProvider === 'secsers'
-                        ? 'Secsers'
-                        : syncProvider === 'resellersmm'
-                        ? 'ResellerSMM'
-                        : 'JustAnotherPanel'
-                    }`}
+                  : 'Sync from ResellerSMM'}
               </span>
             </Button>
           </div>
@@ -260,7 +245,7 @@ export const AdminServicesPage: React.FC = () => {
           <div className="flex-1 pr-2">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-                {syncProvider === 'secsers' ? 'Secsers' : syncProvider === 'resellersmm' ? 'ResellerSMM' : 'JustAnotherPanel'} Balance
+                ResellerSMM Live Balance
               </span>
               <button
                 onClick={async () => {
@@ -423,9 +408,7 @@ export const AdminServicesPage: React.FC = () => {
                 onChange={(e) => setProviderFilter(e.target.value)}
                 className="px-3 py-1.5 bg-slate-950/80 border border-slate-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-blue-500 cursor-pointer"
               >
-                <option value="all">All Providers</option>
-                <option value="jap">JustAnotherPanel</option>
-                <option value="secsers">Secsers</option>
+                <option value="all">All (ResellerSMM)</option>
                 <option value="resellersmm">ResellerSMM</option>
               </select>
             </div>
@@ -621,7 +604,7 @@ export const AdminServicesPage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-white">
-                    {syncProvider === 'secsers' ? 'Secsers' : syncProvider === 'resellersmm' ? 'ResellerSMM' : 'JustAnotherPanel'} API Key
+                    ResellerSMM API Key
                   </h3>
                   <p className="text-xs text-slate-400">Connect wholesale catalog &amp; balance</p>
                 </div>
@@ -666,7 +649,7 @@ export const AdminServicesPage: React.FC = () => {
                   required
                 />
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Obtained from your {syncProvider === 'secsers' ? 'Secsers' : syncProvider === 'resellersmm' ? 'ResellerSMM' : 'JustAnotherPanel'} Account &gt; API tab.
+                  Obtained from your ResellerSMM Account &gt; API tab.
                 </p>
               </div>
 

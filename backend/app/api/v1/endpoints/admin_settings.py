@@ -22,16 +22,6 @@ async def get_platform_settings(
         "debug_mode": settings.DEBUG,
         "use_mock_providers": settings.USE_MOCK_PROVIDERS,
         "providers": {
-            "jap": {
-                "name": "JustAnotherPanel",
-                "api_url": settings.JAP_API_URL,
-                "has_api_key": bool(settings.JAP_API_KEY),
-            },
-            "secsers": {
-                "name": "Secsers",
-                "api_url": settings.SECSERS_API_URL,
-                "has_api_key": bool(settings.SECSERS_API_KEY),
-            },
             "resellersmm": {
                 "name": "ResellerSMM",
                 "api_url": settings.RESELLERSMM_API_URL,

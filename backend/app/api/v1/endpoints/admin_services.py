@@ -94,7 +94,7 @@ async def list_admin_services(
 
 @router.post("/sync", response_model=SyncServicesResponse)
 async def sync_services(
-    provider_slug: str = "jap",
+    provider_slug: str = "resellersmm",
     default_markup: Decimal = Query(Decimal("80.00"), ge=0, description="Default markup % for new services"),
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
@@ -264,7 +264,7 @@ async def apply_bulk_markup(
 
 @router.get("/provider-balance")
 async def get_provider_live_balance(
-    provider_slug: str = "jap",
+    provider_slug: str = "resellersmm",
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
 ) -> Any:
@@ -390,8 +390,6 @@ async def get_all_providers_summary(
     from app.core.config import settings
 
     providers_list = [
-        {"name": "JustAnotherPanel", "slug": "jap", "api_url": settings.JAP_API_URL, "currency": "USD"},
-        {"name": "Secsers", "slug": "secsers", "api_url": settings.SECSERS_API_URL, "currency": "USD"},
         {"name": "ResellerSMM", "slug": "resellersmm", "api_url": settings.RESELLERSMM_API_URL, "currency": "USD"},
     ]
     results = []

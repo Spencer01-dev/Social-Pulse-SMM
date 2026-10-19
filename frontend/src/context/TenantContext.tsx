@@ -15,6 +15,7 @@ export interface TenantData {
   currency: string;
   contact_email: string;
   whatsapp_support?: string | null;
+  whatsapp_channel_url?: string | null;
   default_markup_percent: number;
   nameserver1?: string;
   nameserver2?: string;
@@ -85,6 +86,7 @@ export const SKAKEGAINS_PRESET: TenantData = {
   currency: 'KES',
   contact_email: 'support@skakegains.com',
   whatsapp_support: '+254703917794',
+  whatsapp_channel_url: 'https://whatsapp.com/channel/0029Vb8c54F0bIdka4i2Xh2M',
   default_markup_percent: 25,
   nameserver1: 'ns1.socialpulse.io',
   nameserver2: 'ns2.socialpulse.io',

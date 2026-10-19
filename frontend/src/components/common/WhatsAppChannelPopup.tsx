@@ -1,13 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { X, MessageCircle, ExternalLink, Users, Bell, Zap } from 'lucide-react';
+import { useTenant } from '../../context/TenantContext';
 
-const WHATSAPP_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8hsFI1SWstSgF0M31m';
+const DEFAULT_WHATSAPP_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8hsFI1SWstSgF0M31m';
 const STORAGE_KEY = 'sp_whatsapp_popup_dismissed';
 const DISMISS_HOURS = 24;
 
 export const WhatsAppChannelPopup: React.FC = () => {
+  const { tenant } = useTenant();
   const [visible, setVisible] = useState(false);
   const [animateIn, setAnimateIn] = useState(false);
+
+  const brandName = tenant?.site_name || 'SocialPulse';
+  const channelUrl = tenant?.whatsapp_channel_url || DEFAULT_WHATSAPP_CHANNEL_URL;
 
   useEffect(() => {
     const dismissed = localStorage.getItem(STORAGE_KEY);
@@ -33,7 +38,7 @@ export const WhatsAppChannelPopup: React.FC = () => {
   };
 
   const handleJoin = () => {
-    window.open(WHATSAPP_CHANNEL_URL, '_blank', 'noopener,noreferrer');
+    window.open(channelUrl, '_blank', 'noopener,noreferrer');
     handleDismiss();
   };
 
@@ -165,7 +170,7 @@ export const WhatsAppChannelPopup: React.FC = () => {
                 letterSpacing: '-0.02em',
               }}
             >
-              Join Our WhatsApp Channel
+              Join {brandName} WhatsApp Channel
             </h2>
             <p
               style={{
@@ -191,7 +196,7 @@ export const WhatsAppChannelPopup: React.FC = () => {
               {[
                 { icon: Bell, text: 'Instant service updates & new features', color: '#25D366' },
                 { icon: Zap, text: 'Exclusive deals & early access promos', color: '#FBBF24' },
-                { icon: Users, text: 'Join 1,000+ active SocialPulse users', color: '#60A5FA' },
+                { icon: Users, text: `Join 1,000+ active ${brandName} users`, color: '#60A5FA' },
               ].map(({ icon: Icon, text, color }, i) => (
                 <div
                   key={i}

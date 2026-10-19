@@ -79,7 +79,7 @@ def calculate_selling_rate(
 
 async def sync_services_from_provider(
     db: AsyncSession,
-    provider_slug: str = "jap",
+    provider_slug: str = "resellersmm",
     default_markup_percent: Decimal = Decimal("80.00")
 ) -> Tuple[int, int, int]:
     """
