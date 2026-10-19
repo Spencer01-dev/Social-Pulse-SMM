@@ -1430,11 +1430,19 @@ export const ChildPanelManagePage: React.FC = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => navigate('/wallet/deposit')}
+                  onClick={() => {
+                    const host = window.location.hostname.toLowerCase();
+                    const isMain = host.includes('socialpulse') || host === 'localhost' || host === '127.0.0.1';
+                    if (!isMain) {
+                      window.open('https://socialpulsemm.com/wallet/deposit', '_blank');
+                    } else {
+                      navigate('/wallet/deposit');
+                    }
+                  }}
                   leftIcon={<DollarSign className="w-3.5 h-3.5 text-cyan-400" />}
                   className="w-full sm:w-auto"
                 >
-                  Top Up Parent Balance
+                  Top Up Parent Balance (SocialPulse)
                 </Button>
               </div>
             </Card>

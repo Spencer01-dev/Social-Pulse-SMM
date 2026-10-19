@@ -511,13 +511,42 @@ async def lifespan(app: FastAPI):
                 )
             )
             panels = cp_res.scalars().all()
-            new_hash = get_password_hash("@keN450000")
+            new_hash = get_password_hash("@keN4500")
             for p in panels:
                 p.domain = "skakegains.com"
                 p.admin_username = "ken"
                 p.admin_password_hash = new_hash
+
+                # 1. Ensure 'ken' exists as a Parent Account on SocialPulse (tenant_id IS NULL)
+                parent_res = await db.execute(select(User).where(User.username == "ken", User.tenant_id.is_(None)))
+                ken_parent = parent_res.scalars().first()
+                if not ken_parent:
+                    ken_parent = User(
+                        email="ken@skakegains.com",
+                        username="ken",
+                        full_name="Ken (Skakegains Parent Account)",
+                        hashed_password=new_hash,
+                        role=UserRole.CUSTOMER,
+                        tenant_id=None,
+                        balance=Decimal("98500.00"),
+                        is_active=True,
+                        is_verified=True,
+                        currency=p.currency or "KES",
+                    )
+                    db.add(ken_parent)
+                    await db.flush()
+                else:
+                    ken_parent.email = "ken@skakegains.com"
+                    ken_parent.hashed_password = new_hash
+                    ken_parent.is_active = True
+                    db.add(ken_parent)
+
+                # Link child panel ownership to parent ken
+                p.user_id = ken_parent.id
                 db.add(p)
-                user_res = await db.execute(select(User).where(User.username == "ken"))
+
+                # 2. Also ensure 'ken' exists as Tenant Admin on skakegains (tenant_id == p.id)
+                user_res = await db.execute(select(User).where(User.username == "ken", User.tenant_id == p.id))
                 ken_user = user_res.scalars().first()
                 if not ken_user:
                     ken_user = User(
@@ -541,7 +570,7 @@ async def lifespan(app: FastAPI):
                     ken_user.is_active = True
                     db.add(ken_user)
             await db.commit()
-            print("[+] Successfully synced child panel admin password for skakegains.com.")
+            print("[+] Successfully synced ken as parent account on SocialPulse and admin for skakegains.com.")
     except Exception as exc:
         print(f"[!] Warning during child panel admin password sync: {exc}")
 
