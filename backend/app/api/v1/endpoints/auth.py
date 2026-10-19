@@ -297,9 +297,24 @@ async def refresh_access_token(
 
 @router.get("/me", response_model=UserResponse)
 async def get_authenticated_user_profile(
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
 ) -> Any:
     """
     Get profile information of currently logged-in user.
+    If the user is a child panel administrator, their balance reflects
+    their linked parent wholesale account balance from SocialPulse.
     """
+    if current_user.tenant_id and current_user.role == UserRole.ADMIN:
+        cp_q = await db.execute(select(ChildPanel).where(ChildPanel.id == current_user.tenant_id))
+        panel = cp_q.scalars().first()
+        if panel and panel.user_id:
+            parent_q = await db.execute(select(User).where(User.id == panel.user_id))
+            parent_owner = parent_q.scalars().first()
+            if parent_owner and current_user.balance != parent_owner.balance:
+                current_user.balance = parent_owner.balance
+                db.add(current_user)
+                await db.commit()
+                await db.refresh(current_user)
+
     return current_user

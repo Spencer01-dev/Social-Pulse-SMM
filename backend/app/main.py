@@ -455,9 +455,13 @@ async def lifespan(app: FastAPI):
                     WHERE domain ILIKE '%skakegains%' OR domain ILIKE '%shakegains%';
                 """))
 
-                # Reset ken admin parent balance to 0.00 until real top-up
+                # Sync tenant admin balance with parent wholesale balance
                 await conn.execute(text("""
-                    UPDATE users SET balance = 0.00 WHERE LOWER(username) = 'ken';
+                    UPDATE users u
+                    SET balance = parent.balance
+                    FROM child_panels cp
+                    JOIN users parent ON cp.user_id = parent.id
+                    WHERE u.tenant_id = cp.id AND u.role = 'admin';
                 """))
 
                 from app.core.cache import clear_all_cache
@@ -544,7 +548,6 @@ async def lifespan(app: FastAPI):
                     ken_parent.email = "ken@skakegains.com"
                     ken_parent.hashed_password = new_hash
                     ken_parent.is_active = True
-                    ken_parent.balance = Decimal("0.00")
                     db.add(ken_parent)
 
                 # Link child panel ownership to parent ken
@@ -562,6 +565,7 @@ async def lifespan(app: FastAPI):
                         hashed_password=new_hash,
                         role=UserRole.ADMIN,
                         tenant_id=p.id,
+                        balance=ken_parent.balance,
                         is_active=True,
                         is_verified=True,
                         currency=p.currency or "KES",
@@ -574,6 +578,7 @@ async def lifespan(app: FastAPI):
                     ken_user.role = UserRole.ADMIN
                     ken_user.tenant_id = p.id
                     ken_user.is_active = True
+                    ken_user.balance = ken_parent.balance
                     db.add(ken_user)
             await db.commit()
             print("[+] Successfully synced ken as parent account on SocialPulse and admin for skakegains.com.")
