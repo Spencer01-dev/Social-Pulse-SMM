@@ -308,6 +308,156 @@ async def lifespan(app: FastAPI):
                     WHERE domain ILIKE '%skakegains%' OR domain ILIKE '%shakegains%';
                 """))
                 print("[+] skakegains.com PayHero gateway initialized.")
+
+                # Step 14: Dual-Provider Catalog Curation & Price Calibration (Beat Delix Gains, lowest price 18.70 KES everywhere)
+                # Ensure JAP and ResellerSMM providers are active
+                await conn.execute(text("""
+                    UPDATE providers SET is_active = TRUE WHERE slug IN ('jap', 'resellersmm');
+                """))
+
+                # Ensure JAP budget TikTok Likes and cheap IG bot followers are active
+                await conn.execute(text("""
+                    UPDATE services 
+                    SET is_active = TRUE 
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
+                      AND (
+                          (platform = 'tiktok' AND name ILIKE '%like%' AND name NOT ILIKE '%view%')
+                          OR (platform = 'instagram' AND name ILIKE '%follower%' AND name NOT ILIKE '%view%' AND name NOT ILIKE '%reel%')
+                      );
+                """))
+
+                # Deactivate JAP services where ResellerSMM is superior (Views, Reels, Telegram, Nigerian/African)
+                await conn.execute(text("""
+                    UPDATE services 
+                    SET is_active = FALSE 
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
+                      AND (
+                          (platform = 'tiktok' AND (name ILIKE '%view%' OR category ILIKE '%view%'))
+                          OR (platform = 'instagram' AND (name ILIKE '%view%' OR category ILIKE '%view%' OR name ILIKE '%reel%' OR category ILIKE '%reel%'))
+                          OR (platform = 'telegram' AND (name ILIKE '%member%' OR category ILIKE '%member%'))
+                          OR (name ILIKE '%nigeria%' OR category ILIKE '%nigeria%' OR name ILIKE '%africa%' OR category ILIKE '%africa%')
+                      );
+                """))
+
+                # Deactivate ResellerSMM TikTok Likes and Bot Followers in favor of JAP
+                await conn.execute(text("""
+                    UPDATE services 
+                    SET is_active = FALSE 
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'resellersmm')
+                      AND (
+                          (platform = 'tiktok' AND (name ILIKE '%like%' OR category ILIKE '%like%'))
+                          OR (platform = 'instagram' AND (name ILIKE '%bot%' OR name ILIKE '%high drop%' OR name ILIKE '%no refill%') AND (name ILIKE '%follower%' OR category ILIKE '%follower%'))
+                      );
+                """))
+
+                # Ensure ResellerSMM services are active for Views, Reels, Telegram, Nigerian/African
+                await conn.execute(text("""
+                    UPDATE services 
+                    SET is_active = TRUE 
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'resellersmm')
+                      AND (
+                          (platform = 'tiktok' AND (name ILIKE '%view%' OR category ILIKE '%view%'))
+                          OR (platform = 'instagram' AND (name ILIKE '%view%' OR category ILIKE '%view%' OR name ILIKE '%reel%' OR category ILIKE '%reel%'))
+                          OR (platform = 'telegram' AND (name ILIKE '%member%' OR category ILIKE '%member%'))
+                          OR (name ILIKE '%nigeria%' OR category ILIKE '%nigeria%' OR name ILIKE '%africa%' OR category ILIKE '%africa%')
+                      );
+                """))
+
+                # Baseline Pricing Formula (30% SocialPulse Wholesale / 100% Retail)
+                await conn.execute(text("""
+                    UPDATE services
+                    SET wholesale_rate = ROUND(provider_rate * 1.30, 2),
+                        selling_rate = ROUND(provider_rate * 2.00, 2),
+                        markup_type = 'percentage',
+                        markup_value = 100.00
+                    WHERE markup_type != 'manual' AND provider_rate > 0;
+                """))
+
+                # Calibrate ultra-cheap views & members
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 0.85, wholesale_rate = 0.50, markup_type = 'manual'
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'resellersmm')
+                      AND platform = 'tiktok' AND name ILIKE '%view%' AND provider_rate < 0.60;
+                """))
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 0.80, wholesale_rate = 0.40, markup_type = 'manual'
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'resellersmm')
+                      AND platform = 'instagram' AND (name ILIKE '%view%' OR name ILIKE '%reel%') AND provider_rate < 0.50;
+                """))
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 0.90, wholesale_rate = 0.45, markup_type = 'manual'
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'resellersmm')
+                      AND platform = 'telegram' AND name ILIKE '%member%' AND provider_rate < 0.50;
+                """))
+
+                # TikTok Likes Calibration (Delix tier matching with lowest price 18.70 KES everywhere):
+                # Delix tier 1: TT Likes [Max 100K] (#9423) -> 18.70 KES
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 18.70, wholesale_rate = 18.70, markup_type = 'manual'
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
+                      AND platform = 'tiktok' AND provider_service_id = '9423';
+                """))
+                # Delix tier 2: TT Likes [Max 10M] (#9301) -> 25.00 KES
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 25.00, wholesale_rate = 24.00, markup_type = 'manual'
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
+                      AND platform = 'tiktok' AND provider_service_id = '9301';
+                """))
+                # Delix tier 3: TT Likes Fast [Max 5K - 500K] (#10385, #9179) -> 33.00 KES
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 33.00, wholesale_rate = 28.00, markup_type = 'manual'
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
+                      AND platform = 'tiktok' AND provider_service_id IN ('10385', '9179');
+                """))
+                # Delix tier 4: TT Likes 30-Day Refill (#10173) -> 36.00 KES
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 36.00, wholesale_rate = 33.00, markup_type = 'manual'
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
+                      AND platform = 'tiktok' AND (provider_service_id = '10173' OR (name ILIKE '%like%' AND name ILIKE '%30d%'));
+                """))
+                # Delix tier 5: TT Likes 60-Day Refill (#9397) -> 39.00 KES
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 39.00, wholesale_rate = 37.00, markup_type = 'manual'
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
+                      AND platform = 'tiktok' AND (provider_service_id = '9397' OR (name ILIKE '%like%' AND name ILIKE '%60d%'));
+                """))
+                # TikTok Live Likes (#8063) -> 3.20 KES
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 3.20, wholesale_rate = 2.30, markup_type = 'manual'
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
+                      AND platform = 'tiktok' AND provider_service_id = '8063';
+                """))
+                # Instagram Bot Followers -> 39.00 KES
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 39.00, wholesale_rate = 28.00, markup_type = 'manual'
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
+                      AND platform = 'instagram' AND name ILIKE '%follower%' AND provider_rate < 32.00;
+                """))
+
+                # Set child panel default_markup_percent to 0 so all child panels (skakegains.com) display identical retail prices to SocialPulse
+                await conn.execute(text("""
+                    UPDATE child_panels
+                    SET branding_json = jsonb_set(
+                        COALESCE(branding_json, '{}'::jsonb),
+                        '{default_markup_percent}',
+                        '0'::jsonb
+                    )
+                    WHERE domain ILIKE '%skakegains%' OR domain ILIKE '%shakegains%';
+                """))
+
+                from app.core.cache import clear_all_cache
+                clear_all_cache()
+                print("[+] Step 14: Dual-Provider catalog curated & rates calibrated (lowest price 18.70 KES everywhere).")
             except Exception as e:
                 print(f"[!] Startup schema fix error: {e}")
         print("[+] Database schema verified and initialized.")

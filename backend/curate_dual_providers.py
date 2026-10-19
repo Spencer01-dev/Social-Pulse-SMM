@@ -162,17 +162,17 @@ async def curate_dual_provider_catalog():
         """), {"res_id": reseller_prov.id})
 
         # TikTok Likes Calibration to BEAT Delix Gains on every tier:
-        # Delix tier 1: TT Likes [Max 100K] = 18.4 Ksh -> SocialPulse sells at 17.90 KES (ws: 16.50 KES)
+        # Delix tier 1: TT Likes [Max 100K] (#9423) = 18.4 Ksh -> SocialPulse & Child Panels sell at 18.70 KES (ws: 18.70 KES)
         await db.execute(text("""
             UPDATE services
-            SET selling_rate = 17.90, wholesale_rate = 16.50, markup_type = 'manual'
+            SET selling_rate = 18.70, wholesale_rate = 18.70, markup_type = 'manual'
             WHERE provider_id = :jap_id AND platform = 'tiktok' AND provider_service_id = '9423';
         """), {"jap_id": jap_prov.id})
 
-        # Delix tier 2: TT Likes [Max 10M] = 27.5 Ksh -> SocialPulse sells at 26.00 KES (ws: 23.50 KES)
+        # Delix tier 2: TT Likes [Max 10M] (#9301) = 27.5 Ksh -> SocialPulse & Child Panels sell at 25.00 KES (ws: 24.00 KES)
         await db.execute(text("""
             UPDATE services
-            SET selling_rate = 26.00, wholesale_rate = 23.50, markup_type = 'manual'
+            SET selling_rate = 25.00, wholesale_rate = 24.00, markup_type = 'manual'
             WHERE provider_id = :jap_id AND platform = 'tiktok' AND provider_service_id = '9301';
         """), {"jap_id": jap_prov.id})
 
@@ -209,7 +209,16 @@ async def curate_dual_provider_catalog():
             UPDATE services
             SET selling_rate = 39.00, wholesale_rate = 28.00, markup_type = 'manual'
             WHERE provider_id = :jap_id AND platform = 'instagram' AND name ILIKE '%follower%' AND provider_rate < 32.00;
-        """), {"jap_id": jap_prov.id})
+        # Set child panel (e.g. skakegains.com) default_markup_percent to 0 so all prices match SocialPulse identically
+        await db.execute(text("""
+            UPDATE child_panels
+            SET branding_json = jsonb_set(
+                COALESCE(branding_json, '{}'::jsonb),
+                '{default_markup_percent}',
+                '0'::jsonb
+            )
+            WHERE domain ILIKE '%skakegains%' OR domain ILIKE '%shakegains%';
+        """))
 
         await db.commit()
         print("[+] Rates calibrated to beat Delix Gains with parity across SocialPulse and child panels.")
