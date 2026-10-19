@@ -218,6 +218,10 @@ async def create_order(
         initial_status = OrderStatus.PENDING
 
     # 8. Persist order record in database (using tenant_id resolved in step 2)
+    # If placed on a child panel, profit is the panel's profit (total_charge - wholesale_cost).
+    # If placed directly on SocialPulse, profit is SocialPulse's profit (total_charge - provider_cost).
+    order_profit = (total_charge - wholesale_cost) if (panel_owner and wholesale_cost > Decimal("0.00")) else profit
+
     order = Order(
         user_id=current_user.id,
         tenant_id=tenant_id,
@@ -229,8 +233,9 @@ async def create_order(
         start_count=0,
         remains=order_in.quantity,
         charge=total_charge,
+        wholesale_cost=wholesale_cost,
         provider_cost=provider_cost,
-        profit=profit,
+        profit=order_profit,
         currency="KES",
         status=initial_status,
         custom_comments=order_in.custom_comments,

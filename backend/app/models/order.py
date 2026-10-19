@@ -38,8 +38,9 @@ class Order(TimeStampedUUIDModel):
 
     # Financial tracking (in KES)
     charge = Column(Numeric(12, 2), nullable=False)        # Retail price charged to customer
-    provider_cost = Column(Numeric(12, 2), default=0.00, nullable=False) # Wholesale cost from provider
-    profit = Column(Numeric(12, 2), default=0.00, nullable=False)        # Gross profit earned (charge - provider_cost)
+    wholesale_cost = Column(Numeric(12, 2), default=0.00, nullable=False) # Wholesale fulfillment cost paid by Child Panel to SocialPulse
+    provider_cost = Column(Numeric(12, 2), default=0.00, nullable=False) # Direct cost from upstream provider (JAP/ResellerSMM)
+    profit = Column(Numeric(12, 2), default=0.00, nullable=False)        # Gross profit earned
     currency = Column(String(10), default="KES", nullable=False)
 
     # Order status

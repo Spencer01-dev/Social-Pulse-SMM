@@ -139,6 +139,7 @@ export interface PlatformSummary {
 export interface CustomerOrder {
   id: string;
   order_number?: number;
+  tenant_id?: string;
   service_id: string;
   service_name: string;
   platform: PlatformType;
@@ -147,6 +148,7 @@ export interface CustomerOrder {
   start_count: number;
   remains: number;
   charge: number;
+  wholesale_cost?: number;
   currency: string;
   status: OrderStatus;
   refill_available?: boolean;

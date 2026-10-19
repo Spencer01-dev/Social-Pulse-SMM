@@ -54,6 +54,7 @@ class AdminOrderResponse(BaseModel):
     start_count: int
     remains: int
     charge: Decimal
+    wholesale_cost: Optional[Decimal] = Decimal("0.00")
     provider_cost: Decimal
     profit: Decimal
     currency: str

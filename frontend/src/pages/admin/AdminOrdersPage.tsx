@@ -249,7 +249,13 @@ export const AdminOrdersPage: React.FC = () => {
   };
 
   const activeOrders = orders.filter(o => !['canceled', 'failed'].includes(o.status));
-  const totalRevenue = activeOrders.reduce((acc, o) => acc + Number(o.charge), 0);
+  const totalRevenue = activeOrders.reduce((acc, o) => {
+    // If order was placed on a child panel, SocialPulse wholesale revenue is wholesale_cost
+    const rev = (o.tenant_id && o.wholesale_cost && Number(o.wholesale_cost) > 0)
+      ? Number(o.wholesale_cost)
+      : Number(o.charge);
+    return acc + rev;
+  }, 0);
   const totalProfit = activeOrders.reduce((acc, o) => acc + Number(o.profit), 0);
 
   return (
@@ -510,12 +516,33 @@ export const AdminOrdersPage: React.FC = () => {
                     </div>
                   </td>
                   <td className="py-3.5 px-4 font-mono">
-                    <span className="text-emerald-400 font-semibold block">
-                      KES {Number(order.charge).toFixed(2)}
-                    </span>
-                    <span className="text-[10px] text-indigo-300 font-medium">
-                      +KES {Number(order.profit).toFixed(2)}
-                    </span>
+                    {order.tenant_id && order.wholesale_cost && Number(order.wholesale_cost) > 0 ? (
+                      <div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-emerald-400 font-semibold">
+                            KES {Number(order.wholesale_cost).toFixed(2)}
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded bg-purple-500/20 border border-purple-500/30 text-purple-300 text-[9px] font-bold uppercase tracking-tight">
+                            Wholesale
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">
+                          Retail: KES {Number(order.charge).toFixed(2)}
+                        </span>
+                        <span className="text-[10px] text-indigo-300 font-medium">
+                          +KES {Number(order.profit).toFixed(2)} margin
+                        </span>
+                      </div>
+                    ) : (
+                      <div>
+                        <span className="text-emerald-400 font-semibold block">
+                          KES {Number(order.charge).toFixed(2)}
+                        </span>
+                        <span className="text-[10px] text-indigo-300 font-medium">
+                          +KES {Number(order.profit).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
                   </td>
                   <td className="py-3.5 px-4">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${

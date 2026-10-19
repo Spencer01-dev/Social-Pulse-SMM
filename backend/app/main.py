@@ -175,12 +175,29 @@ async def lifespan(app: FastAPI):
                         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='transactions' AND column_name='tenant_id') THEN
                             ALTER TABLE transactions ADD COLUMN tenant_id UUID REFERENCES child_panels(id) ON DELETE SET NULL;
                         END IF;
-                        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tickets' AND column_name='tenant_id') THEN
-                            ALTER TABLE tickets ADD COLUMN tenant_id UUID REFERENCES child_panels(id) ON DELETE SET NULL;
+                        -- Ensure wholesale_cost column exists on orders table
+                        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orders' AND column_name='wholesale_cost') THEN
+                            ALTER TABLE orders ADD COLUMN wholesale_cost NUMERIC(12, 2) DEFAULT 0.00;
                         END IF;
+
+                        -- Backfill wholesale_cost on existing child panel orders from transactions or wholesale rate
+                        UPDATE orders o
+                        SET wholesale_cost = ABS(t.amount)
+                        FROM transactions t
+                        WHERE t.order_id = o.id AND t.type = 'order_payment' AND t.amount < 0 AND (o.wholesale_cost IS NULL OR o.wholesale_cost = 0);
+
+                        UPDATE orders o
+                        SET wholesale_cost = ROUND(COALESCE(s.wholesale_rate, s.provider_rate * 1.30) * o.quantity / 1000.0, 2)
+                        FROM services s
+                        WHERE o.service_id = s.id AND o.tenant_id IS NOT NULL AND (o.wholesale_cost IS NULL OR o.wholesale_cost = 0);
+
+                        -- Recalculate child panel net profit on existing orders: retail charge minus wholesale paid to SocialPulse
+                        UPDATE orders
+                        SET profit = charge - wholesale_cost
+                        WHERE tenant_id IS NOT NULL AND wholesale_cost > 0;
                     END $$;
                 """))
-                print("[+] Multi-Tenancy & Child Panel Provisioning columns verified.")
+                print("[+] Multi-Tenancy & Child Panel Provisioning columns and order wholesale_cost verified.")
 
                 # Step 9: Ensure wholesale_rate column exists on services table and is populated
                 await conn.execute(text("""

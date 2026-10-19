@@ -73,6 +73,7 @@ async def list_admin_orders(
         AdminOrderResponse(
             id=o.id,
             order_number=o.order_number,
+            tenant_id=o.tenant_id,
             user_id=o.user_id,
             user_email=o.user.email if o.user else "N/A",
             username=o.user.username if o.user else "N/A",
@@ -86,8 +87,13 @@ async def list_admin_orders(
             start_count=o.start_count,
             remains=o.remains,
             charge=o.charge,
+            wholesale_cost=o.wholesale_cost or Decimal("0.00"),
             provider_cost=o.provider_cost,
-            profit=o.profit,
+            profit=(
+                (o.wholesale_cost - o.provider_cost)
+                if (o.tenant_id and o.wholesale_cost and o.wholesale_cost > Decimal("0.00"))
+                else o.profit
+            ),
             currency=o.currency,
             status=o.status,
             refill_available=o.service.refill_available if o.service else False,
@@ -142,6 +148,8 @@ async def override_order_status(
 
     return AdminOrderResponse(
         id=order.id,
+        order_number=order.order_number,
+        tenant_id=order.tenant_id,
         user_id=order.user_id,
         user_email=order.user.email if order.user else "N/A",
         username=order.user.username if order.user else "N/A",
@@ -155,8 +163,13 @@ async def override_order_status(
         start_count=order.start_count,
         remains=order.remains,
         charge=order.charge,
+        wholesale_cost=order.wholesale_cost or Decimal("0.00"),
         provider_cost=order.provider_cost,
-        profit=order.profit,
+        profit=(
+            (order.wholesale_cost - order.provider_cost)
+            if (order.tenant_id and order.wholesale_cost and order.wholesale_cost > Decimal("0.00"))
+            else order.profit
+        ),
         currency=order.currency,
         status=order.status,
         refill_available=order.service.refill_available if order.service else False,
@@ -210,6 +223,8 @@ async def retry_order_dispatch(
 
     return AdminOrderResponse(
         id=order.id,
+        order_number=order.order_number,
+        tenant_id=order.tenant_id,
         user_id=order.user_id,
         user_email=order.user.email if order.user else "N/A",
         username=order.user.username if order.user else "N/A",
@@ -223,8 +238,13 @@ async def retry_order_dispatch(
         start_count=order.start_count,
         remains=order.remains,
         charge=order.charge,
+        wholesale_cost=order.wholesale_cost or Decimal("0.00"),
         provider_cost=order.provider_cost,
-        profit=order.profit,
+        profit=(
+            (order.wholesale_cost - order.provider_cost)
+            if (order.tenant_id and order.wholesale_cost and order.wholesale_cost > Decimal("0.00"))
+            else order.profit
+        ),
         currency=order.currency,
         status=order.status,
         refill_available=order.service.refill_available if order.service else False,

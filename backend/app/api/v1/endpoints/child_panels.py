@@ -136,9 +136,15 @@ async def list_my_child_panels(
 ) -> Any:
     """
     List all child panels owned by the current authenticated user.
-    Also includes panels where the user is the designated tenant admin
-    (auto-created admin accounts have tenant_id pointing to the panel).
+    If the user is a platform super_admin or admin on SocialPulse (tenant_id is None),
+    returns all child panels across the platform so they can oversee and manage all rented panels.
+    Also includes panels where the user is the designated tenant admin.
     """
+    if current_user.role in [UserRole.SUPER_ADMIN, UserRole.ADMIN] and current_user.tenant_id is None:
+        query = select(ChildPanel).order_by(desc(ChildPanel.created_at))
+        result = await db.execute(query)
+        return result.scalars().all()
+
     conditions = [ChildPanel.user_id == current_user.id]
     # If the user has a tenant_id, also match panels where they are the tenant admin
     if current_user.tenant_id:
@@ -513,6 +519,7 @@ async def list_child_panel_orders(
 
     out = []
     for o in orders:
+        panel_profit = (o.charge - o.wholesale_cost) if (o.wholesale_cost and o.wholesale_cost > Decimal("0.00")) else o.profit
         out.append(
             ChildPanelOrderResponse(
                 id=o.id,
@@ -524,7 +531,7 @@ async def list_child_panel_orders(
                 target_link=o.target_link,
                 quantity=o.quantity,
                 charge=o.charge,
-                profit=o.profit,
+                profit=panel_profit,
                 status=o.status.value if hasattr(o.status, "value") else str(o.status),
                 remains=o.remains,
                 start_count=o.start_count,
@@ -544,7 +551,7 @@ async def get_child_panel_order_stats(
     panel = await get_panel_and_verify_owner(panel_id, db, current_user)
 
     orders_q = await db.execute(
-        select(Order.status, Order.charge, Order.profit).where(Order.tenant_id == panel.id)
+        select(Order.status, Order.charge, Order.wholesale_cost, Order.profit).where(Order.tenant_id == panel.id)
     )
     rows = orders_q.all()
 
@@ -557,7 +564,7 @@ async def get_child_panel_order_stats(
     total_rev = Decimal("0.00")
     total_prof = Decimal("0.00")
 
-    for status_val, charge_val, profit_val in rows:
+    for status_val, charge_val, wholesale_val, profit_val in rows:
         st = status_val.value if hasattr(status_val, "value") else str(status_val)
         if st == OrderStatus.PENDING.value:
             pending += 1
@@ -571,8 +578,12 @@ async def get_child_panel_order_stats(
             canceled += 1
 
         if st not in [OrderStatus.CANCELED.value, OrderStatus.FAILED.value]:
-            total_rev += Decimal(str(charge_val or 0))
-            total_prof += Decimal(str(profit_val or 0))
+            c_val = Decimal(str(charge_val or 0))
+            w_val = Decimal(str(wholesale_val or 0))
+            # Child panel net profit: retail charge collected from customer minus wholesale cost paid to SocialPulse
+            p_val = (c_val - w_val) if w_val > Decimal("0.00") else Decimal(str(profit_val or 0))
+            total_rev += c_val
+            total_prof += p_val
 
     return ChildPanelOrderStats(
         total_orders=total,
