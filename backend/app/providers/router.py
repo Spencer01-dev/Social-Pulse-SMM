@@ -66,6 +66,16 @@ class SmartProviderRouter:
                 )
             ]
 
+        # Prioritize the service's designated provider first
+        if service.provider_id:
+            designated = [p for p in active_providers if p.id == service.provider_id]
+            others = [p for p in active_providers if p.id != service.provider_id]
+            active_providers = designated + others
+        elif hasattr(service, 'provider') and service.provider:
+            designated = [p for p in active_providers if p.id == service.provider.id or p.slug == service.provider.slug]
+            others = [p for p in active_providers if p not in designated]
+            active_providers = designated + others
+
         last_error = None
 
         # 2. Try each provider in priority chain

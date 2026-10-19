@@ -895,7 +895,7 @@ export const NewOrderPage: React.FC = () => {
                           : Number(service.rate).toFixed(4))} KES
                       </span>
                       <span className="text-xs text-slate-400">
-                        {service.service_type?.toLowerCase() === 'package' ? 'per package' : 'per 1,000 likes'}
+                        {service.service_type?.toLowerCase() === 'package' ? 'per package' : 'per 1,000'}
                       </span>
                     </div>
 

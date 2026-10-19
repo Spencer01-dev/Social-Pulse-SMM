@@ -205,20 +205,20 @@ async def lifespan(app: FastAPI):
                     BEGIN
                         UPDATE services 
                         SET fallback_provider_id = NULL, fallback_service_id = NULL 
-                        WHERE fallback_provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers'));
+                        WHERE fallback_provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers', 'resellersmm'));
 
                         DELETE FROM orders 
-                        WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers'));
+                        WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers', 'resellersmm'));
 
                         DELETE FROM services 
-                        WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers'))
+                        WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers', 'resellersmm'))
                            OR provider_id IS NULL
                            OR provider_id NOT IN (SELECT id FROM providers WHERE id IS NOT NULL)
                            OR name ILIKE '%delix%' 
                            OR category ILIKE '%delix%';
 
                         DELETE FROM providers 
-                        WHERE slug NOT IN ('jap', 'secsers');
+                        WHERE slug NOT IN ('jap', 'secsers', 'resellersmm');
                     END $$;
                 """))
                 print("[+] Legacy providers and orphaned services cleanup verified.")

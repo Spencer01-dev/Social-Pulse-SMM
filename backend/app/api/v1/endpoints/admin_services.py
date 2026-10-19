@@ -391,6 +391,7 @@ async def get_all_providers_summary(
 
     providers_list = [
         {"name": "ResellerSMM", "slug": "resellersmm", "api_url": settings.RESELLERSMM_API_URL, "currency": "USD"},
+        {"name": "JustAnotherPanel", "slug": "jap", "api_url": settings.JAP_API_URL, "currency": "USD"},
     ]
     results = []
     for p in providers_list:

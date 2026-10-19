@@ -27,6 +27,11 @@ async def get_platform_settings(
                 "api_url": settings.RESELLERSMM_API_URL,
                 "has_api_key": bool(settings.RESELLERSMM_API_KEY),
             },
+            "jap": {
+                "name": "JustAnotherPanel",
+                "api_url": settings.JAP_API_URL,
+                "has_api_key": bool(settings.JAP_API_KEY),
+            },
         },
         "payments": {
             "mpesa": {

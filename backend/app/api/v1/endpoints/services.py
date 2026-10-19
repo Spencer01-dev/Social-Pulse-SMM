@@ -214,11 +214,11 @@ async def list_available_categories(
 
     # Ensure categories for specific platforms only contain relevant keywords
     other_platform_keywords = {
-        Platform.TIKTOK: ["facebook", "fb ", "instagram", "ig ", "youtube", "telegram", "twitter"],
-        Platform.INSTAGRAM: ["facebook", "fb ", "tiktok", "youtube", "telegram", "twitter"],
-        Platform.FACEBOOK: ["instagram", "ig ", "tiktok", "youtube", "telegram", "twitter"],
-        Platform.TELEGRAM: ["instagram", "ig ", "tiktok", "facebook", "youtube", "twitter"],
-        Platform.WHATSAPP: ["instagram", "ig ", "tiktok", "facebook", "youtube", "telegram"],
+        Platform.TIKTOK: ["facebook", "fb ", "instagram", "ig ", "youtube", "telegram", "twitter", "website traffic", "traffic from", "vp-1", "vip", "p-1", "not for use", "task / farm"],
+        Platform.INSTAGRAM: ["facebook", "fb ", "tiktok", "youtube", "telegram", "twitter", "website traffic", "traffic from", "vp-1", "vip", "p-1", "not for use", "task / farm"],
+        Platform.FACEBOOK: ["instagram", "ig ", "tiktok", "youtube", "telegram", "twitter", "website traffic", "traffic from", "vp-1", "vip", "p-1", "not for use", "task / farm"],
+        Platform.TELEGRAM: ["instagram", "ig ", "tiktok", "facebook", "youtube", "twitter", "website traffic", "traffic from", "vp-1", "vip", "p-1", "not for use", "task / farm"],
+        Platform.WHATSAPP: ["instagram", "ig ", "tiktok", "facebook", "youtube", "telegram", "website traffic", "traffic from", "vp-1", "vip", "p-1", "not for use", "task / farm"],
     }
     if platform and platform in other_platform_keywords:
         forbidden = other_platform_keywords.get(platform, [])
