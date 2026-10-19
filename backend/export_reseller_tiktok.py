@@ -32,64 +32,68 @@ async def export_tiktok_services():
             f.write('-- Paste this into Supabase SQL Editor and click RUN\n')
             f.write('-- =====================================================================\n\n')
             
-            # Ensure ResellerSMM provider exists
-            f.write(f"""
-INSERT INTO public.providers (id, name, slug, api_url, api_key_encrypted, is_active, currency, balance, created_at, updated_at)
-VALUES (
-    '{p.id}',
-    'ResellerSMM',
-    'resellersmm',
-    'https://resellersmm.com/api/v2',
-    'f6f545ec5a398c1ba36edb4495962bd8',
-    TRUE,
-    'USD',
-    0.00,
-    NOW(),
-    NOW()
-)
-ON CONFLICT (id) DO UPDATE SET
-    slug = 'resellersmm',
-    is_active = TRUE,
-    api_url = 'https://resellersmm.com/api/v2',
-    api_key_encrypted = 'f6f545ec5a398c1ba36edb4495962bd8';
-\n""")
+            f.write("""DO $$
+DECLARE
+    v_reseller_id UUID;
+BEGIN
+    -- 1. Ensure ResellerSMM provider exists and fetch its ID
+    SELECT id INTO v_reseller_id FROM public.providers WHERE slug = 'resellersmm' LIMIT 1;
+    IF v_reseller_id IS NULL THEN
+        INSERT INTO public.providers (id, name, slug, api_url, api_key_encrypted, is_active, currency, balance, created_at, updated_at)
+        VALUES (
+            gen_random_uuid(),
+            'ResellerSMM',
+            'resellersmm',
+            'https://resellersmm.com/api/v2',
+            'f6f545ec5a398c1ba36edb4495962bd8',
+            TRUE,
+            'USD',
+            0.00,
+            NOW(),
+            NOW()
+        )
+        RETURNING id INTO v_reseller_id;
+    ELSE
+        UPDATE public.providers
+        SET is_active = TRUE,
+            api_url = 'https://resellersmm.com/api/v2',
+            api_key_encrypted = 'f6f545ec5a398c1ba36edb4495962bd8'
+        WHERE id = v_reseller_id;
+    END IF;
+
+    -- 2. Clear old ResellerSMM TikTok services to avoid duplicates
+    DELETE FROM public.services WHERE provider_id = v_reseller_id AND platform = 'tiktok';
+
+    -- 3. Insert all ResellerSMM TikTok services
+""")
 
             # Insert services in batches
             batch_size = 50
             for i in range(0, len(services), batch_size):
                 batch = services[i:i+batch_size]
-                f.write('INSERT INTO public.services (\n')
-                f.write('    id, provider_id, provider_service_id, platform, name, description,\n')
-                f.write('    service_type, category, provider_rate, selling_rate, markup_type,\n')
-                f.write('    markup_value, min_quantity, max_quantity, refill_available, cancel_available,\n')
-                f.write('    is_active, sort_order, created_at, updated_at, fallback_provider_id,\n')
-                f.write('    fallback_service_id, wholesale_rate\n')
-                f.write(') VALUES\n')
+                f.write('    INSERT INTO public.services (\n')
+                f.write('        provider_id, provider_service_id, platform, name, description,\n')
+                f.write('        service_type, category, provider_rate, selling_rate, markup_type,\n')
+                f.write('        markup_value, min_quantity, max_quantity, refill_available, cancel_available,\n')
+                f.write('        is_active, sort_order, created_at, updated_at, fallback_provider_id,\n')
+                f.write('        fallback_service_id, wholesale_rate\n')
+                f.write('    ) VALUES\n')
                 
                 rows_sql = []
                 for s in batch:
                     markup_type_val = s.markup_type.value if hasattr(s.markup_type, 'value') else str(s.markup_type)
-                    row = f"({escape_sql(s.id)}, '{p.id}', {escape_sql(s.provider_service_id)}, 'tiktok', {escape_sql(s.name)}, {escape_sql(s.description)}, {escape_sql(s.service_type)}, {escape_sql(s.category)}, {escape_sql(s.provider_rate)}, {escape_sql(s.selling_rate)}, {escape_sql(markup_type_val)}, {escape_sql(s.markup_value)}, {escape_sql(s.min_quantity)}, {escape_sql(s.max_quantity)}, {escape_sql(s.refill_available)}, {escape_sql(s.cancel_available)}, TRUE, {escape_sql(s.sort_order)}, NOW(), NOW(), NULL, NULL, {escape_sql(s.wholesale_rate)})"
-                    rows_sql.append('  ' + row)
+                    row = f"(v_reseller_id, {escape_sql(s.provider_service_id)}, 'tiktok', {escape_sql(s.name)}, {escape_sql(s.description)}, {escape_sql(s.service_type)}, {escape_sql(s.category)}, {escape_sql(s.provider_rate)}, {escape_sql(s.selling_rate)}, {escape_sql(markup_type_val)}, {escape_sql(s.markup_value)}, {escape_sql(s.min_quantity)}, {escape_sql(s.max_quantity)}, {escape_sql(s.refill_available)}, {escape_sql(s.cancel_available)}, TRUE, {escape_sql(s.sort_order)}, NOW(), NOW(), NULL, NULL, {escape_sql(s.wholesale_rate)})"
+                    rows_sql.append('      ' + row)
                 f.write(',\n'.join(rows_sql))
-                f.write("""
-ON CONFLICT (id) DO UPDATE SET
-    is_active = TRUE,
-    provider_id = EXCLUDED.provider_id,
-    provider_service_id = EXCLUDED.provider_service_id,
-    platform = 'tiktok',
-    name = EXCLUDED.name,
-    category = EXCLUDED.category,
-    provider_rate = EXCLUDED.provider_rate,
-    selling_rate = EXCLUDED.selling_rate,
-    wholesale_rate = EXCLUDED.wholesale_rate;
-\n\n""")
+                f.write(';\n\n')
 
-            f.write(f"""
--- Activate all ResellerSMM TikTok Views, Likes, and Followers
-UPDATE public.services
-SET is_active = TRUE
-WHERE provider_id = '{p.id}' AND platform = 'tiktok';
+            f.write("""    -- 4. Ensure all ResellerSMM TikTok Views, Likes, and Followers are ACTIVE
+    UPDATE public.services
+    SET is_active = TRUE
+    WHERE provider_id = v_reseller_id AND platform = 'tiktok';
+
+    RAISE NOTICE 'Successfully seeded % TikTok services for ResellerSMM!', (SELECT count(*) FROM public.services WHERE provider_id = v_reseller_id AND platform = 'tiktok');
+END $$;
 """)
 
         print('SEED_RESELLERSMM_TIKTOK_SERVICES.sql generated successfully!')
