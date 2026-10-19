@@ -72,7 +72,7 @@ export const ChildPanelManagePage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { formatCurrency } = useCurrency();
-  const { tenant, enterTenantMode } = useTenant();
+  const { tenant } = useTenant();
 
   // Active tab state
   const initialTab = (searchParams.get('tab') as ActiveTab) || 'orders';
@@ -539,11 +539,6 @@ export const ChildPanelManagePage: React.FC = () => {
     }
   };
 
-  const handleLaunchLocalhostSimulation = async () => {
-    if (!activePanel) return;
-    await enterTenantMode(activePanel.domain);
-    navigate('/services');
-  };
 
   if (loadingPanels) {
     return (
@@ -663,31 +658,12 @@ export const ChildPanelManagePage: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleLaunchLocalhostSimulation}
-            leftIcon={<Sparkles className="w-3.5 h-3.5 text-amber-400" />}
-            title="Simulate customer experience on localhost"
-          >
-            Open Localhost
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
             onClick={() => setIsBrandingOpen(true)}
             leftIcon={<Sliders className="w-3.5 h-3.5 text-cyan-400" />}
             title="Configure branding, markup & colors"
           >
             Branding & Markup
           </Button>
-          <a
-            href={`https://${activePanel.domain}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-3 py-2 rounded-xl bg-[#121418] hover:bg-[#222630] border border-[#2b303c] text-slate-300 hover:text-white text-xs font-bold transition-all flex items-center gap-1.5"
-            title="Open external live domain"
-          >
-            <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-            <span>Live Site</span>
-          </a>
         </div>
       </div>
 
@@ -1426,25 +1402,6 @@ export const ChildPanelManagePage: React.FC = () => {
               <p className="text-xs text-slate-300 leading-relaxed">
                 When a customer purchases on <strong>{activePanel.domain}</strong>, the wholesale cost is automatically deducted from this balance. Keep this funded so customer orders are never paused.
               </p>
-              <div className="pt-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const host = window.location.hostname.toLowerCase();
-                    const isMain = host.includes('socialpulse') || host === 'localhost' || host === '127.0.0.1';
-                    if (!isMain) {
-                      window.open('https://socialpulsemm.com/wallet/deposit', '_blank');
-                    } else {
-                      navigate('/wallet/deposit');
-                    }
-                  }}
-                  leftIcon={<DollarSign className="w-3.5 h-3.5 text-cyan-400" />}
-                  className="w-full sm:w-auto"
-                >
-                  Top Up Parent Balance (SocialPulse)
-                </Button>
-              </div>
             </Card>
           </div>
 
