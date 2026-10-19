@@ -1,5 +1,6 @@
 import uuid
 from datetime import date as date_type
+from decimal import Decimal
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import cast, desc, func, select, String

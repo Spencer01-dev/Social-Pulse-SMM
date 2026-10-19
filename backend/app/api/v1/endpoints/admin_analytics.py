@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, List
 from fastapi import APIRouter, Depends
-from sqlalchemy import desc, func, select
+from sqlalchemy import case, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -37,11 +37,21 @@ async def get_analytics_overview(
     # 1. Orders Financial Aggregation
     # Exclude canceled and failed orders from financial metrics (those are refunded)
     active_order_filter = ~Order.status.in_([OrderStatus.CANCELED, OrderStatus.FAILED])
+    # Platform revenue = wholesale_cost for child panel orders, charge for direct orders
+    platform_rev_expr = case(
+        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge)),
+        else_=Order.charge
+    )
+    # Platform profit = wholesale_cost - provider_cost for child panel, charge - provider_cost for direct
+    platform_profit_expr = case(
+        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge) - Order.provider_cost),
+        else_=Order.charge - Order.provider_cost
+    )
     order_agg = await db.execute(
         select(
-            func.coalesce(func.sum(Order.charge), Decimal("0.00")),
+            func.coalesce(func.sum(platform_rev_expr), Decimal("0.00")),
             func.coalesce(func.sum(Order.provider_cost), Decimal("0.00")),
-            func.coalesce(func.sum(Order.profit), Decimal("0.00")),
+            func.coalesce(func.sum(platform_profit_expr), Decimal("0.00")),
             func.count(Order.id)
         ).where(active_order_filter)
     )
@@ -74,11 +84,19 @@ async def get_analytics_overview(
     # 5. Today's Provider Economics
     from app.models.child_panel import ChildPanel, ChildPanelStatus
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_rev_expr = case(
+        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge)),
+        else_=Order.charge
+    )
+    today_profit_expr = case(
+        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge) - Order.provider_cost),
+        else_=Order.charge - Order.provider_cost
+    )
     today_agg = await db.execute(
         select(
-            func.coalesce(func.sum(Order.charge), Decimal("0.00")),
+            func.coalesce(func.sum(today_rev_expr), Decimal("0.00")),
             func.coalesce(func.sum(Order.provider_cost), Decimal("0.00")),
-            func.coalesce(func.sum(Order.profit), Decimal("0.00")),
+            func.coalesce(func.sum(today_profit_expr), Decimal("0.00")),
             func.count(Order.id)
         ).where(active_order_filter, Order.created_at >= today_start)
     )
@@ -190,11 +208,19 @@ async def get_daily_revenue_trends(
     """
     start_date = datetime.now() - timedelta(days=days)
     
+    daily_rev_expr = case(
+        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge)),
+        else_=Order.charge
+    )
+    daily_profit_expr = case(
+        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge) - Order.provider_cost),
+        else_=Order.charge - Order.provider_cost
+    )
     query = (
         select(
             func.date_trunc('day', Order.created_at).label('day'),
-            func.coalesce(func.sum(Order.charge), Decimal("0.00")),
-            func.coalesce(func.sum(Order.profit), Decimal("0.00")),
+            func.coalesce(func.sum(daily_rev_expr), Decimal("0.00")),
+            func.coalesce(func.sum(daily_profit_expr), Decimal("0.00")),
             func.count(Order.id)
         )
         .where(
@@ -248,11 +274,19 @@ async def get_monthly_summary(
 
     active_order_filter = ~Order.status.in_([OrderStatus.CANCELED, OrderStatus.FAILED])
 
+    month_rev_expr = case(
+        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge)),
+        else_=Order.charge
+    )
+    month_profit_expr = case(
+        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge) - Order.provider_cost),
+        else_=Order.charge - Order.provider_cost
+    )
     try:
         query = (
             select(
-                func.coalesce(func.sum(Order.charge), Decimal("0.00")),
-                func.coalesce(func.sum(Order.profit), Decimal("0.00")),
+                func.coalesce(func.sum(month_rev_expr), Decimal("0.00")),
+                func.coalesce(func.sum(month_profit_expr), Decimal("0.00")),
                 func.coalesce(func.sum(Order.provider_cost), Decimal("0.00")),
                 func.count(Order.id)
             )
@@ -267,8 +301,8 @@ async def get_monthly_summary(
     except Exception:
         query = (
             select(
-                func.coalesce(func.sum(Order.charge), Decimal("0.00")),
-                func.coalesce(func.sum(Order.profit), Decimal("0.00")),
+                func.coalesce(func.sum(month_rev_expr), Decimal("0.00")),
+                func.coalesce(func.sum(month_profit_expr), Decimal("0.00")),
                 func.coalesce(func.sum(Order.provider_cost), Decimal("0.00")),
                 func.count(Order.id)
             )
@@ -281,10 +315,10 @@ async def get_monthly_summary(
         result = await db.execute(query)
         total_rev, total_profit, total_cost, total_orders = result.first()
 
-    # Query daily breakdown for that month
+    # Query daily breakdown for that month (include wholesale_cost + tenant_id for correct per-row calculation)
     try:
         daily_query = (
-            select(Order.created_at, Order.charge, Order.profit, Order.id)
+            select(Order.created_at, Order.charge, Order.profit, Order.id, Order.wholesale_cost, Order.tenant_id, Order.provider_cost)
             .where(
                 Order.created_at >= start_dt_utc,
                 Order.created_at <= end_dt_utc,
@@ -296,7 +330,7 @@ async def get_monthly_summary(
         rows = daily_res.all()
     except Exception:
         daily_query = (
-            select(Order.created_at, Order.charge, Order.profit, Order.id)
+            select(Order.created_at, Order.charge, Order.profit, Order.id, Order.wholesale_cost, Order.tenant_id, Order.provider_cost)
             .where(
                 Order.created_at >= start_dt_naive,
                 Order.created_at <= end_dt_naive,
@@ -314,8 +348,17 @@ async def get_monthly_summary(
             d = created.day
             if d not in daily_map:
                 daily_map[d] = {"revenue": Decimal("0.00"), "profit": Decimal("0.00"), "orders": 0}
-            daily_map[d]["revenue"] += Decimal(str(r[1] or 0))
-            daily_map[d]["profit"] += Decimal(str(r[2] or 0))
+            charge = Decimal(str(r[1] or 0))
+            wholesale = Decimal(str(r[4] or 0)) if r[4] else None
+            tenant = r[5]
+            prov_cost = Decimal(str(r[6] or 0))
+            # Platform revenue: wholesale_cost for child panel orders, charge for direct
+            if tenant and wholesale and wholesale > Decimal("0"):
+                daily_map[d]["revenue"] += wholesale
+                daily_map[d]["profit"] += wholesale - prov_cost
+            else:
+                daily_map[d]["revenue"] += charge
+                daily_map[d]["profit"] += charge - prov_cost
             daily_map[d]["orders"] += 1
 
     days_list = []
@@ -354,12 +397,20 @@ async def get_platform_metrics(
     """
     Breakdown of orders, revenue, and profits categorized by social media platform.
     """
+    plat_rev_expr = case(
+        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge)),
+        else_=Order.charge
+    )
+    plat_profit_expr = case(
+        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge) - Order.provider_cost),
+        else_=Order.charge - Order.provider_cost
+    )
     query = (
         select(
             Service.platform,
             func.count(Order.id),
-            func.coalesce(func.sum(Order.charge), Decimal("0.00")),
-            func.coalesce(func.sum(Order.profit), Decimal("0.00"))
+            func.coalesce(func.sum(plat_rev_expr), Decimal("0.00")),
+            func.coalesce(func.sum(plat_profit_expr), Decimal("0.00"))
         )
         .join(Service, Order.service_id == Service.id)
         .where(~Order.status.in_([OrderStatus.CANCELED, OrderStatus.FAILED]))
