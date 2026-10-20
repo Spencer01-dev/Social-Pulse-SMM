@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Optional
 from pydantic import BaseModel, Field, HttpUrl
 
 from app.models.order import OrderStatus
@@ -58,11 +58,11 @@ class AdminOrderResponse(BaseModel):
     provider_cost: Optional[Decimal] = Decimal("0.00")
     profit: Optional[Decimal] = Decimal("0.00")
     currency: Optional[str] = "KES"
-    status: OrderStatus
+    status: Any = "pending"
     refill_available: bool = False
     error_message: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

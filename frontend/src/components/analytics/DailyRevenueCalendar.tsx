@@ -261,6 +261,11 @@ export const DailyRevenueCalendar: React.FC<DailyRevenueCalendarProps> = ({
     setCurrentYear(today.getFullYear());
     setCurrentMonth(today.getMonth());
     setSelectedDayNumber(today.getDate());
+    if (onDateSelect) {
+      const mStr = String(today.getMonth() + 1).padStart(2, '0');
+      const dStr = String(today.getDate()).padStart(2, '0');
+      onDateSelect(`${today.getFullYear()}-${mStr}-${dStr}`);
+    }
   };
 
   // Generate Year options around current year (2 years prior, current, 1 year ahead)

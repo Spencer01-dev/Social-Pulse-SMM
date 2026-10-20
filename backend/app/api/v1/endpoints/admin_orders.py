@@ -70,40 +70,63 @@ async def list_admin_orders(
     result = await db.execute(query)
     orders = result.scalars().all()
 
-    return [
-        AdminOrderResponse(
-            id=o.id,
-            order_number=o.order_number,
-            tenant_id=o.tenant_id,
-            user_id=o.user_id,
-            user_email=o.user.email if o.user else "N/A",
-            username=o.user.username if o.user else "N/A",
-            service_id=o.service_id,
-            service_name=o.service.name if o.service else "SMM Service",
-            platform=str(o.service.platform.value if hasattr(o.service.platform, "value") else o.service.platform) if (o.service and o.service.platform) else "instagram",
-            provider_name=o.provider.name if o.provider else "Direct",
-            provider_order_id=o.provider_order_id,
-            target_link=o.target_link or "",
-            quantity=o.quantity or 0,
-            start_count=o.start_count or 0,
-            remains=o.remains or 0,
-            charge=o.charge or Decimal("0.00"),
-            wholesale_cost=o.wholesale_cost or Decimal("0.00"),
-            provider_cost=o.provider_cost or Decimal("0.00"),
-            profit=(
-                (o.wholesale_cost - o.provider_cost)
-                if (o.tenant_id and o.wholesale_cost and o.wholesale_cost > Decimal("0.00"))
-                else (o.profit or Decimal("0.00"))
-            ),
-            currency=o.currency or "KES",
-            status=o.status,
-            refill_available=o.service.refill_available if o.service else False,
-            error_message=o.error_message,
-            created_at=o.created_at,
-            updated_at=o.updated_at
-        )
-        for o in orders
-    ]
+    response_items = []
+    for o in orders:
+        try:
+            ws_cost = Decimal(str(o.wholesale_cost)) if o.wholesale_cost is not None else Decimal("0.00")
+            prov_cost = Decimal(str(o.provider_cost)) if o.provider_cost is not None else Decimal("0.00")
+            prof_val = Decimal(str(o.profit)) if o.profit is not None else Decimal("0.00")
+
+            if o.tenant_id and ws_cost > Decimal("0.00"):
+                calc_profit = ws_cost - prov_cost
+            else:
+                calc_profit = prof_val
+
+            st_val = o.status
+            if hasattr(st_val, "value"):
+                st_val = st_val.value
+            elif hasattr(st_val, "name"):
+                st_val = st_val.name
+            st_str = str(st_val).lower() if st_val else "pending"
+
+            plat = "instagram"
+            if o.service and o.service.platform:
+                plat = str(o.service.platform.value if hasattr(o.service.platform, "value") else o.service.platform)
+
+            response_items.append(
+                AdminOrderResponse(
+                    id=o.id,
+                    order_number=o.order_number,
+                    tenant_id=o.tenant_id,
+                    user_id=o.user_id,
+                    user_email=(o.user.email if o.user and o.user.email else "N/A"),
+                    username=(o.user.username if o.user and o.user.username else "N/A"),
+                    service_id=o.service_id,
+                    service_name=o.service.name if o.service else "SMM Service",
+                    platform=plat,
+                    provider_name=o.provider.name if o.provider else "Direct",
+                    provider_order_id=str(o.provider_order_id) if o.provider_order_id else None,
+                    target_link=o.target_link or "",
+                    quantity=o.quantity or 0,
+                    start_count=o.start_count or 0,
+                    remains=o.remains or 0,
+                    charge=Decimal(str(o.charge)) if o.charge is not None else Decimal("0.00"),
+                    wholesale_cost=ws_cost,
+                    provider_cost=prov_cost,
+                    profit=calc_profit,
+                    currency=o.currency or "KES",
+                    status=st_str,
+                    refill_available=bool(o.service.refill_available) if o.service else False,
+                    error_message=str(o.error_message) if o.error_message else None,
+                    created_at=o.created_at,
+                    updated_at=o.updated_at or o.created_at
+                )
+            )
+        except Exception as item_err:
+            print(f"[!] Warning: error formatting order {getattr(o, 'id', None)}: {item_err}")
+            continue
+
+    return response_items
 
 
 @router.patch("/{order_id}/status", response_model=AdminOrderResponse)
