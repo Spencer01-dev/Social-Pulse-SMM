@@ -84,7 +84,7 @@ class Settings(BaseSettings):
 
     # Primary Provider (JustAnotherPanel - JAP)
     JAP_API_URL: str = "https://justanotherpanel.com/api/v2"
-    JAP_API_KEY: str = "4181c34178be65d635d0ea70687c285c"
+    JAP_API_KEY: str = "2df3463d103c672edf14d1d7dc661f46"
 
     # Payments
     MPESA_ENVIRONMENT: str = "sandbox"

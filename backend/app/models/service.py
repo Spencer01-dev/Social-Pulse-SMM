@@ -82,4 +82,5 @@ class Service(TimeStampedUUIDModel):
     fallback_provider = relationship("Provider", foreign_keys=[fallback_provider_id])
 
     def __repr__(self):
-        return f"<Service {self.name} - {self.platform.value} (KES {self.selling_rate}/1k)>"
+        plat = getattr(self.platform, "value", self.platform)
+        return f"<Service {self.name} - {plat} (KES {self.selling_rate}/1k)>"
