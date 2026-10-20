@@ -240,8 +240,15 @@ export const DailyRevenueCalendar: React.FC<DailyRevenueCalendarProps> = ({
     }
   }, [currentYear, currentMonth, validDayNumber, formattedDisplayDate]);
 
-  // Notify parent whenever the effective date changes
+  // Track whether the user has interacted with the calendar to filter
+  const isInitialMount = React.useRef(true);
+
+  // Notify parent whenever the effective date changes on user interaction
   React.useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     if (onDateSelect) {
       const mStr = String(currentMonth + 1).padStart(2, '0');
       const dStr = String(validDayNumber).padStart(2, '0');

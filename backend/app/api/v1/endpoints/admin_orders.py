@@ -3,7 +3,7 @@ from datetime import date as date_type
 from decimal import Decimal
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import cast, desc, func, select, String
+from sqlalchemy import cast, Date, desc, func, select, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -50,7 +50,7 @@ async def list_admin_orders(
     if date:
         try:
             parsed_date = date_type.fromisoformat(date)
-            query = query.where(func.date(Order.created_at) == parsed_date)
+            query = query.where(cast(Order.created_at, Date) == parsed_date)
         except ValueError:
             pass  # Ignore invalid date format, return all orders
     if search:

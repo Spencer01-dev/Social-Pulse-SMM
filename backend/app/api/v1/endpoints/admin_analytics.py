@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, List
 from fastapi import APIRouter, Depends
-from sqlalchemy import case, desc, func, select
+from sqlalchemy import case, cast, Date, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -206,7 +206,8 @@ async def get_daily_revenue_trends(
     """
     Get day-by-day revenue and profit timeline for the last N days.
     """
-    start_date = datetime.now() - timedelta(days=days)
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    day_expr = cast(Order.created_at, Date)
     
     daily_rev_expr = case(
         (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge)),
@@ -216,30 +217,54 @@ async def get_daily_revenue_trends(
         (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge) - Order.provider_cost),
         else_=Order.charge - Order.provider_cost
     )
-    query = (
-        select(
-            func.date_trunc('day', Order.created_at).label('day'),
-            func.coalesce(func.sum(daily_rev_expr), Decimal("0.00")),
-            func.coalesce(func.sum(daily_profit_expr), Decimal("0.00")),
-            func.count(Order.id)
+    try:
+        query = (
+            select(
+                day_expr.label('day'),
+                func.coalesce(func.sum(daily_rev_expr), Decimal("0.00")),
+                func.coalesce(func.sum(daily_profit_expr), Decimal("0.00")),
+                func.count(Order.id)
+            )
+            .where(
+                Order.created_at >= start_date,
+                ~Order.status.in_([OrderStatus.CANCELED, OrderStatus.FAILED])
+            )
+            .group_by(day_expr)
+            .order_by(day_expr)
         )
-        .where(
-            Order.created_at >= start_date,
-            ~Order.status.in_([OrderStatus.CANCELED, OrderStatus.FAILED])
+        result = await db.execute(query)
+        rows = result.all()
+    except Exception:
+        start_naive = datetime.now() - timedelta(days=days)
+        query = (
+            select(
+                day_expr.label('day'),
+                func.coalesce(func.sum(daily_rev_expr), Decimal("0.00")),
+                func.coalesce(func.sum(daily_profit_expr), Decimal("0.00")),
+                func.count(Order.id)
+            )
+            .where(
+                Order.created_at >= start_naive,
+                ~Order.status.in_([OrderStatus.CANCELED, OrderStatus.FAILED])
+            )
+            .group_by(day_expr)
+            .order_by(day_expr)
         )
-        .group_by(func.date_trunc('day', Order.created_at))
-        .order_by(func.date_trunc('day', Order.created_at))
-    )
-    result = await db.execute(query)
-    rows = result.all()
+        result = await db.execute(query)
+        rows = result.all()
 
     # Map existing days into a dictionary keyed by ISO date YYYY-MM-DD
-    db_map = {row[0].strftime("%Y-%m-%d"): (row[1], row[2], row[3]) for row in rows if row[0]}
+    db_map = {}
+    for row in rows:
+        if row[0]:
+            iso_key = row[0].strftime("%Y-%m-%d") if hasattr(row[0], "strftime") else str(row[0])
+            db_map[iso_key] = (row[1], row[2], row[3])
 
     # Ensure all days in the range have data points (even 0)
     timeline: List[DailyRevenueItem] = []
+    now_utc = datetime.now(timezone.utc)
     for i in range(days - 1, -1, -1):
-        d = datetime.now() - timedelta(days=i)
+        d = now_utc - timedelta(days=i)
         iso_str = d.strftime("%Y-%m-%d")
         label = d.strftime("%b %d")
         rev, prof, count = db_map.get(iso_str, (Decimal("0.00"), Decimal("0.00"), 0))
