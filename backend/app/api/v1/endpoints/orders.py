@@ -157,43 +157,19 @@ async def create_order(
             detail=f"Insufficient wallet balance. Total cost: KES {total_charge:,.2f} | Available balance: KES {current_bal:,.2f}. Please add funds to proceed."
         )
 
-    # 4b. Prepaid Wholesale Check: Verify and lock Child Panel Owner's Parent Account
+    # 4b. Child Panel Wholesale Rate: Direct JAP provider pricing (zero middle deduction, covered by KES 3,500 monthly fee)
     panel_owner = None
     wholesale_cost = Decimal("0.00")
-    panel_owner_bal_before = Decimal("0.00")
-
-    if panel and panel.user_id and panel.user_id != current_user.id:
-        # Child panels get direct provider price from JAP (0% markup, no deduction in between)
+    if panel and panel.user_id:
         wholesale_rate = service.provider_rate
         if is_package:
             wholesale_cost = round(wholesale_rate * Decimal(order_in.quantity), 2)
         else:
             wholesale_cost = round((wholesale_rate * Decimal(order_in.quantity)) / Decimal(1000), 2)
 
-        owner_q = await db.execute(
-            select(User).where(User.id == panel.user_id).with_for_update()
-        )
-        panel_owner = owner_q.scalars().first()
-        if not panel_owner or panel_owner.balance < wholesale_cost:
-            avail = panel_owner.balance if panel_owner else Decimal("0.00")
-            raise HTTPException(
-                status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail=(
-                    f"Child panel wholesale balance is depleted. "
-                    f"Required: KES {wholesale_cost:,.2f} | Available: KES {avail:,.2f}. "
-                    f"Please contact the panel administrator to top up their parent account."
-                )
-            )
-
     # 5. Deduct funds from customer wallet
     locked_user.balance -= total_charge
     db.add(locked_user)
-
-    # 5b. Deduct wholesale cost from Child Panel Owner's Parent Account
-    if panel_owner and wholesale_cost > Decimal("0.00"):
-        panel_owner_bal_before = panel_owner.balance
-        panel_owner.balance -= wholesale_cost
-        db.add(panel_owner)
 
     # 6. Sanitize and canonicalize target URL
     from app.core.link_cleaner import sanitize_and_canonicalize_target_link
@@ -228,7 +204,7 @@ async def create_order(
     # 8. Persist order record in database (using tenant_id resolved in step 2)
     # If placed on a child panel, profit is the panel's profit (total_charge - wholesale_cost).
     # If placed directly on SocialPulse, profit is SocialPulse's profit (total_charge - provider_cost).
-    order_profit = (total_charge - wholesale_cost) if (panel_owner and wholesale_cost > Decimal("0.00")) else profit
+    order_profit = (total_charge - wholesale_cost) if (panel and wholesale_cost > Decimal("0.00")) else profit
 
     order = Order(
         user_id=current_user.id,
