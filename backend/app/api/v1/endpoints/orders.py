@@ -83,21 +83,26 @@ async def create_order(
             )
             panel = tenant_q.scalars().first()
 
+    if panel:
+        # Instant Expiration Guard: Block orders instantly if child panel monthly subscription has expired
+        now_utc = datetime.now(timezone.utc)
+        exp_time = panel.expires_at if (panel.expires_at and panel.expires_at.tzinfo) else (panel.expires_at.replace(tzinfo=timezone.utc) if panel.expires_at else None)
+        if panel.status != ChildPanelStatus.ACTIVE.value or (exp_time and exp_time < now_utc):
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail="This Child Panel's subscription (KES 3,500/month) has expired and is suspended. Please contact the administrator to renew."
+            )
+
     # Determine retail charge rate:
-    # If customer is ordering on a Child Panel with a custom markup percent configured,
-    # charge the customer that marked up price over wholesale_rate (1.30x provider rate).
-    # Otherwise, default to standard platform retail rate (selling_rate).
+    # Child panels get direct provider rates (service.provider_rate) with NO deduction in between.
+    # If the child panel owner configured a custom markup percent, apply it directly over provider_rate.
     charge_rate = service.selling_rate
     if panel and panel.branding_json:
         try:
             panel_markup = Decimal(str(panel.branding_json.get("default_markup_percent", 0)))
             if panel_markup > Decimal("0"):
-                ws_base = (
-                    service.wholesale_rate 
-                    if (service.wholesale_rate is not None and service.wholesale_rate > Decimal("0")) 
-                    else round(service.provider_rate * Decimal("1.30"), 2)
-                )
-                charge_rate = round(ws_base * (Decimal("1") + (panel_markup / Decimal("100"))), 2)
+                # Direct provider price base from JAP
+                charge_rate = round(service.provider_rate * (Decimal("1") + (panel_markup / Decimal("100"))), 2)
         except Exception:
             charge_rate = service.selling_rate
 
@@ -158,11 +163,8 @@ async def create_order(
     panel_owner_bal_before = Decimal("0.00")
 
     if panel and panel.user_id and panel.user_id != current_user.id:
-        wholesale_rate = (
-            service.wholesale_rate 
-            if (service.wholesale_rate is not None and service.wholesale_rate > Decimal("0")) 
-            else round(service.provider_rate * Decimal("1.30"), 2)
-        )
+        # Child panels get direct provider price from JAP (0% markup, no deduction in between)
+        wholesale_rate = service.provider_rate
         if is_package:
             wholesale_cost = round(wholesale_rate * Decimal(order_in.quantity), 2)
         else:

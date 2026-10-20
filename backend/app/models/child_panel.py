@@ -37,7 +37,7 @@ class ChildPanel(TimeStampedUUIDModel):
     admin_password_hash = Column(String(255), nullable=False)
 
     currency = Column(String(10), default="KES", nullable=False)
-    price_per_month = Column(Numeric(12, 2), default=1500.00, nullable=False)
+    price_per_month = Column(Numeric(12, 2), default=3500.00, nullable=False)
 
     status = Column(
         String(50),

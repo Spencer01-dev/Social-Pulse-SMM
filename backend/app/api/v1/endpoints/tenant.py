@@ -99,12 +99,25 @@ async def resolve_tenant(
     pay_paybill = gw.get("payhero_paybill", "997960")
     pay_acc = gw.get("payhero_account_number") or ("0010542" if is_skake else "0010529")
 
+    # Instant Expiration Check: If monthly rental (KES 3,500) has expired, suspend immediately
+    now_utc = datetime.now(timezone.utc)
+    is_expired = False
+    if panel.expires_at:
+        exp_time = panel.expires_at if panel.expires_at.tzinfo else panel.expires_at.replace(tzinfo=timezone.utc)
+        if exp_time < now_utc:
+            is_expired = True
+            if panel.status == ChildPanelStatus.ACTIVE.value:
+                panel.status = ChildPanelStatus.EXPIRED.value
+                db.add(panel)
+                await db.commit()
+
     return {
         "is_custom_tenant": True,
         "tenant_id": str(panel.id),
         "domain": panel.domain,
-        "status": panel.status,
-        "is_active": panel.status == ChildPanelStatus.ACTIVE.value,
+        "status": ChildPanelStatus.EXPIRED.value if is_expired else panel.status,
+        "is_active": (panel.status == ChildPanelStatus.ACTIVE.value) and not is_expired,
+        "is_expired": is_expired,
         "site_name": branding.get("site_name", f"{brand_name} SMM"),
         "tagline": branding.get("tagline", "Premium Social Media Growth"),
         "logo_url": branding.get("logo_url"),

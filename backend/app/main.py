@@ -373,17 +373,17 @@ async def lifespan(app: FastAPI):
                 """))
 
                 # 2. TikTok Likes (Delix Exact Pricing Structure)
-                # Bait Tier (Cheapest Magnet): Bulk TikTok Likes [Max 100K] (#9423) -> Retail: 18.70 KES | Wholesale: 18.69 KES (0% markup to child panels!)
+                # Bait Tier (Cheapest Magnet): Bulk TikTok Likes [Max 100K] (#9423) -> Retail: 18.70 KES | Wholesale: 18.70 KES
                 await conn.execute(text("""
                     UPDATE services
-                    SET selling_rate = 18.70, wholesale_rate = 18.69, markup_type = 'manual'
+                    SET selling_rate = 18.70, wholesale_rate = 18.70, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok' AND provider_service_id = '9423';
                 """))
-                # Tier 2 (1M HQ Likes): (#9301) -> Retail: 27.50 KES | Wholesale: 23.94 KES (Exact 30% profit to Admin / 70% to Child Panel)
+                # Tier 2 (1M HQ Likes): (#9301) -> Retail: 27.50 KES (Delix: 27.5 Ksh) | Wholesale: 24.00 KES
                 await conn.execute(text("""
                     UPDATE services
-                    SET selling_rate = 27.50, wholesale_rate = 23.94, markup_type = 'manual'
+                    SET selling_rate = 27.50, wholesale_rate = 24.00, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok' AND provider_service_id = '9301';
                 """))
@@ -552,22 +552,18 @@ async def lifespan(app: FastAPI):
                       AND provider_rate <= 40.00;
                 """))
 
-                # Enforce Platform-wide Wholesale Split: 30% profit to Admin / 70% profit to Child Panel
+                # Direct JAP pricing for child panels: wholesale_rate = provider_rate (zero middle deduction)
                 await conn.execute(text("""
                     UPDATE services
-                    SET wholesale_rate = ROUND(provider_rate + (0.30 * (selling_rate - provider_rate)), 2)
-                    WHERE markup_type = 'percentage'
-                      AND selling_rate > provider_rate
-                      AND provider_service_id != '9423';
+                    SET wholesale_rate = provider_rate;
                 """))
 
-                # Safety Invariant: Guarantee NO service has selling_rate <= provider_rate or wholesale_rate <= provider_rate
+                # Safety Invariant: Guarantee NO direct retail service is sold at a loss below provider_rate
                 await conn.execute(text("""
                     UPDATE services
-                    SET selling_rate = ROUND(provider_rate * 2.20, 2),
-                        wholesale_rate = ROUND(provider_rate + (0.30 * (provider_rate * 1.20)), 2),
+                    SET selling_rate = ROUND(provider_rate * 1.35, 2),
                         markup_type = 'percentage'
-                    WHERE selling_rate <= provider_rate OR wholesale_rate <= provider_rate;
+                    WHERE selling_rate < provider_rate;
                 """))
 
                 # Strict Platform-wide Rule: Minimum order quantity floor of 100 for all standard services
@@ -579,7 +575,7 @@ async def lifespan(app: FastAPI):
                       AND name NOT ILIKE '%whatsapp%number%';
                 """))
 
-                # Set child panel default_markup_percent to 0 so all child panels (skakegains.com) display identical retail prices to SocialPulse
+                # Set child panel default_markup_percent to 0 so child panels start with direct rates
                 await conn.execute(text("""
                     UPDATE child_panels
                     SET branding_json = jsonb_set(
@@ -587,6 +583,17 @@ async def lifespan(app: FastAPI):
                         '{default_markup_percent}',
                         '0'::jsonb
                     );
+                """))
+
+                # Child Panel monthly rental fee set to KES 3,500.00 & enforce instant cutoff if expired
+                await conn.execute(text("""
+                    UPDATE child_panels
+                    SET price_per_month = 3500.00;
+                """))
+                await conn.execute(text("""
+                    UPDATE child_panels
+                    SET status = 'expired'
+                    WHERE expires_at IS NOT NULL AND expires_at < NOW() AND status = 'active';
                 """))
 
                 # Sync tenant admin balance with parent wholesale balance

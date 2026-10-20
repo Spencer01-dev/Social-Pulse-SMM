@@ -223,7 +223,7 @@ export const ChildPanelPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Card className="p-4 bg-[#181a20] border-[#2b303c] space-y-1.5">
           <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Monthly Rental</span>
-          <span className="text-xl font-black text-[#f59e0b] block">Ksh 1,500 / mo</span>
+          <span className="text-xl font-black text-[#f59e0b] block">Ksh 3,500 / mo</span>
           <span className="text-[10px] text-slate-500">Auto renews from wallet balance</span>
         </Card>
 
@@ -600,7 +600,7 @@ export const ChildPanelPage: React.FC = () => {
           </div>
           <div className="flex items-center gap-1.5 text-slate-400">
             Panel Cost:
-            <strong className="text-amber-400">Ksh 1,500.00</strong>
+            <strong className="text-amber-400">Ksh 3,500.00</strong>
             <span className="text-slate-500">/ month</span>
           </div>
         </div>
@@ -614,7 +614,7 @@ export const ChildPanelPage: React.FC = () => {
             className="w-full sm:w-auto"
             leftIcon={<Server className="w-4 h-4" />}
           >
-            Purchase Panel (Ksh 1,500 / month)
+            Purchase Panel (Ksh 3,500 / month)
           </Button>
         </div>
       </form>

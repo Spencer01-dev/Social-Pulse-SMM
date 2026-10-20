@@ -46,7 +46,7 @@ from app.schemas.ticket import (
 
 router = APIRouter(prefix="/child-panels", tags=["Child Panels"])
 
-PANEL_MONTHLY_FEE = Decimal("1500.00")
+PANEL_MONTHLY_FEE = Decimal("3500.00")
 
 
 @router.post("", response_model=ChildPanelResponse, status_code=status.HTTP_201_CREATED)
