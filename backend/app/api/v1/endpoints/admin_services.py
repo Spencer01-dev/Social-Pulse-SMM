@@ -375,10 +375,12 @@ async def update_provider_key(
 
 @router.get("/providers-summary")
 async def get_all_providers_summary(
+    db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
 ) -> Any:
     """
     Query live status, balance, and configuration for JustAnotherPanel provider.
+    Uses DB-stored API key (updated via provider-key endpoint) rather than env settings.
     """
     from app.core.config import settings
 
@@ -388,8 +390,21 @@ async def get_all_providers_summary(
     results = []
     for p in providers_list:
         try:
-            client = get_provider(slug=p["slug"])
+            # Read API key from DB provider record first
+            p_query = await db.execute(select(Provider).where(Provider.slug == p["slug"]))
+            p_record = p_query.scalars().first()
+            db_key = p_record.api_key_encrypted if (p_record and p_record.api_key_encrypted) else None
+            db_url = p_record.api_url if (p_record and p_record.api_url) else None
+
+            client = get_provider(slug=p["slug"], api_key=db_key, api_url=db_url)
             balance = await client.get_balance()
+
+            # Update cached balance on provider record
+            if p_record:
+                p_record.balance = balance.balance
+                p_record.currency = balance.currency
+                await db.commit()
+
             results.append({
                 **p,
                 "status": "connected",
@@ -401,7 +416,8 @@ async def get_all_providers_summary(
             results.append({
                 **p,
                 "status": "offline",
-                "balance": 0.0,
+                "balance": float(p_record.balance) if p_record else 0.0,
+                "currency": p_record.currency if p_record else "USD",
                 "error": str(exc)
             })
     return results
