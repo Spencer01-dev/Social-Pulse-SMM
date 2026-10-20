@@ -260,11 +260,11 @@ export const AdminOrdersPage: React.FC = () => {
   const totalRevenue = activeOrders.reduce((acc, o) => {
     // If order was placed on a child panel, SocialPulse wholesale revenue is wholesale_cost
     const rev = (o.tenant_id && o.wholesale_cost && Number(o.wholesale_cost) > 0)
-      ? Number(o.wholesale_cost)
-      : Number(o.charge);
+      ? (Number(o.wholesale_cost) || 0)
+      : (Number(o.charge) || 0);
     return acc + rev;
   }, 0);
-  const totalProfit = activeOrders.reduce((acc, o) => acc + Number(o.profit), 0);
+  const totalProfit = activeOrders.reduce((acc, o) => acc + (Number(o.profit) || 0), 0);
 
   return (
     <div className="space-y-6">
