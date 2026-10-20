@@ -1,15 +1,15 @@
 import uuid
-from datetime import date as date_type
+from datetime import date as date_type, datetime, timezone
 from decimal import Decimal
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import cast, Date, desc, func, select, String
+from sqlalchemy import and_, cast, Date, desc, func, or_, select, String
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.api.deps import require_roles
 from app.core.database import get_db
 from app.models.order import Order, OrderStatus
+from app.models.provider import Provider
 from app.models.service import Service
 from app.models.user import User, UserRole
 from app.schemas.order import AdminOrderResponse, OrderStatusUpdate
@@ -33,12 +33,18 @@ async def list_admin_orders(
     Optionally filter by a specific date to see that day's activity.
     """
     query = (
-        select(Order)
-        .options(
-            selectinload(Order.user),
-            selectinload(Order.service),
-            selectinload(Order.provider)
+        select(
+            Order,
+            User.email.label("user_email"),
+            User.username.label("user_username"),
+            Service.name.label("service_name"),
+            Service.platform.label("service_platform"),
+            Service.refill_available.label("service_refill_available"),
+            Provider.slug.label("provider_slug")
         )
+        .join(User, Order.user_id == User.id, isouter=True)
+        .join(Service, Order.service_id == Service.id, isouter=True)
+        .join(Provider, Order.provider_id == Provider.id, isouter=True)
         .order_by(desc(Order.created_at))
         .offset(skip)
         .limit(limit)
@@ -46,17 +52,28 @@ async def list_admin_orders(
 
     if status:
         query = query.where(Order.status == status)
+
     # Filter by specific date (YYYY-MM-DD) when calendar date is selected
-    if date:
+    if date and date.strip():
         try:
-            parsed_date = date_type.fromisoformat(date)
-            query = query.where(cast(Order.created_at, Date) == parsed_date)
+            parsed_date = date_type.fromisoformat(date.strip())
+            start_dt = datetime(parsed_date.year, parsed_date.month, parsed_date.day, 0, 0, 0, tzinfo=timezone.utc)
+            end_dt = datetime(parsed_date.year, parsed_date.month, parsed_date.day, 23, 59, 59, 999999, tzinfo=timezone.utc)
+            start_naive = datetime(parsed_date.year, parsed_date.month, parsed_date.day, 0, 0, 0)
+            end_naive = datetime(parsed_date.year, parsed_date.month, parsed_date.day, 23, 59, 59, 999999)
+            query = query.where(
+                or_(
+                    and_(Order.created_at >= start_dt, Order.created_at <= end_dt),
+                    and_(Order.created_at >= start_naive, Order.created_at <= end_naive),
+                    cast(Order.created_at, Date) == parsed_date
+                )
+            )
         except ValueError:
             pass  # Ignore invalid date format, return all orders
+
     if search:
         search_clean = search.strip().lstrip('#').lower()
         pattern = f"%{search_clean}%"
-        query = query.join(Order.user, isouter=True).join(Order.service, isouter=True)
         query = query.where(
             (cast(Order.order_number, String).ilike(pattern)) |
             (cast(Order.id, String).ilike(pattern)) |
@@ -68,11 +85,21 @@ async def list_admin_orders(
         )
 
     result = await db.execute(query)
-    orders = result.scalars().all()
+    rows = result.all()
 
     response_items = []
-    for o in orders:
+    for o, u_email, u_name, svc_name, svc_plat, svc_refill, prov_slug in rows:
         try:
+            prov_name = "Direct"
+            if prov_slug:
+                s_lower = str(prov_slug).lower()
+                prov_name = "JustAnotherPanel (JAP)" if "jap" in s_lower else str(prov_slug).capitalize()
+
+            plat_str = "instagram"
+            if svc_plat:
+                plat_str = str(getattr(svc_plat, "value", svc_plat) or "instagram")
+
+            chg = Decimal(str(o.charge)) if o.charge is not None else Decimal("0.00")
             ws_cost = Decimal(str(o.wholesale_cost)) if o.wholesale_cost is not None else Decimal("0.00")
             prov_cost = Decimal(str(o.provider_cost)) if o.provider_cost is not None else Decimal("0.00")
             prof_val = Decimal(str(o.profit)) if o.profit is not None else Decimal("0.00")
@@ -82,16 +109,8 @@ async def list_admin_orders(
             else:
                 calc_profit = prof_val
 
-            st_val = o.status
-            if hasattr(st_val, "value"):
-                st_val = st_val.value
-            elif hasattr(st_val, "name"):
-                st_val = st_val.name
-            st_str = str(st_val).lower() if st_val else "pending"
-
-            plat = "instagram"
-            if o.service and o.service.platform:
-                plat = str(o.service.platform.value if hasattr(o.service.platform, "value") else o.service.platform)
+            st_val = getattr(o, "status", "pending")
+            st_str = str(getattr(st_val, "value", getattr(st_val, "name", st_val)) or "pending").lower()
 
             response_items.append(
                 AdminOrderResponse(
@@ -99,24 +118,24 @@ async def list_admin_orders(
                     order_number=o.order_number,
                     tenant_id=o.tenant_id,
                     user_id=o.user_id,
-                    user_email=(o.user.email if o.user and o.user.email else "N/A"),
-                    username=(o.user.username if o.user and o.user.username else "N/A"),
+                    user_email=u_email or "N/A",
+                    username=u_name or "Customer",
                     service_id=o.service_id,
-                    service_name=o.service.name if o.service else "SMM Service",
-                    platform=plat,
-                    provider_name=o.provider.name if o.provider else "Direct",
+                    service_name=svc_name or "SMM Service",
+                    platform=plat_str,
+                    provider_name=prov_name,
                     provider_order_id=str(o.provider_order_id) if o.provider_order_id else None,
                     target_link=o.target_link or "",
                     quantity=o.quantity or 0,
                     start_count=o.start_count or 0,
                     remains=o.remains or 0,
-                    charge=Decimal(str(o.charge)) if o.charge is not None else Decimal("0.00"),
+                    charge=chg,
                     wholesale_cost=ws_cost,
                     provider_cost=prov_cost,
                     profit=calc_profit,
                     currency=o.currency or "KES",
                     status=st_str,
-                    refill_available=bool(o.service.refill_available) if o.service else False,
+                    refill_available=bool(svc_refill) if svc_refill is not None else False,
                     error_message=str(o.error_message) if o.error_message else None,
                     created_at=o.created_at,
                     updated_at=o.updated_at or o.created_at

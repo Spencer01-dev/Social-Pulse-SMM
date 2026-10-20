@@ -596,6 +596,11 @@ export const DailyRevenueCalendar: React.FC<DailyRevenueCalendarProps> = ({
                     onClick={() => {
                       if (cell.isCurrentMonth) {
                         setSelectedDayNumber(cell.dayNumber);
+                        if (onDateSelect) {
+                          const mStr = String(currentMonth + 1).padStart(2, '0');
+                          const dStr = String(cell.dayNumber).padStart(2, '0');
+                          onDateSelect(`${currentYear}-${mStr}-${dStr}`);
+                        }
                       }
                     }}
                     className={`min-h-[56px] sm:min-h-[70px] p-2 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${

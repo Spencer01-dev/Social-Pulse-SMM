@@ -17,5 +17,14 @@ class Provider(TimeStampedUUIDModel):
     # Relationships
     services = relationship("Service", back_populates="provider", cascade="all, delete-orphan", foreign_keys="[Service.provider_id]")
 
+    @property
+    def name(self) -> str:
+        if self.slug:
+            slug_lower = self.slug.lower()
+            if "jap" in slug_lower:
+                return "JustAnotherPanel (JAP)"
+            return self.slug.capitalize()
+        return "Direct"
+
     def __repr__(self):
         return f"<Provider {self.name} ({self.slug})>"
