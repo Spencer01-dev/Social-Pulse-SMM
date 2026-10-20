@@ -253,7 +253,13 @@ async def retry_order_dispatch(
             db=db,
             comments=order.custom_comments
         )
-        order.provider_order_id = p_order_id
+        if p_order_id:
+            order.provider_order_id = p_order_id
+            if p_id:
+                try:
+                    order.provider_id = uuid.UUID(p_id)
+                except Exception:
+                    pass
         order.status = OrderStatus.IN_PROGRESS if p_order_id else OrderStatus.PROCESSING
         order.error_message = None
     except Exception as e:
@@ -263,6 +269,10 @@ async def retry_order_dispatch(
     db.add(order)
     await db.commit()
     await db.refresh(order)
+
+    prov_display = "Direct"
+    if order.provider:
+        prov_display = getattr(order.provider, "name", None) or "JustAnotherPanel (JAP)"
 
     return AdminOrderResponse(
         id=order.id,
@@ -274,7 +284,7 @@ async def retry_order_dispatch(
         service_id=order.service_id,
         service_name=order.service.name if order.service else "SMM Service",
         platform=order.service.platform if order.service else "instagram",
-        provider_name=order.provider.name if order.provider else "Direct",
+        provider_name=prov_display,
         provider_order_id=order.provider_order_id,
         target_link=order.target_link,
         quantity=order.quantity,
@@ -295,6 +305,65 @@ async def retry_order_dispatch(
         created_at=order.created_at,
         updated_at=order.updated_at
     )
+
+
+@router.post("/retry-pending")
+async def retry_all_pending_orders(
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
+) -> Any:
+    """
+    Retry dispatching all pending orders that have not yet been sent to an upstream provider.
+    """
+    from app.providers.router import SmartProviderRouter
+    query = await db.execute(
+        select(Order)
+        .options(selectinload(Order.service))
+        .where(
+            Order.status == OrderStatus.PENDING,
+            Order.provider_order_id.is_(None)
+        )
+    )
+    pending_orders = query.scalars().all()
+    dispatched_count = 0
+    errors = []
+
+    for order in pending_orders:
+        if not order.service:
+            continue
+        try:
+            p_id, p_order_id, msg = await SmartProviderRouter.dispatch_with_failover(
+                service=order.service,
+                target_link=order.target_link,
+                quantity=order.quantity,
+                db=db,
+                comments=order.custom_comments
+            )
+            if p_order_id:
+                order.provider_order_id = p_order_id
+                if p_id:
+                    try:
+                        order.provider_id = uuid.UUID(p_id)
+                    except Exception:
+                        pass
+                order.status = OrderStatus.IN_PROGRESS
+                order.error_message = None
+                dispatched_count += 1
+                db.add(order)
+        except Exception as err:
+            order.error_message = str(err)
+            db.add(order)
+            errors.append(f"Order #{getattr(order, 'id', '')}: {err}")
+
+    await db.commit()
+    return {
+        "success": True,
+        "message": f"Successfully dispatched {dispatched_count} of {len(pending_orders)} pending orders to upstream provider.",
+        "total_pending": len(pending_orders),
+        "dispatched": dispatched_count,
+        "failed": len(errors),
+        "errors": errors[:5]
+    }
 
 
 @router.post("/sync-active")

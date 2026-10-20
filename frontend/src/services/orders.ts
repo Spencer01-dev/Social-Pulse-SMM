@@ -51,6 +51,25 @@ export const ordersService = {
     return response.data;
   },
 
+  retryAllPendingOrdersAdmin: async (): Promise<{
+    success: boolean;
+    message: string;
+    total_pending: number;
+    dispatched: number;
+    failed: number;
+    errors: string[];
+  }> => {
+    const response = await apiClient.post<{
+      success: boolean;
+      message: string;
+      total_pending: number;
+      dispatched: number;
+      failed: number;
+      errors: string[];
+    }>('/admin/orders/retry-pending');
+    return response.data;
+  },
+
   requestRefill: async (orderId: string): Promise<{ success: boolean; refill_id: string; message: string }> => {
     const response = await apiClient.post<{ success: boolean; refill_id: string; message: string }>(
       `/orders/${orderId}/refill`

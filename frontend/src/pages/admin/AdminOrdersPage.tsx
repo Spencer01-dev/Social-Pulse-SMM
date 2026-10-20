@@ -17,6 +17,7 @@ import {
   Calendar,
   BarChart3,
   Percent,
+  Send,
 } from 'lucide-react';
 import { ordersService } from '../../services/orders';
 import { analyticsService, DailyRevenue, MonthlySummary } from '../../services/analytics';
@@ -31,6 +32,7 @@ export const AdminOrdersPage: React.FC = () => {
   const [dailyRevenue, setDailyRevenue] = useState<DailyRevenue[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [retryingAll, setRetryingAll] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const getTodayIso = () => {
@@ -139,6 +141,20 @@ export const AdminOrdersPage: React.FC = () => {
       setSyncMessage(`Sync Error: ${err.message}`);
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleRetryAllPending = async () => {
+    setRetryingAll(true);
+    setSyncMessage(null);
+    try {
+      const res = await ordersService.retryAllPendingOrdersAdmin();
+      setSyncMessage(res.message);
+      await fetchAdminOrders();
+    } catch (err: any) {
+      setSyncMessage(`Dispatch Error: ${err.response?.data?.detail || err.message}`);
+    } finally {
+      setRetryingAll(false);
     }
   };
 
@@ -285,6 +301,17 @@ export const AdminOrdersPage: React.FC = () => {
           >
             <Calendar className="w-4 h-4 text-amber-400" />
             <span>Monthly Revenue & Profits</span>
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleRetryAllPending}
+            disabled={retryingAll}
+            className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20"
+          >
+            <Send className={`w-4 h-4 ${retryingAll ? 'animate-pulse' : ''}`} />
+            <span>{retryingAll ? 'Dispatching...' : 'Dispatch Pending to JAP'}</span>
           </Button>
 
           <Button

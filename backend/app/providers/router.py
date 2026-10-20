@@ -79,20 +79,23 @@ class SmartProviderRouter:
         # 2. Try each provider in priority chain
         for provider_record in active_providers:
             try:
-                logger.info(f"[*] Attempting dispatch to Provider: {provider_record.name} ({provider_record.slug})")
+                p_slug = getattr(provider_record, "slug", "jap") or "jap"
+                p_name = getattr(provider_record, "name", None) or ("JustAnotherPanel (JAP)" if "jap" in str(p_slug).lower() else str(p_slug).capitalize())
+                p_url = getattr(provider_record, "api_url", None) or settings.JAP_API_URL
+                p_key = getattr(provider_record, "api_key_encrypted", None) or settings.JAP_API_KEY
+                logger.info(f"[*] Attempting dispatch to Provider: {p_name} ({p_slug})")
 
                 # Instantiate provider client
-                p_key = provider_record.api_key_encrypted
-                if provider_record.slug in ["jap", "justanotherpanel", "just_another_panel", "just-another-panel", "default"]:
+                if str(p_slug).lower() in ["jap", "justanotherpanel", "just_another_panel", "just-another-panel", "default"]:
                     client = JustAnotherPanelProvider(
-                        api_url=provider_record.api_url or settings.JAP_API_URL,
-                        api_key=p_key or settings.JAP_API_KEY
+                        api_url=p_url,
+                        api_key=p_key
                     )
                 else:
                     client = GenericSMMProvider(
-                        name=provider_record.name,
-                        api_url=provider_record.api_url,
-                        api_key=p_key or settings.JAP_API_KEY
+                        name=p_name,
+                        api_url=p_url,
+                        api_key=p_key
                     )
 
                 # Submit order
@@ -104,12 +107,14 @@ class SmartProviderRouter:
                     **kwargs
                 )
 
-                logger.info(f"[+] Order successfully dispatched to {provider_record.name}! Provider Order ID: {resp.provider_order_id}")
-                return str(provider_record.id) if hasattr(provider_record, 'id') else None, resp.provider_order_id, f"Dispatched to {provider_record.name}"
+                logger.info(f"[+] Order successfully dispatched to {p_name}! Provider Order ID: {resp.provider_order_id}")
+                prov_id_str = str(getattr(provider_record, 'id', '')) if getattr(provider_record, 'id', None) else None
+                return prov_id_str, resp.provider_order_id, f"Dispatched to {p_name}"
 
             except Exception as err:
                 last_error = err
-                logger.warning(f"[!] Failover triggered: Provider {provider_record.name} failed: {err}. Routing to next fallback...")
+                p_ident = getattr(provider_record, 'name', None) or getattr(provider_record, 'slug', 'unknown')
+                logger.warning(f"[!] Failover triggered: Provider {p_ident} failed: {err}. Routing to next fallback...")
                 continue
 
         # If all live providers fail, raise informative exception

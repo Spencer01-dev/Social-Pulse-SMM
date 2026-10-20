@@ -7,7 +7,9 @@ from app.models.base import TimeStampedUUIDModel
 class Provider(TimeStampedUUIDModel):
     __tablename__ = "providers"
 
+    name = Column(String(100), nullable=True, default="JustAnotherPanel")
     slug = Column(String(50), unique=True, index=True, nullable=False)  # jap, mock
+    api_url = Column(String(255), nullable=True, default="https://justanotherpanel.com/api/v2")
     api_key_encrypted = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     balance = Column(Numeric(12, 2), default=0.00, nullable=False)
@@ -17,14 +19,5 @@ class Provider(TimeStampedUUIDModel):
     # Relationships
     services = relationship("Service", back_populates="provider", cascade="all, delete-orphan", foreign_keys="[Service.provider_id]")
 
-    @property
-    def name(self) -> str:
-        if self.slug:
-            slug_lower = self.slug.lower()
-            if "jap" in slug_lower:
-                return "JustAnotherPanel (JAP)"
-            return self.slug.capitalize()
-        return "Direct"
-
     def __repr__(self):
-        return f"<Provider {self.name} ({self.slug})>"
+        return f"<Provider {self.name or self.slug} ({self.slug})>"
