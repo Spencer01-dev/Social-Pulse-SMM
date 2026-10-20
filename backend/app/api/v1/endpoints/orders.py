@@ -1,4 +1,6 @@
+import logging
 import uuid
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
@@ -9,7 +11,7 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import get_current_active_user
 from app.api.v1.endpoints.tenant import MAIN_PLATFORM_DOMAINS
 from app.core.database import get_db
-from app.models.child_panel import ChildPanel
+from app.models.child_panel import ChildPanel, ChildPanelStatus
 from app.models.order import Order, OrderStatus
 from app.models.service import Service
 from app.models.transaction import PaymentMethod, Transaction, TransactionStatus, TransactionType
@@ -17,6 +19,8 @@ from app.models.user import User, UserRole
 from app.providers.manager import get_provider
 from app.schemas.order import CustomerOrderResponse, OrderCreate
 from app.workers.order_tasks import sync_single_order
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -231,14 +235,15 @@ async def create_order(
 
     # 9. Record Child Panel Owner wholesale deduction in transaction ledger
     if panel_owner and wholesale_cost > Decimal("0.00"):
+        panel_owner_bal = getattr(panel_owner, "balance", Decimal("0.00"))
         owner_tx = Transaction(
             user_id=panel_owner.id,
             order_id=order.id,
             tenant_id=panel.id,
             type=TransactionType.ORDER_PAYMENT,
             amount=-wholesale_cost,
-            balance_before=panel_owner_bal_before,
-            balance_after=panel_owner.balance,
+            balance_before=panel_owner_bal + wholesale_cost,
+            balance_after=panel_owner_bal,
             currency="KES",
             payment_method=PaymentMethod.INTERNAL,
             status=TransactionStatus.COMPLETED,

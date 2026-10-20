@@ -867,6 +867,23 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"detail": first_msg}
     )
 
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception(f"[!] Unhandled server exception on {request.method} {request.url.path}: {exc}")
+    origin = request.headers.get("origin") or "*"
+    headers = {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Allow-Methods": "*",
+        "Access-Control-Allow-Headers": "*",
+    }
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected server error occurred. Please try again or contact support."},
+        headers=headers
+    )
+
 # Register Security Headers Middleware
 app.add_middleware(SecurityHeadersMiddleware)
 
