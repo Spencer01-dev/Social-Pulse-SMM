@@ -373,17 +373,17 @@ async def lifespan(app: FastAPI):
                 """))
 
                 # 2. TikTok Likes (Delix Exact Pricing Structure)
-                # Bait Tier (Cheapest Magnet): Bulk TikTok Likes [Max 100K] (#9423) -> Retail: 18.70 KES | Wholesale: 18.70 KES
+                # Bait Tier (Cheapest Magnet): Bulk TikTok Likes [Max 100K] (#9423) -> Retail: 18.70 KES | Wholesale: 18.69 KES (0% markup to child panels!)
                 await conn.execute(text("""
                     UPDATE services
-                    SET selling_rate = 18.70, wholesale_rate = 18.70, markup_type = 'manual'
+                    SET selling_rate = 18.70, wholesale_rate = 18.69, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok' AND provider_service_id = '9423';
                 """))
-                # Tier 2 (1M HQ Likes): (#9301) -> Retail: 27.50 KES (Delix: 27.5 Ksh) | Wholesale: 24.00 KES
+                # Tier 2 (1M HQ Likes): (#9301) -> Retail: 27.50 KES | Wholesale: 23.94 KES (Exact 30% profit to Admin / 70% to Child Panel)
                 await conn.execute(text("""
                     UPDATE services
-                    SET selling_rate = 27.50, wholesale_rate = 24.00, markup_type = 'manual'
+                    SET selling_rate = 27.50, wholesale_rate = 23.94, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok' AND provider_service_id = '9301';
                 """))
@@ -552,11 +552,20 @@ async def lifespan(app: FastAPI):
                       AND provider_rate <= 40.00;
                 """))
 
+                # Enforce Platform-wide Wholesale Split: 30% profit to Admin / 70% profit to Child Panel
+                await conn.execute(text("""
+                    UPDATE services
+                    SET wholesale_rate = ROUND(provider_rate + (0.30 * (selling_rate - provider_rate)), 2)
+                    WHERE markup_type = 'percentage'
+                      AND selling_rate > provider_rate
+                      AND provider_service_id != '9423';
+                """))
+
                 # Safety Invariant: Guarantee NO service has selling_rate <= provider_rate or wholesale_rate <= provider_rate
                 await conn.execute(text("""
                     UPDATE services
-                    SET wholesale_rate = ROUND(provider_rate * 1.35, 2),
-                        selling_rate = ROUND(provider_rate * 2.20, 2),
+                    SET selling_rate = ROUND(provider_rate * 2.20, 2),
+                        wholesale_rate = ROUND(provider_rate + (0.30 * (provider_rate * 1.20)), 2),
                         markup_type = 'percentage'
                     WHERE selling_rate <= provider_rate OR wholesale_rate <= provider_rate;
                 """))
