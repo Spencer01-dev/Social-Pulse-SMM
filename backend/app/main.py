@@ -648,8 +648,9 @@ async def lifespan(app: FastAPI):
 
     # Step: Sync child panel admin password for skakegains.com (Admin: ken -> @keN450000)
     try:
-        from app.models.child_panel import ChildPanel
+        from app.models.child_panel import ChildPanel, ChildPanelStatus
         from sqlalchemy import or_
+        from datetime import datetime, timezone, timedelta
         async with AsyncSessionLocal() as db:
             cp_res = await db.execute(
                 select(ChildPanel).where(
@@ -666,6 +667,8 @@ async def lifespan(app: FastAPI):
                 p.domain = "skakegains.com"
                 p.admin_username = "ken"
                 p.admin_password_hash = new_hash
+                p.status = ChildPanelStatus.ACTIVE
+                p.expires_at = datetime.now(timezone.utc) + timedelta(days=30)
 
                 # 1. Ensure 'ken' exists as a Parent Account on SocialPulse (tenant_id IS NULL)
                 parent_res = await db.execute(select(User).where(User.username == "ken", User.tenant_id.is_(None)))
