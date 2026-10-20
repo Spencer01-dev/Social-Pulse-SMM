@@ -351,46 +351,71 @@ async def lifespan(app: FastAPI):
                     WHERE provider_rate > 0;
                 """))
 
-                # TikTok Views (JAP) -> Retail: 2.90 KES (Delix exact rate!) | Wholesale: 1.30 KES
+                # === DELIX CUSTOMER ATTRACTION MAGNET & TIERED PRICING ===
+
+                # 1. TikTok Views
+                # Magnet Tier: Super-cheap Views (#4124, Cost: 0.69 KES) -> Retail: 0.95 KES | Wholesale: 0.80 KES
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 0.95, wholesale_rate = 0.80, markup_type = 'manual'
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
+                      AND platform = 'tiktok' AND provider_service_id = '4124';
+                """))
+                # Standard Tier: TikTok Views (Cost: < 1.50 KES) -> Retail: 2.90 KES (Delix rate) | Wholesale: 1.30 KES
                 await conn.execute(text("""
                     UPDATE services
                     SET selling_rate = 2.90, wholesale_rate = 1.30, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok'
                       AND (name ILIKE '%view%' OR category ILIKE '%view%')
+                      AND provider_service_id != '4124'
                       AND provider_rate < 1.50;
                 """))
 
-                # TikTok Likes (Cost: ~14.62 - 18.69 KES from JAP)
-                # Tier 1: Bulk TikTok Likes [Max 100K] (#9423) -> Retail: 35.00 KES | Wholesale: 24.00 KES (Delix exact rate!)
+                # 2. TikTok Likes (Tiered exactly like Delix screenshot)
+                # Tier 1 (Magnet): Bulk TikTok Likes [Max 100K] (#9423) -> Retail: 18.70 KES | Wholesale: 18.70 KES (Delix ~18.4 KES!)
                 await conn.execute(text("""
                     UPDATE services
-                    SET selling_rate = 35.00, wholesale_rate = 24.00, markup_type = 'manual'
+                    SET selling_rate = 18.70, wholesale_rate = 18.70, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok' AND provider_service_id = '9423';
                 """))
-                # Tier 2: TikTok HQ Likes (#9301) -> Retail: 37.00 KES | Wholesale: 26.00 KES
+                # Tier 2 (Magnet 1M): TikTok HQ Likes (#9301) -> Retail: 27.50 KES | Wholesale: 24.00 KES (Delix 27.5 KES!)
                 await conn.execute(text("""
                     UPDATE services
-                    SET selling_rate = 37.00, wholesale_rate = 26.00, markup_type = 'manual'
+                    SET selling_rate = 27.50, wholesale_rate = 24.00, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok' AND provider_service_id = '9301';
                 """))
-                # Tier 3: Fast TikTok Likes (#10385, #9179) -> Retail: 39.00 KES | Wholesale: 30.00 KES
+                # Tier 3 (Standard 10M): TikTok Likes (#9179, #10385) -> Retail: 35.00 KES | Wholesale: 29.00 KES (Delix 35 KES!)
                 await conn.execute(text("""
                     UPDATE services
-                    SET selling_rate = 39.00, wholesale_rate = 30.00, markup_type = 'manual'
+                    SET selling_rate = 35.00, wholesale_rate = 29.00, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok' AND provider_service_id IN ('10385', '9179');
                 """))
-                # Tier 4: TikTok Likes 30D Refill (#10173) -> Retail: 45.00 KES | Wholesale: 36.00 KES
+                # Tier 4 (30D Refill): TikTok Likes (#10173) -> Retail: 38.00 KES | Wholesale: 33.00 KES (Delix 38 KES!)
                 await conn.execute(text("""
                     UPDATE services
-                    SET selling_rate = 45.00, wholesale_rate = 36.00, markup_type = 'manual'
+                    SET selling_rate = 38.00, wholesale_rate = 33.00, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok' AND provider_service_id = '10173';
                 """))
-                # Tier 5: TikTok Live Likes (#8063) -> Retail: 4.50 KES | Wholesale: 2.80 KES
+                # Tier 5 (60D Refill): TikTok Likes (#3367) -> Retail: 41.00 KES | Wholesale: 35.00 KES (Delix 41 KES!)
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 41.00, wholesale_rate = 35.00, markup_type = 'manual'
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
+                      AND platform = 'tiktok' AND provider_service_id = '3367';
+                """))
+                # Tier 6 (90D Refill): TikTok Likes (#9396) -> Retail: 43.00 KES | Wholesale: 37.00 KES (Delix 43 KES!)
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 43.00, wholesale_rate = 37.00, markup_type = 'manual'
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
+                      AND platform = 'tiktok' AND provider_service_id = '9396';
+                """))
+                # TikTok Live Likes (#8063) -> Retail: 4.50 KES | Wholesale: 2.80 KES
                 await conn.execute(text("""
                     UPDATE services
                     SET selling_rate = 4.50, wholesale_rate = 2.80, markup_type = 'manual'
@@ -398,49 +423,108 @@ async def lifespan(app: FastAPI):
                       AND platform = 'tiktok' AND provider_service_id = '8063';
                 """))
 
-                # Facebook Reactions & Post Likes (Cost: ~10.46 KES from JAP) -> Retail: 26.60 KES (Delix exact rate!) | Wholesale: 16.00 KES
+                # 3. TikTok Saves & Shares (Magnet)
                 await conn.execute(text("""
                     UPDATE services
-                    SET selling_rate = 26.60, wholesale_rate = 16.00, markup_type = 'manual'
-                    WHERE platform = 'facebook'
-                      AND (name ILIKE '%reaction%' OR name ILIKE '%post like%')
-                      AND provider_rate <= 12.00;
+                    SET selling_rate = 2.60, wholesale_rate = 1.80, markup_type = 'manual'
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
+                      AND platform = 'tiktok' AND provider_service_id = '54';
                 """))
 
-                # Instagram Views & Reels (Cost: ~0.13 - 0.45 KES) -> Retail: 2.80 KES | Wholesale: 1.20 KES
+                # 4. Instagram Views & Reels
+                # Magnet Tier: Super-cheap Views (Cost: < 0.20 KES) -> Retail: 0.45 KES | Wholesale: 0.30 KES
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 0.45, wholesale_rate = 0.30, markup_type = 'manual'
+                    WHERE platform = 'instagram'
+                      AND (name ILIKE '%view%' OR name ILIKE '%reel%')
+                      AND provider_rate <= 0.20;
+                """))
+                # Standard Tier: Views (Cost: 0.21 - 0.60 KES) -> Retail: 2.80 KES | Wholesale: 1.20 KES
                 await conn.execute(text("""
                     UPDATE services
                     SET selling_rate = 2.80, wholesale_rate = 1.20, markup_type = 'manual'
                     WHERE platform = 'instagram'
                       AND (name ILIKE '%view%' OR name ILIKE '%reel%')
-                      AND provider_rate <= 0.60;
+                      AND provider_rate > 0.20 AND provider_rate <= 0.60;
                 """))
 
-                # Instagram Likes (Cost: ~9.50 - 12.00 KES) -> Retail: 28.00 KES | Wholesale: 18.00 KES
+                # 5. Instagram Likes
+                # Magnet Tier: Customer Attraction Likes (#9530, #1837, #1865 - Cost: 5.37 KES) -> Retail: 7.50 KES | Wholesale: 6.20 KES
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 7.50, wholesale_rate = 6.20, markup_type = 'manual'
+                    WHERE platform = 'instagram' AND provider_service_id IN ('9530', '1837', '1865');
+                """))
+                # Standard Tier: Instagram Likes (Cost: <= 15.00 KES) -> Retail: 28.00 KES | Wholesale: 18.00 KES
                 await conn.execute(text("""
                     UPDATE services
                     SET selling_rate = 28.00, wholesale_rate = 18.00, markup_type = 'manual'
                     WHERE platform = 'instagram'
                       AND name ILIKE '%like%' AND name NOT ILIKE '%view%' AND name NOT ILIKE '%story%'
+                      AND provider_service_id NOT IN ('9530', '1837', '1865')
                       AND provider_rate <= 15.00;
                 """))
 
-                # Instagram Followers (Bot Followers) -> Retail: 45.00 KES | Wholesale: 32.00 KES
+                # 6. Instagram Followers
+                # Magnet Tier: Bot/Prank Followers (#2989, #1806 - Cost: ~28 KES) -> Retail: 35.00 KES | Wholesale: 30.00 KES
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 35.00, wholesale_rate = 30.00, markup_type = 'manual'
+                    WHERE platform = 'instagram' AND provider_service_id IN ('2989', '1806');
+                """))
+                # Standard Followers -> Retail: 45.00 KES | Wholesale: 32.00 KES
                 await conn.execute(text("""
                     UPDATE services
                     SET selling_rate = 45.00, wholesale_rate = 32.00, markup_type = 'manual'
                     WHERE platform = 'instagram'
                       AND name ILIKE '%follower%'
+                      AND provider_service_id NOT IN ('2989', '1806')
                       AND provider_rate <= 30.00;
                 """))
 
-                # Telegram Views & Members
+                # 7. Facebook Reactions & Post Likes
+                # Magnet Tier: Lowest cost reactions -> Retail: 16.50 KES | Wholesale: 12.50 KES
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 16.50, wholesale_rate = 12.50, markup_type = 'manual'
+                    WHERE platform = 'facebook'
+                      AND (name ILIKE '%reaction%' OR name ILIKE '%post like%')
+                      AND provider_rate <= 11.00;
+                """))
+                # Standard Reactions -> Retail: 26.60 KES (Delix exact rate!) | Wholesale: 16.00 KES
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 26.60, wholesale_rate = 16.00, markup_type = 'manual'
+                    WHERE platform = 'facebook'
+                      AND (name ILIKE '%reaction%' OR name ILIKE '%post like%')
+                      AND provider_rate > 11.00 AND provider_rate <= 15.00;
+                """))
+
+                # 8. Twitter / X Views
+                # Magnet Tier (#6497, Cost: 0.32 KES) -> Retail: 0.80 KES | Wholesale: 0.50 KES
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 0.80, wholesale_rate = 0.50, markup_type = 'manual'
+                    WHERE platform = 'twitter' AND provider_service_id = '6497';
+                """))
+
+                # 9. Telegram Views & Members
+                # Magnet Tier: Lowest views -> Retail: 0.75 KES | Wholesale: 0.50 KES
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 0.75, wholesale_rate = 0.50, markup_type = 'manual'
+                    WHERE platform = 'telegram'
+                      AND (name ILIKE '%view%' OR name ILIKE '%post%')
+                      AND provider_rate <= 0.40;
+                """))
+                # Standard Views -> Retail: 2.50 KES | Wholesale: 1.10 KES
                 await conn.execute(text("""
                     UPDATE services
                     SET selling_rate = 2.50, wholesale_rate = 1.10, markup_type = 'manual'
                     WHERE platform = 'telegram'
                       AND (name ILIKE '%view%' OR name ILIKE '%post%')
-                      AND provider_rate <= 0.60;
+                      AND provider_rate > 0.40 AND provider_rate <= 0.60;
                 """))
                 await conn.execute(text("""
                     UPDATE services
