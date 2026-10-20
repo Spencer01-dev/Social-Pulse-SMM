@@ -32,7 +32,7 @@ export const AdminServicesPage: React.FC = () => {
   } | null>(null);
 
   const [search, setSearch] = useState('');
-  const [syncProvider, setSyncProvider] = useState('resellersmm');
+  const [syncProvider, setSyncProvider] = useState('jap');
   const [providerFilter, setProviderFilter] = useState<string>('all');
   const [platformFilter, setPlatformFilter] = useState<string>('all');
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
@@ -203,7 +203,6 @@ export const AdminServicesPage: React.FC = () => {
               onChange={(e) => setSyncProvider(e.target.value)}
               className="px-3 py-1.5 bg-slate-950/80 border border-amber-500/30 rounded-xl text-amber-400 text-xs font-semibold focus:outline-none focus:border-amber-400 cursor-pointer"
             >
-              <option value="resellersmm">ResellerSMM</option>
               <option value="jap">JustAnotherPanel (JAP)</option>
             </select>
 
@@ -216,9 +215,7 @@ export const AdminServicesPage: React.FC = () => {
             >
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
               <span>
-                {syncing
-                  ? 'Syncing...'
-                  : `Sync from ${syncProvider === 'jap' ? 'JAP' : 'ResellerSMM'}`}
+                {syncing ? 'Syncing...' : 'Sync from JAP'}
               </span>
             </Button>
           </div>
@@ -287,32 +284,17 @@ export const AdminServicesPage: React.FC = () => {
               <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5">
                 <button
                   type="button"
-                  onClick={() => setSyncProvider('resellersmm')}
-                  className={`px-2 py-0.5 text-[10px] rounded-md font-semibold transition-colors ${
-                    syncProvider === 'resellersmm'
-                      ? 'bg-amber-500 text-slate-950 shadow-sm'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  ResellerSMM
-                </button>
-                <button
-                  type="button"
                   onClick={() => setSyncProvider('jap')}
-                  className={`px-2 py-0.5 text-[10px] rounded-md font-semibold transition-colors ${
-                    syncProvider === 'jap'
-                      ? 'bg-amber-500 text-slate-950 shadow-sm'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
+                  className="px-2.5 py-0.5 text-[10px] rounded-md font-semibold bg-amber-500 text-slate-950 shadow-sm"
                 >
-                  JAP
+                  JustAnotherPanel (JAP)
                 </button>
               </div>
             </div>
 
             <div className="mt-1">
               <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">
-                {syncProvider === 'jap' ? 'JustAnotherPanel' : 'ResellerSMM'}
+                JustAnotherPanel (Live Upstream)
               </span>
               {loadingBalance ? (
                 <span className="text-sm font-medium text-amber-400 animate-pulse">Connecting...</span>
@@ -446,7 +428,6 @@ export const AdminServicesPage: React.FC = () => {
                 className="px-3 py-1.5 bg-slate-950/80 border border-slate-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-amber-500 cursor-pointer"
               >
                 <option value="all">All Providers</option>
-                <option value="resellersmm">ResellerSMM</option>
                 <option value="jap">JustAnotherPanel (JAP)</option>
               </select>
             </div>
@@ -489,10 +470,6 @@ export const AdminServicesPage: React.FC = () => {
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                         service.provider_slug === 'jap'
                           ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
-                          : service.provider_slug === 'secsers'
-                          ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30'
-                          : service.provider_slug === 'resellersmm'
-                          ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
                           : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
                       }`}
                     >
@@ -500,19 +477,10 @@ export const AdminServicesPage: React.FC = () => {
                         className={`w-1.5 h-1.5 rounded-full ${
                           service.provider_slug === 'jap'
                             ? 'bg-cyan-400'
-                            : service.provider_slug === 'secsers'
-                            ? 'bg-indigo-400'
-                            : service.provider_slug === 'resellersmm'
-                            ? 'bg-emerald-400'
                             : 'bg-amber-400'
                         }`}
                       />
-                      {service.provider_name ||
-                        (service.provider_slug === 'secsers'
-                          ? 'Secsers'
-                          : service.provider_slug === 'resellersmm'
-                          ? 'ResellerSMM'
-                          : 'JustAnotherPanel')}
+                      {service.provider_name || 'JustAnotherPanel'}
                     </span>
                   </td>
                   <td className="py-3.5 px-4 font-mono text-slate-400">#{service.provider_service_id}</td>
@@ -642,7 +610,7 @@ export const AdminServicesPage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-white">
-                    ResellerSMM API Key
+                    JustAnotherPanel (JAP) API Key
                   </h3>
                   <p className="text-xs text-slate-400">Connect wholesale catalog &amp; balance</p>
                 </div>
@@ -676,7 +644,7 @@ export const AdminServicesPage: React.FC = () => {
             <form onSubmit={handleSaveProviderKey} className="space-y-4 mt-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  {syncProvider === 'jap' ? 'JustAnotherPanel (JAP)' : 'ResellerSMM'} API Key
+                  JustAnotherPanel (JAP) API Key
                 </label>
                 <input
                   type="text"
@@ -687,9 +655,7 @@ export const AdminServicesPage: React.FC = () => {
                   required
                 />
                 <p className="text-[11px] text-slate-500 mt-1">
-                  {syncProvider === 'jap'
-                    ? 'Obtained from your JustAnotherPanel Account > API tab.'
-                    : 'Obtained from your ResellerSMM Account > API tab.'}
+                  Obtained from your JustAnotherPanel Account &gt; API tab.
                 </p>
               </div>
 

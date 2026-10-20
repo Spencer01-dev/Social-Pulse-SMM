@@ -7,9 +7,7 @@ from app.models.base import TimeStampedUUIDModel
 class Provider(TimeStampedUUIDModel):
     __tablename__ = "providers"
 
-    name = Column(String(100), nullable=False)
-    slug = Column(String(50), unique=True, index=True, nullable=False)  # jap, secsers, mock
-    api_url = Column(String(255), nullable=False)
+    slug = Column(String(50), unique=True, index=True, nullable=False)  # jap, mock
     api_key_encrypted = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     balance = Column(Numeric(12, 2), default=0.00, nullable=False)

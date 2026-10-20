@@ -901,7 +901,7 @@ export const NewOrderPage: React.FC = () => {
 
                     {/* Min, Max, Refill Details */}
                     <div className="mt-1 text-[11px] text-slate-400 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                      <span>Min: <strong className="text-slate-200">{(Number(service.min_quantity) || 100).toLocaleString()}</strong></span>
+                      <span>Min: <strong className="text-slate-200">{(service.service_type?.toLowerCase() === 'package' ? (Number(service.min_quantity) || 1) : Math.max(Number(service.min_quantity) || 100, 100)).toLocaleString()}</strong></span>
                       <span>Max: <strong className="text-slate-200">{(Number(service.max_quantity) || 100000).toLocaleString()}</strong></span>
                       <span>
                         {service.refill_available ? (

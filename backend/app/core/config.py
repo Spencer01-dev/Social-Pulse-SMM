@@ -86,14 +86,6 @@ class Settings(BaseSettings):
     JAP_API_URL: str = "https://justanotherpanel.com/api/v2"
     JAP_API_KEY: str = "4181c34178be65d635d0ea70687c285c"
 
-    # Upstream Provider (Secsers)
-    SECSERS_API_URL: str = "https://secsers.com/api/v2"
-    SECSERS_API_KEY: str = "9fa5f5dea3e45ce91a8cf69f7d6a0605"
-
-    # Upstream Provider (ResellerSMM - Cheap TikTok/YouTube/Telegram)
-    RESELLERSMM_API_URL: str = "https://resellersmm.com/api/v2"
-    RESELLERSMM_API_KEY: str = "f6f545ec5a398c1ba36edb4495962bd8"
-
     # Payments
     MPESA_ENVIRONMENT: str = "sandbox"
     MPESA_CONSUMER_KEY: str = ""

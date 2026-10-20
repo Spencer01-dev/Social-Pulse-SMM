@@ -2,13 +2,11 @@ from typing import Optional
 from app.core.config import settings
 from app.providers.base import ProviderInterface
 from app.providers.jap import JustAnotherPanelProvider
-from app.providers.secsers import SecsersProvider
-from app.providers.resellersmm import ResellerSMMProvider
 from app.providers.generic_smm import GenericSMMProvider
 from app.providers.mock import MockProvider
 
 
-def get_provider(slug: str = "resellersmm", api_url: Optional[str] = None, api_key: Optional[str] = None) -> ProviderInterface:
+def get_provider(slug: str = "jap", api_url: Optional[str] = None, api_key: Optional[str] = None) -> ProviderInterface:
     """
     Provider Factory function.
     Returns the appropriate ProviderInterface implementation.
@@ -18,34 +16,22 @@ def get_provider(slug: str = "resellersmm", api_url: Optional[str] = None, api_k
     if settings.USE_MOCK_PROVIDERS:
         return MockProvider()
 
-    if slug_clean in ["resellersmm", "reseller_smm", "reseller-smm", "resellersmm.com", "default", "primary"]:
-        return ResellerSMMProvider(
-            api_url=api_url or settings.RESELLERSMM_API_URL,
-            api_key=api_key or settings.RESELLERSMM_API_KEY,
-        )
-
-    if slug_clean in ["secsers", "secsers.com", "secser"]:
-        return SecsersProvider(
-            api_url=api_url or settings.SECSERS_API_URL,
-            api_key=api_key or settings.SECSERS_API_KEY,
-        )
-
-    if slug_clean in ["jap", "justanotherpanel", "just_another_panel", "just-another-panel"]:
+    if slug_clean in ["jap", "justanotherpanel", "just_another_panel", "just-another-panel", "default", "primary"]:
         return JustAnotherPanelProvider(
             api_url=api_url or settings.JAP_API_URL,
             api_key=api_key or settings.JAP_API_KEY,
         )
 
     # Generic SMM v2 Provider fallback
-    if api_url and (api_key or settings.RESELLERSMM_API_KEY):
+    if api_url and (api_key or settings.JAP_API_KEY):
         return GenericSMMProvider(
             name=slug.capitalize(),
             api_url=api_url,
-            api_key=api_key or settings.RESELLERSMM_API_KEY
+            api_key=api_key or settings.JAP_API_KEY
         )
 
-    # Default fallback to ResellerSMM
-    return ResellerSMMProvider(
-        api_url=settings.RESELLERSMM_API_URL,
-        api_key=settings.RESELLERSMM_API_KEY
+    # Default fallback to JustAnotherPanel
+    return JustAnotherPanelProvider(
+        api_url=settings.JAP_API_URL,
+        api_key=settings.JAP_API_KEY
     )

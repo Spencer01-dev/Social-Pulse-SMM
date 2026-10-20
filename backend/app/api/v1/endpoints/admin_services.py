@@ -94,7 +94,7 @@ async def list_admin_services(
 
 @router.post("/sync", response_model=SyncServicesResponse)
 async def sync_services(
-    provider_slug: str = "resellersmm",
+    provider_slug: str = "jap",
     default_markup: Decimal = Query(Decimal("80.00"), ge=0, description="Default markup % for new services"),
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
@@ -264,7 +264,7 @@ async def apply_bulk_markup(
 
 @router.get("/provider-balance")
 async def get_provider_live_balance(
-    provider_slug: str = "resellersmm",
+    provider_slug: str = "jap",
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
 ) -> Any:
@@ -322,12 +322,6 @@ async def update_provider_key(
     if clean_slug in ["jap", "justanotherpanel"]:
         p_name = "JustAnotherPanel"
         default_url = settings.JAP_API_URL
-    elif clean_slug in ["secsers", "secsers.com"]:
-        p_name = "Secsers"
-        default_url = settings.SECSERS_API_URL
-    elif clean_slug in ["resellersmm", "reseller_smm", "reseller-smm"]:
-        p_name = "ResellerSMM"
-        default_url = settings.RESELLERSMM_API_URL
     else:
         p_name = clean_slug.capitalize()
         default_url = settings.JAP_API_URL
@@ -384,13 +378,11 @@ async def get_all_providers_summary(
     admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
 ) -> Any:
     """
-    Query live status, balance, and configuration across all registered SMM providers:
-    JustAnotherPanel, Secsers, and ResellerSMM.
+    Query live status, balance, and configuration for JustAnotherPanel provider.
     """
     from app.core.config import settings
 
     providers_list = [
-        {"name": "ResellerSMM", "slug": "resellersmm", "api_url": settings.RESELLERSMM_API_URL, "currency": "USD"},
         {"name": "JustAnotherPanel", "slug": "jap", "api_url": settings.JAP_API_URL, "currency": "USD"},
     ]
     results = []
@@ -429,17 +421,17 @@ async def purge_delix_and_orphans(
     await db.execute(text("""
         UPDATE services 
         SET fallback_provider_id = NULL, fallback_service_id = NULL 
-        WHERE fallback_provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers', 'resellersmm'));
+        WHERE fallback_provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap'));
     """))
 
     res_orders = await db.execute(text("""
         DELETE FROM orders 
-        WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers', 'resellersmm'));
+        WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap'));
     """))
 
     res_services = await db.execute(text("""
         DELETE FROM services 
-        WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap', 'secsers', 'resellersmm'))
+        WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap'))
            OR provider_id IS NULL
            OR provider_id NOT IN (SELECT id FROM providers WHERE id IS NOT NULL)
            OR name ILIKE '%delix%' 
@@ -448,7 +440,7 @@ async def purge_delix_and_orphans(
 
     res_providers = await db.execute(text("""
         DELETE FROM providers 
-        WHERE slug NOT IN ('jap', 'secsers', 'resellersmm');
+        WHERE slug NOT IN ('jap');
     """))
 
     res_wholesale = await db.execute(text("""

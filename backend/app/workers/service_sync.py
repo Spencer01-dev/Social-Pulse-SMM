@@ -79,7 +79,7 @@ def calculate_selling_rate(
 
 async def sync_services_from_provider(
     db: AsyncSession,
-    provider_slug: str = "resellersmm",
+    provider_slug: str = "jap",
     default_markup_percent: Decimal = Decimal("100.00")
 ) -> Tuple[int, int, int]:
     """
@@ -95,14 +95,6 @@ async def sync_services_from_provider(
         if provider_slug in ["jap", "justanotherpanel", "just_another_panel", "just-another-panel"]:
             p_name = "JustAnotherPanel"
             p_url = settings.JAP_API_URL
-            p_currency = "USD"
-        elif provider_slug in ["secsers", "secsers.com", "secser"]:
-            p_name = "Secsers"
-            p_url = settings.SECSERS_API_URL
-            p_currency = "USD"
-        elif provider_slug in ["resellersmm", "reseller_smm", "reseller-smm", "resellersmm.com"]:
-            p_name = "ResellerSMM"
-            p_url = settings.RESELLERSMM_API_URL
             p_currency = "USD"
         else:
             p_name = provider_slug.capitalize()
