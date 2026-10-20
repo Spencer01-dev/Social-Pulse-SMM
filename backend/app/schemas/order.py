@@ -41,23 +41,23 @@ class AdminOrderResponse(BaseModel):
     id: uuid.UUID
     order_number: Optional[int] = None
     tenant_id: Optional[uuid.UUID] = None
-    user_id: uuid.UUID
-    user_email: str
-    username: str
-    service_id: uuid.UUID
-    service_name: str
-    platform: Platform
+    user_id: Optional[uuid.UUID] = None
+    user_email: Optional[str] = "N/A"
+    username: Optional[str] = "N/A"
+    service_id: Optional[uuid.UUID] = None
+    service_name: Optional[str] = "SMM Service"
+    platform: Optional[str] = "instagram"
     provider_name: Optional[str] = None
     provider_order_id: Optional[str] = None
-    target_link: str
-    quantity: int
-    start_count: int
-    remains: int
-    charge: Decimal
+    target_link: Optional[str] = ""
+    quantity: Optional[int] = 0
+    start_count: Optional[int] = 0
+    remains: Optional[int] = 0
+    charge: Optional[Decimal] = Decimal("0.00")
     wholesale_cost: Optional[Decimal] = Decimal("0.00")
-    provider_cost: Decimal
-    profit: Decimal
-    currency: str
+    provider_cost: Optional[Decimal] = Decimal("0.00")
+    profit: Optional[Decimal] = Decimal("0.00")
+    currency: Optional[str] = "KES"
     status: OrderStatus
     refill_available: bool = False
     error_message: Optional[str] = None

@@ -80,22 +80,22 @@ async def list_admin_orders(
             username=o.user.username if o.user else "N/A",
             service_id=o.service_id,
             service_name=o.service.name if o.service else "SMM Service",
-            platform=o.service.platform if o.service else "instagram",
+            platform=str(o.service.platform.value if hasattr(o.service.platform, "value") else o.service.platform) if (o.service and o.service.platform) else "instagram",
             provider_name=o.provider.name if o.provider else "Direct",
             provider_order_id=o.provider_order_id,
-            target_link=o.target_link,
-            quantity=o.quantity,
-            start_count=o.start_count,
-            remains=o.remains,
-            charge=o.charge,
+            target_link=o.target_link or "",
+            quantity=o.quantity or 0,
+            start_count=o.start_count or 0,
+            remains=o.remains or 0,
+            charge=o.charge or Decimal("0.00"),
             wholesale_cost=o.wholesale_cost or Decimal("0.00"),
-            provider_cost=o.provider_cost,
+            provider_cost=o.provider_cost or Decimal("0.00"),
             profit=(
                 (o.wholesale_cost - o.provider_cost)
                 if (o.tenant_id and o.wholesale_cost and o.wholesale_cost > Decimal("0.00"))
-                else o.profit
+                else (o.profit or Decimal("0.00"))
             ),
-            currency=o.currency,
+            currency=o.currency or "KES",
             status=o.status,
             refill_available=o.service.refill_available if o.service else False,
             error_message=o.error_message,
