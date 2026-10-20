@@ -372,48 +372,66 @@ async def lifespan(app: FastAPI):
                       AND provider_rate < 1.50;
                 """))
 
-                # 2. TikTok Likes (Tiered exactly like Delix screenshot)
-                # Tier 1 (Magnet): Bulk TikTok Likes [Max 100K] (#9423) -> Retail: 18.70 KES | Wholesale: 18.70 KES (Delix ~18.4 KES!)
+                # 2. TikTok Likes (Delix Exact Pricing Structure)
+                # Bait Tier (Cheapest Magnet): Bulk TikTok Likes [Max 100K] (#9423) -> Retail: 18.70 KES | Wholesale: 18.70 KES
                 await conn.execute(text("""
                     UPDATE services
                     SET selling_rate = 18.70, wholesale_rate = 18.70, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok' AND provider_service_id = '9423';
                 """))
-                # Tier 2 (Magnet 1M): TikTok HQ Likes (#9301) -> Retail: 27.50 KES | Wholesale: 24.00 KES (Delix 27.5 KES!)
+                # Tier 2 (1M HQ Likes): (#9301) -> Retail: 27.50 KES (Delix: 27.5 Ksh) | Wholesale: 24.00 KES
                 await conn.execute(text("""
                     UPDATE services
                     SET selling_rate = 27.50, wholesale_rate = 24.00, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok' AND provider_service_id = '9301';
                 """))
-                # Tier 3 (Standard 10M): TikTok Likes (#9179, #10385) -> Retail: 35.00 KES | Wholesale: 29.00 KES (Delix 35 KES!)
+                # Tier 3 (Standard 10M Likes): (#9179, #10385) -> Retail: 35.00 KES (Delix: 35.0 Ksh) | Wholesale: 29.00 KES
                 await conn.execute(text("""
                     UPDATE services
                     SET selling_rate = 35.00, wholesale_rate = 29.00, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok' AND provider_service_id IN ('10385', '9179');
                 """))
-                # Tier 4 (30D Refill): TikTok Likes (#10173) -> Retail: 38.00 KES | Wholesale: 33.00 KES (Delix 38 KES!)
+                # Tier 4 (30D Refill): (#10173) -> Retail: 38.00 KES (Delix: 38.0 Ksh) | Wholesale: 33.00 KES
                 await conn.execute(text("""
                     UPDATE services
                     SET selling_rate = 38.00, wholesale_rate = 33.00, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok' AND provider_service_id = '10173';
                 """))
-                # Tier 5 (60D Refill): TikTok Likes (#3367) -> Retail: 41.00 KES | Wholesale: 35.00 KES (Delix 41 KES!)
+                # Tier 5 (60D Refill): (#9397, #3367) -> Retail: 41.00 KES (Delix: 41.0 Ksh) | Wholesale: 38.50 KES
                 await conn.execute(text("""
                     UPDATE services
-                    SET selling_rate = 41.00, wholesale_rate = 35.00, markup_type = 'manual'
+                    SET selling_rate = 41.00, wholesale_rate = 38.50, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
-                      AND platform = 'tiktok' AND provider_service_id = '3367';
+                      AND platform = 'tiktok' AND (provider_service_id IN ('9397', '3367') OR name ILIKE '%60%d%');
                 """))
-                # Tier 6 (90D Refill): TikTok Likes (#9396) -> Retail: 43.00 KES | Wholesale: 37.00 KES (Delix 43 KES!)
+                # Tier 6 (90D Refill): (#9396) -> Retail: 43.00 KES (Delix: 43.0 Ksh) | Wholesale: 37.00 KES
                 await conn.execute(text("""
                     UPDATE services
                     SET selling_rate = 43.00, wholesale_rate = 37.00, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
-                      AND platform = 'tiktok' AND provider_service_id = '9396';
+                      AND platform = 'tiktok' AND (provider_service_id = '9396' OR name ILIKE '%90%d%');
+                """))
+                # Tier 7 (365D Refill): -> Retail: 46.00 KES (Delix: 46.0 Ksh) | Wholesale: 40.00 KES
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 46.00, wholesale_rate = 40.00, markup_type = 'manual'
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
+                      AND platform = 'tiktok' AND (name ILIKE '%365%d%' OR name ILIKE '%1 year%') AND name ILIKE '%like%';
+                """))
+                # Floor all other standard TikTok Likes to at least 35.00 KES so #9423 (18.70) remains the sole cheapest bait
+                await conn.execute(text("""
+                    UPDATE services
+                    SET selling_rate = 35.00, wholesale_rate = 29.00, markup_type = 'manual'
+                    WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
+                      AND platform = 'tiktok'
+                      AND (name ILIKE '%like%' OR category ILIKE '%like%')
+                      AND name NOT ILIKE '%live%'
+                      AND provider_service_id NOT IN ('9423', '9301')
+                      AND selling_rate < 35.00;
                 """))
                 # TikTok Live Likes (#8063) -> Retail: 4.50 KES | Wholesale: 2.80 KES
                 await conn.execute(text("""
