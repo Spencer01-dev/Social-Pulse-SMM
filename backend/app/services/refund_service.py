@@ -154,7 +154,7 @@ async def refund_order(
                             if (service.wholesale_rate and service.wholesale_rate > Decimal("0"))
                             else round(service.provider_rate * Decimal("1.30"), 2)
                         )
-                        is_package = service.type and service.type.value == "package"
+                        is_package = service.service_type and str(service.service_type).lower() == "package"
                         if is_package:
                             wholesale_cost = round(w_rate * Decimal(qty), 2)
                         else:
