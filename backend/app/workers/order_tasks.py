@@ -120,6 +120,63 @@ async def sync_active_orders(db: AsyncSession) -> Tuple[int, int]:
     if total_updated > 0:
         await db.commit()
 
+    # Auto-retry: Dispatch any PENDING orders that were never sent to a provider
+    undispatched_query = (
+        select(Order)
+        .options(selectinload(Order.service), selectinload(Order.provider), selectinload(Order.user))
+        .where(
+            Order.status.in_([OrderStatus.PENDING, OrderStatus.PROCESSING]),
+            Order.provider_order_id.is_(None)
+        )
+    )
+    undispatched_result = await db.execute(undispatched_query)
+    undispatched_orders = undispatched_result.scalars().all()
+
+    if undispatched_orders:
+        logger.info(f"[*] Found {len(undispatched_orders)} undispatched orders. Attempting auto-retry dispatch...")
+
+    for order in undispatched_orders:
+        try:
+            from app.providers.router import SmartProviderRouter
+            from app.models.service import Service
+
+            service = order.service
+            if not service and order.service_id:
+                svc_res = await db.execute(select(Service).where(Service.id == order.service_id))
+                service = svc_res.scalars().first()
+
+            if not service:
+                logger.warning(f"[!] Cannot auto-dispatch order #{str(order.id)[:8]}: service not found")
+                continue
+
+            p_id, p_order_id, msg = await SmartProviderRouter.dispatch_with_failover(
+                service=service,
+                target_link=order.target_link,
+                quantity=order.quantity,
+                db=db,
+                comments=getattr(order, 'custom_comments', None)
+            )
+            if p_order_id:
+                order.provider_order_id = str(p_order_id)
+                order.status = OrderStatus.IN_PROGRESS
+                order.error_message = None
+                if p_id:
+                    import uuid as uuid_mod
+                    try:
+                        order.provider_id = uuid_mod.UUID(p_id)
+                    except Exception:
+                        pass
+                db.add(order)
+                total_updated += 1
+                total_checked += 1
+                logger.info(f"[+] Auto-retry dispatch SUCCESS for order #{str(order.id)[:8]}! Provider Order ID: {p_order_id}")
+        except Exception as retry_err:
+            logger.warning(f"[!] Auto-retry dispatch FAILED for order #{str(order.id)[:8]}: {retry_err}")
+            continue
+
+    if undispatched_orders:
+        await db.commit()
+
     return total_checked, total_updated
 
 
@@ -127,8 +184,58 @@ async def sync_single_order(db: AsyncSession, order: Order) -> Tuple[bool, Order
     """
     Sync a single order immediately against its upstream provider.
     Updates start_count, remains, and status, and commits to DB.
+    If the order was never dispatched (no provider_order_id), retry dispatch now.
     """
     if not order.provider_order_id:
+        # Retry dispatch for orders that failed initial submission
+        if order.status in [OrderStatus.PENDING, OrderStatus.PROCESSING]:
+            logger.info(f"[*] Retrying dispatch for undispatched order #{str(order.id)[:8]}...")
+            try:
+                from app.providers.router import SmartProviderRouter
+                from sqlalchemy.orm import selectinload
+                from sqlalchemy import select as sa_select
+                from app.models.service import Service
+
+                # Load the service if not already loaded
+                service = order.service
+                if not service and order.service_id:
+                    svc_res = await db.execute(
+                        sa_select(Service).where(Service.id == order.service_id)
+                    )
+                    service = svc_res.scalars().first()
+
+                if service:
+                    p_id, p_order_id, msg = await SmartProviderRouter.dispatch_with_failover(
+                        service=service,
+                        target_link=order.target_link,
+                        quantity=order.quantity,
+                        db=db,
+                        comments=order.custom_comments
+                    )
+                    if p_order_id:
+                        order.provider_order_id = str(p_order_id)
+                        order.status = OrderStatus.IN_PROGRESS
+                        order.error_message = None
+                        if p_id:
+                            import uuid as uuid_mod
+                            try:
+                                order.provider_id = uuid_mod.UUID(p_id)
+                            except Exception:
+                                pass
+                        db.add(order)
+                        await db.commit()
+                        await db.refresh(order)
+                        logger.info(f"[+] Retry dispatch SUCCESS for order #{str(order.id)[:8]}! Provider Order ID: {p_order_id}")
+                        return True, order
+                    else:
+                        logger.warning(f"[!] Retry dispatch returned no order ID for order #{str(order.id)[:8]}")
+                else:
+                    logger.warning(f"[!] Cannot retry dispatch: service not found for order #{str(order.id)[:8]}")
+            except Exception as retry_err:
+                logger.warning(f"[!] Retry dispatch FAILED for order #{str(order.id)[:8]}: {retry_err}")
+                order.error_message = f"Retry failed: {str(retry_err)}"
+                db.add(order)
+                await db.commit()
         return False, order
 
     provider_slug = "jap"
