@@ -423,13 +423,14 @@ async def get_all_providers_summary(
     return results
 
 
-@router.post("/purge-delix")
-async def purge_delix_and_orphans(
+@router.post("/purge-non-jap")
+async def purge_non_jap_providers(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
 ) -> Any:
     """
-    Purge all legacy Delix services, orders, and orphaned records from the database.
+    Purge all non-JAP provider services, orders, and orphaned records from the database.
+    Only JustAnotherPanel (JAP) services are retained.
     """
     from sqlalchemy import text
     from app.core.cache import clear_all_cache
@@ -449,9 +450,7 @@ async def purge_delix_and_orphans(
         DELETE FROM services 
         WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap'))
            OR provider_id IS NULL
-           OR provider_id NOT IN (SELECT id FROM providers WHERE id IS NOT NULL)
-           OR name ILIKE '%delix%' 
-           OR category ILIKE '%delix%';
+           OR provider_id NOT IN (SELECT id FROM providers WHERE id IS NOT NULL);
     """))
 
     res_providers = await db.execute(text("""

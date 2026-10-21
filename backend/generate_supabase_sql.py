@@ -37,7 +37,7 @@ out.append("""-- ===============================================================
 --   3. All Application Tables & Relationships (DDL)
 --   4. Performance Indexes & Constraints
 --   5. All 16 Registered Users with Encrypted Passwords, Roles & Balances
---   6. Configured Upstream Providers (JustAnotherPanel & Secsers)
+--   6. Configured Upstream Provider (JustAnotherPanel)
 --   7. Child Panels & Branded Tenant Data
 --   8. Support Tickets & Ticket Messages
 --   9. Alembic Migration Head Record (010_add_wholesale_rate)

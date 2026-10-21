@@ -216,7 +216,7 @@ async def lifespan(app: FastAPI):
                 """))
                 print("[+] wholesale_rate column on services verified and populated.")
 
-                # Step 10: Clean up legacy providers (smm_africa, delix) and orphaned services
+                # Step 10: Clean up legacy providers and orphaned services (only keep JAP)
                 await conn.execute(text("""
                     DO $$
                     BEGIN
@@ -230,9 +230,7 @@ async def lifespan(app: FastAPI):
                         DELETE FROM services 
                         WHERE provider_id IN (SELECT id FROM providers WHERE slug NOT IN ('jap'))
                            OR provider_id IS NULL
-                           OR provider_id NOT IN (SELECT id FROM providers WHERE id IS NOT NULL)
-                           OR name ILIKE '%delix%' 
-                           OR category ILIKE '%delix%';
+                           OR provider_id NOT IN (SELECT id FROM providers WHERE id IS NOT NULL);
 
                         DELETE FROM providers 
                         WHERE slug NOT IN ('jap');
@@ -326,7 +324,7 @@ async def lifespan(app: FastAPI):
                 """))
                 print("[+] skakegains.com PayHero gateway initialized.")
 
-                # Step 14: Dual-Provider Catalog Curation & Price Calibration (Beat Delix Gains, lowest price 18.70 KES everywhere)
+                # Step 14: JAP Catalog Curation & Competitive Price Calibration
                 # Ensure JustAnotherPanel (JAP) is active as the sole provider
                 await conn.execute(text("""
                     UPDATE providers SET is_active = TRUE WHERE slug = 'jap';
@@ -351,7 +349,7 @@ async def lifespan(app: FastAPI):
                     WHERE provider_rate > 0;
                 """))
 
-                # === DELIX CUSTOMER ATTRACTION MAGNET & TIERED PRICING ===
+                # === COMPETITIVE TIERED PRICING ===
 
                 # 1. TikTok Views
                 # Magnet Tier: Super-cheap Views (#4124, Cost: 0.69 KES) -> Retail: 0.95 KES | Wholesale: 0.80 KES
@@ -361,7 +359,7 @@ async def lifespan(app: FastAPI):
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok' AND provider_service_id = '4124';
                 """))
-                # Standard Tier: TikTok Views (Cost: < 1.50 KES) -> Retail: 2.90 KES (Delix rate) | Wholesale: 1.30 KES
+                # Standard Tier: TikTok Views (Cost: < 1.50 KES) -> Retail: 2.90 KES | Wholesale: 1.30 KES
                 await conn.execute(text("""
                     UPDATE services
                     SET selling_rate = 2.90, wholesale_rate = 1.30, markup_type = 'manual'
@@ -372,7 +370,7 @@ async def lifespan(app: FastAPI):
                       AND provider_rate < 1.50;
                 """))
 
-                # 2. TikTok Likes (Delix Exact Pricing Structure)
+                # 2. TikTok Likes (Competitive Tiered Pricing)
                 # Bait Tier (Cheapest Magnet): Bulk TikTok Likes [Max 100K] (#9423) -> Retail: 18.70 KES | Wholesale: 18.70 KES
                 await conn.execute(text("""
                     UPDATE services
@@ -380,42 +378,42 @@ async def lifespan(app: FastAPI):
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok' AND provider_service_id = '9423';
                 """))
-                # Tier 2 (1M HQ Likes): (#9301) -> Retail: 27.50 KES (Delix: 27.5 Ksh) | Wholesale: 24.00 KES
+                # Tier 2 (1M HQ Likes): (#9301) -> Retail: 27.50 KES | Wholesale: 24.00 KES
                 await conn.execute(text("""
                     UPDATE services
                     SET selling_rate = 27.50, wholesale_rate = 24.00, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok' AND provider_service_id = '9301';
                 """))
-                # Tier 3 (Standard 10M Likes): (#9179, #10385) -> Retail: 35.00 KES (Delix: 35.0 Ksh) | Wholesale: 29.00 KES
+                # Tier 3 (Standard 10M Likes): (#9179, #10385) -> Retail: 35.00 KES | Wholesale: 29.00 KES
                 await conn.execute(text("""
                     UPDATE services
                     SET selling_rate = 35.00, wholesale_rate = 29.00, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok' AND provider_service_id IN ('10385', '9179');
                 """))
-                # Tier 4 (30D Refill): (#10173) -> Retail: 38.00 KES (Delix: 38.0 Ksh) | Wholesale: 33.00 KES
+                # Tier 4 (30D Refill): (#10173) -> Retail: 38.00 KES | Wholesale: 33.00 KES
                 await conn.execute(text("""
                     UPDATE services
                     SET selling_rate = 38.00, wholesale_rate = 33.00, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok' AND provider_service_id = '10173';
                 """))
-                # Tier 5 (60D Refill): (#9397, #3367) -> Retail: 41.00 KES (Delix: 41.0 Ksh) | Wholesale: 38.50 KES
+                # Tier 5 (60D Refill): (#9397, #3367) -> Retail: 41.00 KES | Wholesale: 38.50 KES
                 await conn.execute(text("""
                     UPDATE services
                     SET selling_rate = 41.00, wholesale_rate = 38.50, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok' AND (provider_service_id IN ('9397', '3367') OR name ILIKE '%60%d%');
                 """))
-                # Tier 6 (90D Refill): (#9396) -> Retail: 43.00 KES (Delix: 43.0 Ksh) | Wholesale: 37.00 KES
+                # Tier 6 (90D Refill): (#9396) -> Retail: 43.00 KES | Wholesale: 37.00 KES
                 await conn.execute(text("""
                     UPDATE services
                     SET selling_rate = 43.00, wholesale_rate = 37.00, markup_type = 'manual'
                     WHERE provider_id IN (SELECT id FROM providers WHERE slug = 'jap')
                       AND platform = 'tiktok' AND (provider_service_id = '9396' OR name ILIKE '%90%d%');
                 """))
-                # Tier 7 (365D Refill): -> Retail: 46.00 KES (Delix: 46.0 Ksh) | Wholesale: 40.00 KES
+                # Tier 7 (365D Refill): -> Retail: 46.00 KES | Wholesale: 40.00 KES
                 await conn.execute(text("""
                     UPDATE services
                     SET selling_rate = 46.00, wholesale_rate = 40.00, markup_type = 'manual'
@@ -510,7 +508,7 @@ async def lifespan(app: FastAPI):
                       AND (name ILIKE '%reaction%' OR name ILIKE '%post like%')
                       AND provider_rate <= 11.00;
                 """))
-                # Standard Reactions -> Retail: 26.60 KES (Delix exact rate!) | Wholesale: 16.00 KES
+                # Standard Reactions -> Retail: 26.60 KES | Wholesale: 16.00 KES
                 await conn.execute(text("""
                     UPDATE services
                     SET selling_rate = 26.60, wholesale_rate = 16.00, markup_type = 'manual'

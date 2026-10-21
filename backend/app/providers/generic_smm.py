@@ -17,7 +17,7 @@ class GenericSMMProvider(ProviderInterface):
     """
     Universal standard SMM API v2 provider client.
     Works seamlessly with ANY SMM panel or supplier worldwide 
-    (e.g. JustAnotherPanel, ResellerSMM, SMMRush, Peakerr, PrimeSMM, etc.)
+    (e.g. JustAnotherPanel, SMMRush, Peakerr, PrimeSMM, etc.)
     """
 
     def __init__(
