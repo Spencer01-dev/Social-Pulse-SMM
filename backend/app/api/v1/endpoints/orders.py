@@ -154,11 +154,16 @@ async def create_order(
         select(User).where(User.id == current_user.id).with_for_update()
     )
     locked_user = user_lock_query.scalars().first()
-    if not locked_user or locked_user.balance < total_charge:
+    if not locked_user or locked_user.balance <= Decimal("0.00"):
         current_bal = locked_user.balance if locked_user else Decimal("0.00")
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail=f"Insufficient wallet balance. Total cost: KES {total_charge:,.2f} | Available balance: KES {current_bal:,.2f}. Please add funds to proceed."
+            detail=f"Your wallet balance is KES {current_bal:,.2f}. Please add funds to place an order."
+        )
+    if locked_user.balance < total_charge or (locked_user.balance - total_charge) < Decimal("0.00"):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=f"Insufficient wallet balance. Total cost: KES {total_charge:,.2f} | Available balance: KES {locked_user.balance:,.2f}. Please add funds to proceed."
         )
 
     # 4b. Child Panel Wholesale Rate: Direct JAP provider pricing
@@ -178,7 +183,7 @@ async def create_order(
             )
             panel_owner = owner_q.scalars().first()
             if panel_owner:
-                if panel_owner.balance < wholesale_cost:
+                if panel_owner.balance <= Decimal("0.00") or panel_owner.balance < wholesale_cost or (panel_owner.balance - wholesale_cost) < Decimal("0.00"):
                     raise HTTPException(
                         status_code=status.HTTP_402_PAYMENT_REQUIRED,
                         detail=(
@@ -188,16 +193,16 @@ async def create_order(
                         )
                     )
 
-    # 5. Deduct funds from customer wallet
+    # 5. Deduct funds from customer wallet (guaranteed non-negative)
     customer_bal_before = locked_user.balance
-    locked_user.balance = customer_bal_before - total_charge
+    locked_user.balance = max(Decimal("0.00"), customer_bal_before - total_charge)
     db.add(locked_user)
 
-    # 5b. Deduct wholesale fulfillment cost from child panel owner
+    # 5b. Deduct wholesale fulfillment cost from child panel owner (guaranteed non-negative)
     owner_bal_before = None
     if panel_owner and wholesale_cost > Decimal("0.00"):
         owner_bal_before = panel_owner.balance
-        panel_owner.balance = owner_bal_before - wholesale_cost
+        panel_owner.balance = max(Decimal("0.00"), owner_bal_before - wholesale_cost)
         db.add(panel_owner)
 
         # Sync Child Panel Admin account balance immediately so child panel header/wallet stays in sync

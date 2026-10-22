@@ -157,11 +157,12 @@ async def handle_reseller_action(
             return {"error": f"Service mispriced — selling rate (KES {total_charge:.2f}) is below provider cost (KES {provider_cost:.2f}). Contact the admin to fix pricing."}
 
         # Balance check
-        if user.balance < total_charge:
-            return {"error": f"Not enough funds on balance. Required: KES {total_charge:.2f}"}
+        if not user or user.balance <= Decimal("0.00") or user.balance < total_charge or (user.balance - total_charge) < Decimal("0.00"):
+            avail = user.balance if user else Decimal("0.00")
+            return {"error": f"Not enough funds on balance. Required: KES {total_charge:.2f} | Available: KES {avail:.2f}. Please add funds to proceed."}
 
-        # Deduct balance
-        user.balance -= total_charge
+        # Deduct balance (guaranteed non-negative)
+        user.balance = max(Decimal("0.00"), user.balance - total_charge)
         db.add(user)
 
         # Sanitize target link
