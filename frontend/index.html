@@ -9,14 +9,15 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="shortcut icon" href="/favicon.ico" />
 
-    <!-- Open Graph / Social Sharing Image -->
+    <!-- Open Graph / Social Sharing Image (dynamically augmented by /api/og and early script) -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Premium SMM Panel" />
-    <meta property="og:description" content="Premium Social Media Marketing Growth Panel." />
-    <meta property="og:image" content="https://www.socialpulsesmm.com/socialpulse-logo.png" />
-    <meta property="og:url" content="https://www.socialpulsesmm.com" />
+    <meta property="og:description" content="Order for cheapest and fastest social media growth services." />
+    <meta property="og:image" content="/skakegains-logo.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content="https://www.socialpulsesmm.com/socialpulse-logo.png" />
+    <meta name="twitter:title" content="Premium SMM Panel" />
+    <meta name="twitter:description" content="Order for cheapest and fastest social media growth services." />
+    <meta name="twitter:image" content="/skakegains-logo.png" />
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Premium Social Media Marketing Panel" />
@@ -33,7 +34,7 @@
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap">
     </noscript>
     <title>Loading...</title>
-    <!-- Early domain detection: prevents SocialPulse branding flash on child panel domains -->
+    <!-- Early domain detection: sets tenant branding, title, favicons and OG tags before render -->
     <script>
       (function() {
         var h = location.hostname.toLowerCase().split(':')[0].replace(/^www\./, '');
@@ -42,6 +43,13 @@
         var params = new URLSearchParams(window.location.search);
         var tenantParam = params.get('tenant') || (window.sessionStorage ? sessionStorage.getItem('active_tenant_domain') : null);
         var isChildPanel = !isMain || Boolean(tenantParam);
+
+        var ogTitle = document.querySelector('meta[property="og:title"]');
+        var ogDesc = document.querySelector('meta[property="og:description"]');
+        var ogImg = document.querySelector('meta[property="og:image"]');
+        var twTitle = document.querySelector('meta[name="twitter:title"]');
+        var twDesc = document.querySelector('meta[name="twitter:description"]');
+        var twImg = document.querySelector('meta[name="twitter:image"]');
 
         if (isChildPanel) {
           var target = (tenantParam || h).toLowerCase().replace(/^www\./, '');
@@ -52,19 +60,30 @@
             var b = target.split('.')[0];
             brand = b.charAt(0).toUpperCase() + b.slice(1) + ' SMM';
           }
-          document.title = brand + ' | Premium SMM Panel';
+          var pageTitle = brand + ' | Premium SMM Panel';
+          document.title = pageTitle;
           document.documentElement.style.setProperty('--tenant-accent', '#10b981');
           document.documentElement.style.setProperty('--tenant-accent-rgb', '16, 185, 129');
           document.documentElement.setAttribute('data-tenant-active', 'true');
           
+          var logoPath = '/skakegains-logo.png';
           var earlyIcons = document.querySelectorAll("link[rel*='icon'], link[rel='apple-touch-icon'], link[rel='shortcut icon']");
-          earlyIcons.forEach(function(el) { el.href = '/skakegains-logo.png'; });
+          earlyIcons.forEach(function(el) { el.href = logoPath; });
+
+          var fullLogoUrl = window.location.origin + logoPath;
+          var childDesc = 'Order at our website ' + target + ' for cheapest and fastest social media growth services.';
+          if (ogTitle) ogTitle.setAttribute('content', pageTitle);
+          if (ogDesc) ogDesc.setAttribute('content', childDesc);
+          if (ogImg) ogImg.setAttribute('content', fullLogoUrl);
+          if (twTitle) twTitle.setAttribute('content', brand);
+          if (twDesc) twDesc.setAttribute('content', childDesc);
+          if (twImg) twImg.setAttribute('content', fullLogoUrl);
         } else {
           document.title = 'SocialPulse | Wholesale SMM Platform';
-          var ogTitle = document.querySelector('meta[property="og:title"]');
           if (ogTitle) ogTitle.setAttribute('content', 'SocialPulse | Wholesale SMM Platform');
-          var ogDesc = document.querySelector('meta[property="og:description"]');
           if (ogDesc) ogDesc.setAttribute('content', 'Wholesale Social Media Marketing Reseller and Child Panel SaaS Platform.');
+          if (ogImg) ogImg.setAttribute('content', 'https://www.socialpulsesmm.com/socialpulse-logo.png');
+          if (twImg) twImg.setAttribute('content', 'https://www.socialpulsesmm.com/socialpulse-logo.png');
         }
       })();
     </script>
