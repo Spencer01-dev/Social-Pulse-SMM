@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, MessageCircle, ExternalLink, Users, Bell, Zap } from 'lucide-react';
 import { useTenant } from '../../context/TenantContext';
+import { trackLead } from '../../utils/metaPixel';
 
 const DEFAULT_WHATSAPP_CHANNEL_URL = 'https://whatsapp.com/channel/0029Vb8hsFI1SWstSgF0M31m';
 const STORAGE_KEY = 'sp_whatsapp_popup_dismissed';
@@ -38,6 +39,9 @@ export const WhatsAppChannelPopup: React.FC = () => {
   };
 
   const handleJoin = () => {
+    trackLead({
+      content_name: `WhatsApp Channel Join (${brandName})`,
+    });
     window.open(channelUrl, '_blank', 'noopener,noreferrer');
     handleDismiss();
   };

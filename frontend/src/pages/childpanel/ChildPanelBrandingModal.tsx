@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ChildPanelData, childPanelService } from '../../services/childPanels';
 import { useTenant } from '../../context/TenantContext';
 import { Button } from '../../components/common/Button';
-import { X, Sparkles, Sliders, Check, Palette, DollarSign, Phone, Mail, HelpCircle, Image as ImageIcon, Upload, Trash2 } from 'lucide-react';
+import { X, Sparkles, Sliders, Check, Palette, DollarSign, Phone, Mail, HelpCircle, Image as ImageIcon, Upload, Trash2, Target } from 'lucide-react';
 
 interface ChildPanelBrandingModalProps {
   panel: ChildPanelData;
@@ -46,6 +46,8 @@ export const ChildPanelBrandingModal: React.FC<ChildPanelBrandingModalProps> = (
     existing.whatsapp_support || ''
   );
   const [logoUrl, setLogoUrl] = useState<string>(existing.logo_url || '');
+  const [googleTagId, setGoogleTagId] = useState<string>(existing.google_tag_id || '');
+  const [metaPixelId, setMetaPixelId] = useState<string>(existing.meta_pixel_id || '');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -91,6 +93,8 @@ export const ChildPanelBrandingModal: React.FC<ChildPanelBrandingModalProps> = (
         default_markup_percent: Number(markupPercent),
         contact_email: contactEmail.trim(),
         whatsapp_support: whatsappSupport.trim() || null,
+        google_tag_id: googleTagId.trim() || null,
+        meta_pixel_id: metaPixelId.trim() || null,
       });
       setSuccessMsg('Branding & markup settings updated successfully!');
       onUpdated(updated);
@@ -353,6 +357,50 @@ export const ChildPanelBrandingModal: React.FC<ChildPanelBrandingModalProps> = (
                 placeholder="+254712345678"
                 className="w-full bg-[#121418] border border-[#2b303c] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
               />
+            </div>
+          </div>
+
+          {/* Ad Tracking & Remarketing Pixels (Google & Meta) */}
+          <div className="p-4 rounded-xl bg-[#121418] border border-[#2b303c] space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <Target className="w-3.5 h-3.5 text-blue-400" />
+                Audience Remarketing & Pixels
+              </label>
+              <span className="text-[10px] text-slate-400 font-medium">Google Ads & Meta</span>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              When customers browse your child panel, Google and Meta pixels build remarketing audience lists. When you run ads, you can re-target these exact visitors to drive repeat sales.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1 flex items-center gap-1">
+                  Google Ads / Tag ID
+                  <span className="text-[10px] text-slate-500 font-normal">(AW-XXXX or G-XXXX)</span>
+                </label>
+                <input
+                  type="text"
+                  value={googleTagId}
+                  onChange={(e) => setGoogleTagId(e.target.value)}
+                  placeholder="e.g. AW-123456789 or G-ABCDEF1234"
+                  className="w-full bg-[#181a20] border border-[#2b303c] rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-blue-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1 flex items-center gap-1">
+                  Meta (Facebook) Pixel ID
+                  <span className="text-[10px] text-slate-500 font-normal">(15-16 digits)</span>
+                </label>
+                <input
+                  type="text"
+                  value={metaPixelId}
+                  onChange={(e) => setMetaPixelId(e.target.value)}
+                  placeholder="e.g. 1234567890123456"
+                  className="w-full bg-[#181a20] border border-[#2b303c] rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-blue-400"
+                />
+              </div>
             </div>
           </div>
 

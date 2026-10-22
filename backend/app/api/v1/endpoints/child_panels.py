@@ -1373,3 +1373,41 @@ async def adjust_child_panel_user_balance(
         created_at=user_record.created_at
     )
 
+
+# ------------------------------------------------------------------------------
+# 5. RETROACTIVE ORDER BALANCE RECONCILIATION
+# ------------------------------------------------------------------------------
+
+@router.post("/{panel_id}/reconcile-orders")
+async def reconcile_child_panel_orders_endpoint(
+    panel_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """
+    Retroactively inspects all customer orders placed on this child panel.
+    Deducts retail charges for any customer whose order was undeducted,
+    deducts wholesale costs from the child panel owner, and synchronizes
+    the child panel admin balance.
+    """
+    panel = await get_panel_and_verify_owner(panel_id, db, current_user)
+    from app.services.reconciliation_service import reconcile_panel_orders
+    report = await reconcile_panel_orders(db, panel_id=panel.id, dry_run=False)
+    return report
+
+
+@router.post("/admin/reconcile-all-orders")
+async def reconcile_all_child_panel_orders_admin_endpoint(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """
+    Super Admin endpoint to retroactively reconcile undeducted orders across all child panels.
+    """
+    if current_user.role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Platform administrator privileges required.")
+    from app.services.reconciliation_service import reconcile_panel_orders
+    report = await reconcile_panel_orders(db, panel_id=None, dry_run=False)
+    return report
+
+

@@ -23,6 +23,8 @@ export interface TenantData {
   payment_account_name?: string;
   payment_paybill?: string;
   payment_account_number?: string;
+  google_tag_id?: string | null;
+  meta_pixel_id?: string | null;
 }
 
 interface TenantContextType {
@@ -92,7 +94,9 @@ export const SKAKEGAINS_PRESET: TenantData = {
   nameserver2: 'ns2.socialpulse.io',
   payment_account_name: 'shakegains',
   payment_paybill: '997960',
-  payment_account_number: '0010542'
+  payment_account_number: '0010542',
+  google_tag_id: null,
+  meta_pixel_id: null
 };
 
 export function getInitialTenant(): { initialTenant: TenantData | null; isCustomHost: boolean } {
@@ -153,6 +157,8 @@ export function getInitialTenant(): { initialTenant: TenantData | null; isCustom
         payment_account_name: isTargetSkake ? 'shakegains' : brandTitle,
         payment_paybill: '997960',
         payment_account_number: isTargetSkake ? '0010542' : '0010529',
+        google_tag_id: null,
+        meta_pixel_id: null,
       },
       isCustomHost: true,
     };

@@ -70,7 +70,7 @@ export const ChildPanelManagePage: React.FC = () => {
   const { panelId } = useParams<{ panelId?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refreshUserProfile } = useAuth();
   const { formatCurrency } = useCurrency();
   const { tenant } = useTenant();
 
@@ -193,6 +193,28 @@ export const ChildPanelManagePage: React.FC = () => {
       showToast('error', err.response?.data?.detail || 'Failed to save payment gateway settings.');
     } finally {
       setSavingGateway(false);
+    }
+  };
+
+  const [isReconciling, setIsReconciling] = useState(false);
+  const handleReconcileOrders = async () => {
+    if (!activePanel) return;
+    setIsReconciling(true);
+    try {
+      const res = await childPanelService.reconcileOrders(activePanel.id);
+      showToast(
+        'success',
+        `Reconciliation complete! Deducted KES ${res.customer_deductions_total} from customers and KES ${res.owner_deductions_total} wholesale.`
+      );
+      if (refreshUserProfile) {
+        await refreshUserProfile();
+      }
+      loadOrders();
+      loadUsers();
+    } catch (err: any) {
+      showToast('error', err.response?.data?.detail || 'Failed to reconcile orders.');
+    } finally {
+      setIsReconciling(false);
     }
   };
 
@@ -1472,6 +1494,18 @@ export const ChildPanelManagePage: React.FC = () => {
               <p className="text-xs text-slate-300 leading-relaxed">
                 When a customer purchases on <strong>{activePanel.domain}</strong>, the wholesale cost is automatically deducted from this balance. Keep this funded so customer orders are never paused.
               </p>
+              <div className="pt-2 border-t border-[#222630] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="text-[11px] text-slate-400">Order fulfillment ledger sync</span>
+                <button
+                  type="button"
+                  onClick={handleReconcileOrders}
+                  disabled={isReconciling}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-xs font-bold text-cyan-400 transition-colors"
+                >
+                  <RefreshCcw className={`w-3.5 h-3.5 ${isReconciling ? 'animate-spin' : ''}`} />
+                  {isReconciling ? 'Syncing Balances...' : 'Sync & Reconcile Past Orders'}
+                </button>
+              </div>
             </Card>
           </div>
 

@@ -38,13 +38,21 @@ async def get_analytics_overview(
     # Exclude canceled and failed orders from financial metrics (those are refunded)
     active_order_filter = ~Order.status.in_([OrderStatus.CANCELED, OrderStatus.FAILED])
     # Platform revenue = wholesale_cost for child panel orders, charge for direct orders
+    # CRITICAL: Use NULLIF to treat 0 as NULL so fallback to provider_cost (not charge)
+    # This prevents child panel customer retail charges from inflating SocialPulse revenue
     platform_rev_expr = case(
-        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge)),
+        (Order.tenant_id.isnot(None), func.coalesce(
+            func.nullif(Order.wholesale_cost, Decimal("0.00")),
+            Order.provider_cost
+        )),
         else_=Order.charge
     )
     # Platform profit = wholesale_cost - provider_cost for child panel, charge - provider_cost for direct
     platform_profit_expr = case(
-        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge) - Order.provider_cost),
+        (Order.tenant_id.isnot(None), func.coalesce(
+            func.nullif(Order.wholesale_cost, Decimal("0.00")),
+            Order.provider_cost
+        ) - Order.provider_cost),
         else_=Order.charge - Order.provider_cost
     )
     order_agg = await db.execute(
@@ -85,11 +93,17 @@ async def get_analytics_overview(
     from app.models.child_panel import ChildPanel, ChildPanelStatus
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     today_rev_expr = case(
-        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge)),
+        (Order.tenant_id.isnot(None), func.coalesce(
+            func.nullif(Order.wholesale_cost, Decimal("0.00")),
+            Order.provider_cost
+        )),
         else_=Order.charge
     )
     today_profit_expr = case(
-        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge) - Order.provider_cost),
+        (Order.tenant_id.isnot(None), func.coalesce(
+            func.nullif(Order.wholesale_cost, Decimal("0.00")),
+            Order.provider_cost
+        ) - Order.provider_cost),
         else_=Order.charge - Order.provider_cost
     )
     today_agg = await db.execute(
@@ -210,11 +224,17 @@ async def get_daily_revenue_trends(
     day_expr = cast(Order.created_at, Date)
     
     daily_rev_expr = case(
-        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge)),
+        (Order.tenant_id.isnot(None), func.coalesce(
+            func.nullif(Order.wholesale_cost, Decimal("0.00")),
+            Order.provider_cost
+        )),
         else_=Order.charge
     )
     daily_profit_expr = case(
-        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge) - Order.provider_cost),
+        (Order.tenant_id.isnot(None), func.coalesce(
+            func.nullif(Order.wholesale_cost, Decimal("0.00")),
+            Order.provider_cost
+        ) - Order.provider_cost),
         else_=Order.charge - Order.provider_cost
     )
     try:
@@ -300,11 +320,17 @@ async def get_monthly_summary(
     active_order_filter = ~Order.status.in_([OrderStatus.CANCELED, OrderStatus.FAILED])
 
     month_rev_expr = case(
-        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge)),
+        (Order.tenant_id.isnot(None), func.coalesce(
+            func.nullif(Order.wholesale_cost, Decimal("0.00")),
+            Order.provider_cost
+        )),
         else_=Order.charge
     )
     month_profit_expr = case(
-        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge) - Order.provider_cost),
+        (Order.tenant_id.isnot(None), func.coalesce(
+            func.nullif(Order.wholesale_cost, Decimal("0.00")),
+            Order.provider_cost
+        ) - Order.provider_cost),
         else_=Order.charge - Order.provider_cost
     )
     try:
@@ -374,13 +400,15 @@ async def get_monthly_summary(
             if d not in daily_map:
                 daily_map[d] = {"revenue": Decimal("0.00"), "profit": Decimal("0.00"), "orders": 0}
             charge = Decimal(str(r[1] or 0))
-            wholesale = Decimal(str(r[4] or 0)) if r[4] else None
+            wholesale = Decimal(str(r[4] or 0)) if r[4] else Decimal("0")
             tenant = r[5]
             prov_cost = Decimal(str(r[6] or 0))
-            # Platform revenue: wholesale_cost for child panel orders, charge for direct
-            if tenant and wholesale and wholesale > Decimal("0"):
-                daily_map[d]["revenue"] += wholesale
-                daily_map[d]["profit"] += wholesale - prov_cost
+            # Platform revenue: for child panel orders use wholesale_cost (or provider_cost fallback)
+            # NEVER use customer retail charge for child panel orders — that inflates admin revenue
+            if tenant:
+                effective_rev = wholesale if wholesale > Decimal("0") else prov_cost
+                daily_map[d]["revenue"] += effective_rev
+                daily_map[d]["profit"] += effective_rev - prov_cost
             else:
                 daily_map[d]["revenue"] += charge
                 daily_map[d]["profit"] += charge - prov_cost
@@ -423,11 +451,17 @@ async def get_platform_metrics(
     Breakdown of orders, revenue, and profits categorized by social media platform.
     """
     plat_rev_expr = case(
-        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge)),
+        (Order.tenant_id.isnot(None), func.coalesce(
+            func.nullif(Order.wholesale_cost, Decimal("0.00")),
+            Order.provider_cost
+        )),
         else_=Order.charge
     )
     plat_profit_expr = case(
-        (Order.tenant_id.isnot(None), func.coalesce(Order.wholesale_cost, Order.charge) - Order.provider_cost),
+        (Order.tenant_id.isnot(None), func.coalesce(
+            func.nullif(Order.wholesale_cost, Decimal("0.00")),
+            Order.provider_cost
+        ) - Order.provider_cost),
         else_=Order.charge - Order.provider_cost
     )
     query = (
@@ -481,14 +515,29 @@ async def get_top_services(
     """
     Get top performing services by revenue and order volume.
     """
+    # Top services revenue: use platform-correct revenue (wholesale for child panel, charge for direct)
+    top_rev_expr = case(
+        (Order.tenant_id.isnot(None), func.coalesce(
+            func.nullif(Order.wholesale_cost, Decimal("0.00")),
+            Order.provider_cost
+        )),
+        else_=Order.charge
+    )
+    top_profit_expr = case(
+        (Order.tenant_id.isnot(None), func.coalesce(
+            func.nullif(Order.wholesale_cost, Decimal("0.00")),
+            Order.provider_cost
+        ) - Order.provider_cost),
+        else_=Order.charge - Order.provider_cost
+    )
     query = (
         select(
             Service.id,
             Service.name,
             Service.platform,
             func.count(Order.id).label("order_count"),
-            func.coalesce(func.sum(Order.charge), Decimal("0.00")).label("total_rev"),
-            func.coalesce(func.sum(Order.profit), Decimal("0.00")).label("total_profit")
+            func.coalesce(func.sum(top_rev_expr), Decimal("0.00")).label("total_rev"),
+            func.coalesce(func.sum(top_profit_expr), Decimal("0.00")).label("total_profit")
         )
         .join(Order, Service.id == Order.service_id)
         .where(~Order.status.in_([OrderStatus.CANCELED, OrderStatus.FAILED]))

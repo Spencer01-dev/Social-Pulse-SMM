@@ -3,6 +3,17 @@
  * Supports single-page app (SPA) route changes and standard conversion events.
  */
 
+import {
+  initGoogleTag,
+  trackGooglePageView,
+  trackGoogleEvent,
+  trackGoogleSignUp,
+  trackGoogleLead,
+  trackGoogleBeginCheckout,
+  trackGooglePurchase,
+  GOOGLE_TAG_ID,
+} from './googleTag';
+
 // Fallback or configured Meta Pixel ID from environment
 export const META_PIXEL_ID = (import.meta.env.VITE_META_PIXEL_ID || '').trim();
 
@@ -68,30 +79,35 @@ export const initMetaPixel = (pixelId: string = META_PIXEL_ID): boolean => {
 };
 
 /**
- * Tracks a PageView event in Meta Pixel.
+ * Tracks a PageView event in Meta Pixel AND Google Tag.
  * Crucial for React Router SPAs where route transitions happen client-side.
  */
-export const trackPageView = (): void => {
+export const trackPageView = (pagePath?: string, pageTitle?: string): void => {
+  // 1. Meta Pixel
   if (typeof window !== 'undefined' && window.fbq) {
     try {
       window.fbq('track', 'PageView');
       if (import.meta.env.DEV) {
         console.log(`[Meta Pixel] PageView tracked: ${window.location.pathname}`);
       }
-    } catch (err) {
-      // Graceful fail in case of browser extensions/blockers
+    } catch {
+      // Graceful fail
     }
   }
+
+  // 2. Google Tag (gtag.js) for Google Ads Remarketing & Analytics
+  trackGooglePageView(pagePath, pageTitle);
 };
 
 /**
- * Tracks a standard Meta Pixel event.
+ * Tracks a standard event in Meta Pixel and Google Tag.
  */
 export const trackEvent = (
   eventName: string,
   parameters?: Record<string, unknown>,
   eventId?: string
 ): void => {
+  // Meta Pixel
   if (typeof window !== 'undefined' && window.fbq) {
     try {
       if (eventId) {
@@ -102,10 +118,13 @@ export const trackEvent = (
       if (import.meta.env.DEV) {
         console.log(`[Meta Pixel] Event tracked: ${eventName}`, parameters);
       }
-    } catch (err) {
+    } catch {
       // Graceful fail
     }
   }
+
+  // Google Tag
+  trackGoogleEvent(eventName, parameters);
 };
 
 /**
@@ -126,10 +145,11 @@ export const trackCustomEvent = (
       if (import.meta.env.DEV) {
         console.log(`[Meta Pixel] Custom event tracked: ${eventName}`, parameters);
       }
-    } catch (err) {
+    } catch {
       // Graceful fail
     }
   }
+  trackGoogleEvent(eventName, parameters);
 };
 
 // ==========================================
@@ -137,7 +157,7 @@ export const trackCustomEvent = (
 // ==========================================
 
 /**
- * Track user sign up / account creation
+ * Track user sign up / account creation (Meta + Google Ads)
  */
 export const trackCompleteRegistration = (params?: {
   method?: string;
@@ -148,6 +168,7 @@ export const trackCompleteRegistration = (params?: {
     status: params?.status || 'success',
     registration_method: params?.method || 'email',
   });
+  trackGoogleSignUp({ method: params?.method });
 };
 
 /**
@@ -163,10 +184,15 @@ export const trackLead = (params?: {
     value: params?.value,
     currency: params?.currency || 'KES',
   });
+  trackGoogleLead({
+    content_name: params?.content_name,
+    value: params?.value,
+    currency: params?.currency,
+  });
 };
 
 /**
- * Track checkout / deposit initiation
+ * Track checkout / deposit initiation (Meta + Google Ads)
  */
 export const trackInitiateCheckout = (params?: {
   value?: number;
@@ -180,10 +206,14 @@ export const trackInitiateCheckout = (params?: {
     currency: params?.currency || 'KES',
     num_items: params?.num_items || 1,
   });
+  trackGoogleBeginCheckout({
+    value: params?.value,
+    currency: params?.currency,
+  });
 };
 
 /**
- * Track successful order / purchase or deposit completion
+ * Track successful order / purchase or deposit completion (Meta + Google Ads)
  */
 export const trackPurchase = (params: {
   value: number;
@@ -203,6 +233,12 @@ export const trackPurchase = (params: {
     },
     params.order_id ? String(params.order_id) : undefined
   );
+  trackGooglePurchase({
+    value: params.value,
+    currency: params.currency,
+    order_id: params.order_id,
+    content_name: params.content_name,
+  });
 };
 
 /**
@@ -220,4 +256,22 @@ export const trackViewContent = (params?: {
     value: params?.value,
     currency: params?.currency || 'KES',
   });
+  trackGoogleEvent('view_item', {
+    item_name: params?.content_name,
+    item_category: params?.content_category,
+    value: params?.value,
+    currency: params?.currency || 'KES',
+  });
+};
+
+// Re-export Google Tag functions and ID
+export {
+  initGoogleTag,
+  trackGooglePageView,
+  trackGoogleEvent,
+  trackGoogleSignUp,
+  trackGoogleLead,
+  trackGoogleBeginCheckout,
+  trackGooglePurchase,
+  GOOGLE_TAG_ID,
 };

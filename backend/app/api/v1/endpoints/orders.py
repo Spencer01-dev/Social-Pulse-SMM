@@ -161,7 +161,7 @@ async def create_order(
             detail=f"Insufficient wallet balance. Total cost: KES {total_charge:,.2f} | Available balance: KES {current_bal:,.2f}. Please add funds to proceed."
         )
 
-    # 4b. Child Panel Wholesale Rate: Direct JAP provider pricing (zero middle deduction, covered by KES 3,500 monthly fee)
+    # 4b. Child Panel Wholesale Rate: Direct JAP provider pricing
     panel_owner = None
     wholesale_cost = Decimal("0.00")
     if panel and panel.user_id:
@@ -171,9 +171,45 @@ async def create_order(
         else:
             wholesale_cost = round((wholesale_rate * Decimal(order_in.quantity)) / Decimal(1000), 2)
 
+        # If order is placed on a child panel by an end-customer (not the owner themselves ordering as owner)
+        if panel.user_id != locked_user.id and wholesale_cost > Decimal("0.00"):
+            owner_q = await db.execute(
+                select(User).where(User.id == panel.user_id).with_for_update()
+            )
+            panel_owner = owner_q.scalars().first()
+            if panel_owner:
+                if panel_owner.balance < wholesale_cost:
+                    raise HTTPException(
+                        status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                        detail=(
+                            f"Child panel owner has insufficient wholesale fulfillment balance "
+                            f"(KES {panel_owner.balance:,.2f} available, KES {wholesale_cost:,.2f} required). "
+                            f"Please top up the Parent Wholesale Balance."
+                        )
+                    )
+
     # 5. Deduct funds from customer wallet
-    locked_user.balance -= total_charge
+    customer_bal_before = locked_user.balance
+    locked_user.balance = customer_bal_before - total_charge
     db.add(locked_user)
+
+    # 5b. Deduct wholesale fulfillment cost from child panel owner
+    owner_bal_before = None
+    if panel_owner and wholesale_cost > Decimal("0.00"):
+        owner_bal_before = panel_owner.balance
+        panel_owner.balance = owner_bal_before - wholesale_cost
+        db.add(panel_owner)
+
+        # Sync Child Panel Admin account balance immediately so child panel header/wallet stays in sync
+        admin_res = await db.execute(
+            select(User).where(
+                User.tenant_id == panel.id,
+                User.role == UserRole.ADMIN,
+            ).with_for_update()
+        )
+        for admin_u in admin_res.scalars().all():
+            admin_u.balance = panel_owner.balance
+            db.add(admin_u)
 
     # 6. Sanitize and canonicalize target URL
     from app.core.link_cleaner import sanitize_and_canonicalize_target_link
@@ -206,8 +242,6 @@ async def create_order(
         initial_status = OrderStatus.PENDING
 
     # 8. Persist order record in database (using tenant_id resolved in step 2)
-    # If placed on a child panel, profit is the panel's profit (total_charge - wholesale_cost).
-    # If placed directly on SocialPulse, profit is SocialPulse's profit (total_charge - provider_cost).
     order_profit = (total_charge - wholesale_cost) if (panel and wholesale_cost > Decimal("0.00")) else profit
 
     order = Order(
@@ -233,21 +267,38 @@ async def create_order(
     db.add(order)
     await db.flush()
 
-    # 9. Record Child Panel Owner wholesale deduction in transaction ledger
-    if panel_owner and wholesale_cost > Decimal("0.00"):
-        panel_owner_bal = getattr(panel_owner, "balance", Decimal("0.00"))
+    # 9a. Record Customer order payment transaction in ledger
+    customer_tx = Transaction(
+        user_id=locked_user.id,
+        order_id=order.id,
+        tenant_id=tenant_id,
+        type=TransactionType.ORDER_PAYMENT,
+        amount=-total_charge,
+        balance_before=customer_bal_before,
+        balance_after=locked_user.balance,
+        currency="KES",
+        payment_method=PaymentMethod.INTERNAL,
+        payment_reference=f"ORD-{order.order_number or str(order.id)[:8]}",
+        status=TransactionStatus.COMPLETED,
+        description=f"Payment for Order #{order.order_number or str(order.id)[:8]} - {service.name}"
+    )
+    db.add(customer_tx)
+
+    # 9b. Record Child Panel Owner wholesale deduction in transaction ledger
+    if panel_owner and wholesale_cost > Decimal("0.00") and owner_bal_before is not None:
         owner_tx = Transaction(
             user_id=panel_owner.id,
             order_id=order.id,
             tenant_id=panel.id,
             type=TransactionType.ORDER_PAYMENT,
             amount=-wholesale_cost,
-            balance_before=panel_owner_bal + wholesale_cost,
-            balance_after=panel_owner_bal,
+            balance_before=owner_bal_before,
+            balance_after=panel_owner.balance,
             currency="KES",
             payment_method=PaymentMethod.INTERNAL,
+            payment_reference=f"WHOLESALE-{order.order_number or str(order.id)[:8]}",
             status=TransactionStatus.COMPLETED,
-            description=f"Wholesale fulfillment for Order #{order.order_number or ''} on {panel.domain}"
+            description=f"Wholesale fulfillment for Order #{order.order_number or str(order.id)[:8]} on {panel.domain}"
         )
         db.add(owner_tx)
 

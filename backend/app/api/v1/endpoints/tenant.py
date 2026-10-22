@@ -59,7 +59,9 @@ async def resolve_tenant(
             "logo_url": None,
             "theme_color": "#f59e0b",
             "currency": "KES",
-            "contact_email": "support@socialpulse.io"
+            "contact_email": "support@socialpulse.io",
+            "google_tag_id": None,
+            "meta_pixel_id": None
         }
 
     # Query child panels by custom domain (flexible matching for root vs www)
@@ -128,6 +130,8 @@ async def resolve_tenant(
         "whatsapp_support": branding.get("whatsapp_support"),
         "whatsapp_channel_url": branding.get("whatsapp_channel_url"),
         "default_markup_percent": branding.get("default_markup_percent", 0),
+        "google_tag_id": branding.get("google_tag_id"),
+        "meta_pixel_id": branding.get("meta_pixel_id"),
         "nameserver1": panel.nameserver1,
         "nameserver2": panel.nameserver2,
         "expires_at": panel.expires_at.isoformat() if panel.expires_at else None,

@@ -203,6 +203,11 @@ export const childPanelService = {
     );
     return response.data;
   },
+
+  reconcileOrders: async (panelId: string): Promise<any> => {
+    const response = await apiClient.post(`/child-panels/${panelId}/reconcile-orders`);
+    return response.data;
+  },
 };
 
 export interface ChildPanelPaymentGatewayConfig {
