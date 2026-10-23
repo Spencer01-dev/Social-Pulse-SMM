@@ -1,13 +1,14 @@
+import calendar
 import logging
 import secrets
 import uuid
 
 logger = logging.getLogger("socialpulse.child_panels")
-from datetime import datetime, timedelta, timezone
+from datetime import date as date_type, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import cast, desc, func, or_, select, String
+from sqlalchemy import and_, case, cast, Date, desc, func, or_, select, String, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -21,6 +22,7 @@ from app.models.service import Platform, Service
 from app.models.ticket import Ticket, TicketMessage, TicketPriority, TicketStatus
 from app.models.transaction import PaymentMethod, Transaction, TransactionStatus, TransactionType
 from app.models.user import User, UserRole
+from app.schemas.analytics import DailyRevenueItem
 from app.schemas.child_panel import (
     ChildPanelAdminCredentialsUpdate,
     ChildPanelCreate,
@@ -489,6 +491,7 @@ async def list_child_panel_orders(
     panel_id: uuid.UUID,
     status_filter: Optional[OrderStatus] = Query(None, alias="status"),
     search: Optional[str] = None,
+    date: Optional[str] = Query(None, description="Filter orders created on this date YYYY-MM-DD"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -497,60 +500,100 @@ async def list_child_panel_orders(
     """List all customer orders placed on this child panel."""
     panel = await get_panel_and_verify_owner(panel_id, db, current_user)
 
+    # 1. Proactively reconcile/backfill any orphaned orders where customer belongs to this child panel
+    try:
+        await db.execute(
+            update(Order)
+            .where(
+                Order.tenant_id.is_(None),
+                Order.user_id.in_(
+                    select(User.id).where(User.tenant_id == panel.id)
+                )
+            )
+            .values(tenant_id=panel.id)
+        )
+        await db.commit()
+    except Exception as bf_err:
+        logger.warning(f"Error backfilling orphaned orders for panel {panel.id}: {bf_err}")
+
+    # 2. Build order query with explicit JOINs to avoid any MissingGreenlet lazy-loading issues
     query = (
-        select(Order)
-        .options(selectinload(Order.user), selectinload(Order.service))
-        .where(Order.tenant_id == panel.id)
+        select(
+            Order,
+            User.username.label("user_username"),
+            Service.name.label("service_name")
+        )
+        .join(User, Order.user_id == User.id, isouter=True)
+        .join(Service, Order.service_id == Service.id, isouter=True)
+        .where(
+            or_(
+                Order.tenant_id == panel.id,
+                User.tenant_id == panel.id
+            )
+        )
         .order_by(desc(Order.created_at))
         .offset(skip)
         .limit(limit)
     )
+
     if status_filter:
         query = query.where(Order.status == status_filter)
+
+    if date and date.strip():
+        try:
+            parsed_date = date_type.fromisoformat(date.strip())
+            start_dt = datetime(parsed_date.year, parsed_date.month, parsed_date.day, 0, 0, 0, tzinfo=timezone.utc)
+            end_dt = datetime(parsed_date.year, parsed_date.month, parsed_date.day, 23, 59, 59, 999999, tzinfo=timezone.utc)
+            start_naive = datetime(parsed_date.year, parsed_date.month, parsed_date.day, 0, 0, 0)
+            end_naive = datetime(parsed_date.year, parsed_date.month, parsed_date.day, 23, 59, 59, 999999)
+            query = query.where(
+                or_(
+                    and_(Order.created_at >= start_dt, Order.created_at <= end_dt),
+                    and_(Order.created_at >= start_naive, Order.created_at <= end_naive),
+                    cast(Order.created_at, Date) == parsed_date
+                )
+            )
+        except ValueError:
+            pass
+
     if search:
         s = f"%{search.strip().lower()}%"
-        query = query.join(Order.user, isouter=True).join(Order.service, isouter=True)
         query = query.where(
             (cast(Order.order_number, String).ilike(s)) |
+            (cast(Order.id, String).ilike(s)) |
             (Order.target_link.ilike(s)) |
             (User.username.ilike(s)) |
             (Service.name.ilike(s))
         )
 
     result = await db.execute(query)
-    orders = result.scalars().all()
-
-    # Automatically live-sync any active orders to ensure start_count and COMPLETED statuses are updated ASAP
-    active_orders = [
-        o for o in orders 
-        if o.status in [OrderStatus.PENDING, OrderStatus.PROCESSING, OrderStatus.IN_PROGRESS] and o.provider_order_id
-    ]
-    if active_orders:
-        from app.workers.order_tasks import sync_single_order
-        for ao in active_orders[:8]:
-            try:
-                await sync_single_order(db, ao)
-            except Exception as sync_err:
-                logger.warning(f"Error live-syncing active child panel order {ao.id}: {sync_err}")
+    rows = result.all()
 
     out = []
-    for o in orders:
-        panel_profit = (o.charge - o.wholesale_cost) if (o.wholesale_cost and o.wholesale_cost > Decimal("0.00")) else o.profit
+    for o, u_name, svc_name in rows:
+        chg = Decimal(str(o.charge)) if o.charge is not None else Decimal("0.00")
+        ws = Decimal(str(o.wholesale_cost)) if o.wholesale_cost is not None else Decimal("0.00")
+        prof = Decimal(str(o.profit)) if o.profit is not None else Decimal("0.00")
+        panel_profit = (chg - ws) if ws > Decimal("0.00") else prof
+
+        st_val = getattr(o, "status", "pending")
+        st_str = str(getattr(st_val, "value", getattr(st_val, "name", st_val)) or "pending").lower()
+
         out.append(
             ChildPanelOrderResponse(
                 id=o.id,
                 order_number=o.order_number,
                 user_id=o.user_id,
-                username=o.user.username if o.user else "Customer",
+                username=u_name or "Customer",
                 service_id=o.service_id,
-                service_name=o.service.name if o.service else "Service",
-                target_link=o.target_link,
-                quantity=o.quantity,
-                charge=o.charge,
+                service_name=svc_name or "Service",
+                target_link=o.target_link or "",
+                quantity=o.quantity or 0,
+                charge=chg,
                 profit=panel_profit,
-                status=o.status.value if hasattr(o.status, "value") else str(o.status),
-                remains=o.remains,
-                start_count=o.start_count,
+                status=st_str,
+                remains=o.remains or 0,
+                start_count=o.start_count or 0,
                 created_at=o.created_at
             )
         )
@@ -569,7 +612,7 @@ async def sync_child_panel_order(
     result = await db.execute(
         select(Order)
         .options(selectinload(Order.service), selectinload(Order.provider), selectinload(Order.user))
-        .where(Order.id == order_id, Order.tenant_id == panel.id)
+        .where(Order.id == order_id, or_(Order.tenant_id == panel.id, Order.user.has(User.tenant_id == panel.id)))
     )
     order = result.scalars().first()
     if not order:
@@ -577,6 +620,15 @@ async def sync_child_panel_order(
 
     from app.workers.order_tasks import sync_single_order
     changed, updated_order = await sync_single_order(db, order)
+
+    # Re-fetch order with relationships to avoid MissingGreenlet in async context
+    refreshed_res = await db.execute(
+        select(Order)
+        .options(selectinload(Order.service), selectinload(Order.user))
+        .where(Order.id == order_id)
+    )
+    updated_order = refreshed_res.scalars().first() or updated_order
+
     panel_profit = (updated_order.charge - updated_order.wholesale_cost) if (updated_order.wholesale_cost and updated_order.wholesale_cost > Decimal("0.00")) else updated_order.profit
 
     return {
@@ -604,15 +656,42 @@ async def sync_child_panel_order(
 @router.get("/{panel_id}/orders/stats", response_model=ChildPanelOrderStats)
 async def get_child_panel_order_stats(
     panel_id: uuid.UUID,
+    date: Optional[str] = Query(None, description="Optional date filter YYYY-MM-DD"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ) -> Any:
     """Get aggregated order statistics and total profit for this child panel."""
     panel = await get_panel_and_verify_owner(panel_id, db, current_user)
 
-    orders_q = await db.execute(
-        select(Order.status, Order.charge, Order.wholesale_cost, Order.profit).where(Order.tenant_id == panel.id)
+    query = (
+        select(Order.status, Order.charge, Order.wholesale_cost, Order.profit)
+        .join(User, Order.user_id == User.id, isouter=True)
+        .where(
+            or_(
+                Order.tenant_id == panel.id,
+                User.tenant_id == panel.id
+            )
+        )
     )
+
+    if date and date.strip():
+        try:
+            parsed_date = date_type.fromisoformat(date.strip())
+            start_dt = datetime(parsed_date.year, parsed_date.month, parsed_date.day, 0, 0, 0, tzinfo=timezone.utc)
+            end_dt = datetime(parsed_date.year, parsed_date.month, parsed_date.day, 23, 59, 59, 999999, tzinfo=timezone.utc)
+            start_naive = datetime(parsed_date.year, parsed_date.month, parsed_date.day, 0, 0, 0)
+            end_naive = datetime(parsed_date.year, parsed_date.month, parsed_date.day, 23, 59, 59, 999999)
+            query = query.where(
+                or_(
+                    and_(Order.created_at >= start_dt, Order.created_at <= end_dt),
+                    and_(Order.created_at >= start_naive, Order.created_at <= end_naive),
+                    cast(Order.created_at, Date) == parsed_date
+                )
+            )
+        except ValueError:
+            pass
+
+    orders_q = await db.execute(query)
     rows = orders_q.all()
 
     total = len(rows)
@@ -670,7 +749,7 @@ async def cancel_child_panel_order(
     res = await db.execute(
         select(Order)
         .options(selectinload(Order.user), selectinload(Order.service))
-        .where(Order.id == order_id, Order.tenant_id == panel.id)
+        .where(Order.id == order_id, or_(Order.tenant_id == panel.id, Order.user.has(User.tenant_id == panel.id)))
     )
     order = res.scalars().first()
     if not order:
@@ -688,7 +767,13 @@ async def cancel_child_panel_order(
 
     db.add(order)
     await db.commit()
-    await db.refresh(order)
+
+    refreshed_res = await db.execute(
+        select(Order)
+        .options(selectinload(Order.user), selectinload(Order.service))
+        .where(Order.id == order_id)
+    )
+    order = refreshed_res.scalars().first() or order
 
     return ChildPanelOrderResponse(
         id=order.id,
@@ -706,6 +791,185 @@ async def cancel_child_panel_order(
         start_count=order.start_count,
         created_at=order.created_at
     )
+
+
+# ------------------------------------------------------------------------------
+# 1B. CHILD PANEL ORDERS CALENDAR & SUMMARY TELEMETRY
+# ------------------------------------------------------------------------------
+
+@router.get("/{panel_id}/analytics/daily-revenue", response_model=List[DailyRevenueItem])
+async def get_child_panel_daily_revenue(
+    panel_id: uuid.UUID,
+    days: int = Query(60, ge=7, le=180),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """Get day-by-day revenue, profit, and order count for this child panel (e.g. for the Daily Calendar)."""
+    panel = await get_panel_and_verify_owner(panel_id, db, current_user)
+
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    day_expr = cast(Order.created_at, Date)
+    active_order_filter = ~Order.status.in_([OrderStatus.CANCELED, OrderStatus.FAILED])
+
+    daily_rev_expr = Order.charge
+    daily_profit_expr = case(
+        (and_(Order.wholesale_cost.isnot(None), Order.wholesale_cost > Decimal("0.00")),
+         Order.charge - Order.wholesale_cost),
+        else_=Order.profit
+    )
+
+    query = (
+        select(
+            day_expr.label("day"),
+            func.coalesce(func.sum(daily_rev_expr), Decimal("0.00")),
+            func.coalesce(func.sum(daily_profit_expr), Decimal("0.00")),
+            func.count(Order.id)
+        )
+        .join(User, Order.user_id == User.id, isouter=True)
+        .where(
+            or_(
+                Order.tenant_id == panel.id,
+                User.tenant_id == panel.id
+            ),
+            Order.created_at >= start_date,
+            active_order_filter
+        )
+        .group_by(day_expr)
+        .order_by(day_expr)
+    )
+    result = await db.execute(query)
+    rows = result.all()
+
+    db_map = {}
+    for row in rows:
+        if row[0]:
+            iso_key = row[0].strftime("%Y-%m-%d") if hasattr(row[0], "strftime") else str(row[0])
+            db_map[iso_key] = {
+                "revenue": row[1] or Decimal("0.00"),
+                "profit": row[2] or Decimal("0.00"),
+                "orders_count": row[3] or 0
+            }
+
+    timeline: List[DailyRevenueItem] = []
+    now_utc = datetime.now(timezone.utc)
+    for i in range(days, -1, -1):
+        dt = now_utc - timedelta(days=i)
+        iso_str = dt.strftime("%Y-%m-%d")
+        label = dt.strftime("%b %d")
+        item_data = db_map.get(iso_str, {"revenue": Decimal("0.00"), "profit": Decimal("0.00"), "orders_count": 0})
+        timeline.append(
+            DailyRevenueItem(
+                date_label=label,
+                full_date=iso_str,
+                revenue=item_data["revenue"],
+                profit=item_data["profit"],
+                orders_count=item_data["orders_count"]
+            )
+        )
+    return timeline
+
+
+@router.get("/{panel_id}/analytics/monthly-summary")
+async def get_child_panel_monthly_summary(
+    panel_id: uuid.UUID,
+    year: int,
+    month: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """Get aggregated monthly performance metrics and day-by-day breakdown for this child panel."""
+    panel = await get_panel_and_verify_owner(panel_id, db, current_user)
+
+    days_in_month = calendar.monthrange(year, month)[1]
+    start_dt_utc = datetime(year, month, 1, 0, 0, 0, tzinfo=timezone.utc)
+    end_dt_utc = datetime(year, month, days_in_month, 23, 59, 59, 999999, tzinfo=timezone.utc)
+    active_order_filter = ~Order.status.in_([OrderStatus.CANCELED, OrderStatus.FAILED])
+
+    month_rev_expr = Order.charge
+    month_profit_expr = case(
+        (and_(Order.wholesale_cost.isnot(None), Order.wholesale_cost > Decimal("0.00")),
+         Order.charge - Order.wholesale_cost),
+        else_=Order.profit
+    )
+    month_cost_expr = func.coalesce(Order.wholesale_cost, Decimal("0.00"))
+
+    query = (
+        select(
+            func.coalesce(func.sum(month_rev_expr), Decimal("0.00")),
+            func.coalesce(func.sum(month_profit_expr), Decimal("0.00")),
+            func.coalesce(func.sum(month_cost_expr), Decimal("0.00")),
+            func.count(Order.id)
+        )
+        .join(User, Order.user_id == User.id, isouter=True)
+        .where(
+            or_(
+                Order.tenant_id == panel.id,
+                User.tenant_id == panel.id
+            ),
+            Order.created_at >= start_dt_utc,
+            Order.created_at <= end_dt_utc,
+            active_order_filter
+        )
+    )
+    result = await db.execute(query)
+    total_rev, total_profit, total_cost, total_orders = result.first()
+
+    # Query daily breakdown
+    daily_query = (
+        select(Order.created_at, Order.charge, Order.profit, Order.wholesale_cost, Order.id)
+        .join(User, Order.user_id == User.id, isouter=True)
+        .where(
+            or_(
+                Order.tenant_id == panel.id,
+                User.tenant_id == panel.id
+            ),
+            Order.created_at >= start_dt_utc,
+            Order.created_at <= end_dt_utc,
+            active_order_filter
+        )
+        .order_by(Order.created_at.asc())
+    )
+    daily_res = await db.execute(daily_query)
+    order_rows = daily_res.all()
+
+    day_buckets = {d: {"revenue": Decimal("0.00"), "profit": Decimal("0.00"), "orders_count": 0} for d in range(1, days_in_month + 1)}
+    for created_at_val, chg_val, prof_val, ws_val, _oid in order_rows:
+        if created_at_val:
+            day_num = created_at_val.day
+            if day_num in day_buckets:
+                c = Decimal(str(chg_val or 0))
+                w = Decimal(str(ws_val or 0))
+                p = (c - w) if w > Decimal("0.00") else Decimal(str(prof_val or 0))
+                day_buckets[day_num]["revenue"] += c
+                day_buckets[day_num]["profit"] += p
+                day_buckets[day_num]["orders_count"] += 1
+
+    days_list = [
+        {
+            "day": d,
+            "date": f"{year}-{month:02d}-{d:02d}",
+            "revenue": float(day_buckets[d]["revenue"]),
+            "profit": float(day_buckets[d]["profit"]),
+            "orders_count": day_buckets[d]["orders_count"]
+        }
+        for d in range(1, days_in_month + 1)
+    ]
+
+    margin = Decimal("0.00")
+    if total_rev > 0:
+        margin = round((total_profit / total_rev) * Decimal("100.00"), 1)
+
+    return {
+        "year": year,
+        "month": month,
+        "month_name": calendar.month_name[month],
+        "total_revenue": float(total_rev),
+        "total_gross_profit": float(total_profit),
+        "total_provider_cost": float(total_cost),
+        "total_orders": total_orders,
+        "profit_margin_percent": float(margin),
+        "days": days_list
+    }
 
 
 # ------------------------------------------------------------------------------

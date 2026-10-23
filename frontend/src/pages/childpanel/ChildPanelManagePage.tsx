@@ -43,6 +43,12 @@ import {
   TrendingUp,
   CheckSquare,
   Square,
+  Calendar,
+  CalendarDays,
+  BarChart3,
+  PackageCheck,
+  RotateCcw,
+  X,
 } from 'lucide-react';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -50,6 +56,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useCurrency } from '../../context/CurrencyContext';
 import { useTenant } from '../../context/TenantContext';
 import { formatExternalUrl } from '../../utils/url';
+import { DailyRevenueCalendar } from '../../components/analytics/DailyRevenueCalendar';
+import { DailyRevenue, MonthlySummary } from '../../services/analytics';
 import {
   childPanelService,
   ChildPanelData,
@@ -114,6 +122,16 @@ export const ChildPanelManagePage: React.FC = () => {
   const [orderSearch, setOrderSearch] = useState<string>('');
   const [cancelingOrderId, setCancelingOrderId] = useState<string | null>(null);
   const [syncingOrderId, setSyncingOrderId] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [dailyRevenue, setDailyRevenue] = useState<DailyRevenue[]>([]);
+  const [loadingDailyRevenue, setLoadingDailyRevenue] = useState(false);
+
+  // Monthly Revenue & Profit Modal State
+  const [showMonthModal, setShowMonthModal] = useState(false);
+  const [monthModalYear, setMonthModalYear] = useState(new Date().getFullYear());
+  const [monthModalMonth, setMonthModalMonth] = useState(new Date().getMonth() + 1);
+  const [monthSummary, setMonthSummary] = useState<MonthlySummary | null>(null);
+  const [loadingMonthSummary, setLoadingMonthSummary] = useState(false);
 
   // ---------------------------------------------------------------------------
   // TAB 2: TICKETS STATE
@@ -393,16 +411,55 @@ export const ChildPanelManagePage: React.FC = () => {
         childPanelService.getPanelOrders(activePanel.id, {
           status: orderStatusFilter !== 'all' ? orderStatusFilter : undefined,
           search: orderSearch.trim() || undefined,
+          date: selectedDate || undefined,
         }),
-        childPanelService.getPanelOrderStats(activePanel.id),
+        childPanelService.getPanelOrderStats(activePanel.id, {
+          date: selectedDate || undefined,
+        }),
       ]);
       setOrders(ordersData);
       setOrderStats(statsData);
     } catch (err: any) {
+      console.error('Failed to load panel orders:', err);
       if (!silent) showToast('error', err.response?.data?.detail || 'Failed to load panel orders.');
     } finally {
       if (!silent) setLoadingOrders(false);
     }
+  };
+
+  const loadDailyRevenue = async () => {
+    if (!activePanel) return;
+    setLoadingDailyRevenue(true);
+    try {
+      const data = await childPanelService.getPanelDailyRevenue(activePanel.id, 60);
+      setDailyRevenue(data);
+    } catch (err: any) {
+      console.error('Failed to load daily revenue for panel:', err);
+    } finally {
+      setLoadingDailyRevenue(false);
+    }
+  };
+
+  const fetchMonthSummary = async (yr: number, mo: number) => {
+    if (!activePanel) return;
+    setLoadingMonthSummary(true);
+    try {
+      const data = await childPanelService.getPanelMonthlySummary(activePanel.id, yr, mo);
+      setMonthSummary(data);
+    } catch (err) {
+      console.error('Failed to fetch monthly summary for panel:', err);
+    } finally {
+      setLoadingMonthSummary(false);
+    }
+  };
+
+  const handleOpenMonthModal = (mo?: number, yr?: number) => {
+    const targetMonth = mo ?? monthModalMonth;
+    const targetYear = yr ?? monthModalYear;
+    setMonthModalMonth(targetMonth);
+    setMonthModalYear(targetYear);
+    setShowMonthModal(true);
+    fetchMonthSummary(targetYear, targetMonth);
   };
 
   // Auto-refresh orders every 8 seconds if activeTab is 'orders' and any order is active (pending/processing/in_progress)
@@ -473,6 +530,7 @@ export const ChildPanelManagePage: React.FC = () => {
     if (!activePanel) return;
     if (activeTab === 'orders') {
       loadOrders();
+      loadDailyRevenue();
     } else if (activeTab === 'tickets') {
       loadTickets();
     } else if (activeTab === 'users') {
@@ -482,7 +540,7 @@ export const ChildPanelManagePage: React.FC = () => {
     } else if (activeTab === 'services') {
       loadPanelServices();
     }
-  }, [activePanel, activeTab, orderStatusFilter, ticketStatusFilter]);
+  }, [activePanel, activeTab, orderStatusFilter, ticketStatusFilter, selectedDate]);
 
   // Order Cancel & Refund
   const handleCancelOrder = async (orderId: string, orderNumber?: number) => {
@@ -834,47 +892,128 @@ export const ChildPanelManagePage: React.FC = () => {
       {/* ===================================================================== */}
       {activeTab === 'orders' && (
         <div className="space-y-4">
-          {/* Order Financial & Volume Metrics Cards */}
-          {orderStats && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              <Card className="p-3 bg-[#181a20] border-[#2b303c]">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Total Orders</span>
-                <span className="text-xl font-black text-white">{orderStats.total_orders}</span>
-              </Card>
+          {/* Executive Admin Summary Console Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-[#181a20] via-[#1c202a] to-[#181a20] p-4 rounded-2xl border border-[#2b303c] shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center font-black">
+                <BarChart3 className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-sm font-extrabold text-white tracking-tight flex items-center gap-2">
+                  <span>Executive Admin Summary</span>
+                  {selectedDate ? (
+                    <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-mono text-[11px] font-bold">
+                      {selectedDate}
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
+                      All-Time Overview
+                    </span>
+                  )}
+                </h2>
+                <p className="text-[11px] text-slate-400">
+                  Real-time sales turnover, wholesale margin, and customer fulfillment telemetry
+                </p>
+              </div>
+            </div>
 
-              <Card className="p-3 bg-[#181a20] border-[#2b303c]">
-                <span className="text-[10px] uppercase font-bold text-amber-400 block mb-0.5">Pending / In Prog</span>
-                <span className="text-xl font-black text-amber-300">
-                  {orderStats.pending_orders + orderStats.in_progress_orders + orderStats.processing_orders}
-                </span>
-              </Card>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => handleOpenMonthModal()}
+                className="flex items-center gap-1.5 bg-[#121418] border-[#2b303c] text-white hover:border-amber-400 shadow-sm"
+              >
+                <Calendar className="w-4 h-4 text-amber-400" />
+                <span>Monthly Summary & Breakdown</span>
+              </Button>
 
-              <Card className="p-3 bg-[#181a20] border-[#2b303c]">
-                <span className="text-[10px] uppercase font-bold text-emerald-400 block mb-0.5">Completed</span>
-                <span className="text-xl font-black text-emerald-400">{orderStats.completed_orders}</span>
-              </Card>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  loadOrders(false);
+                  loadDailyRevenue();
+                }}
+                isLoading={loadingOrders || loadingDailyRevenue}
+                leftIcon={<RefreshCcw className="w-3.5 h-3.5 text-cyan-400" />}
+              >
+                Refresh Telemetry
+              </Button>
+            </div>
+          </div>
 
-              <Card className="p-3 bg-[#181a20] border-[#2b303c]">
-                <span className="text-[10px] uppercase font-bold text-rose-400 block mb-0.5">Canceled</span>
-                <span className="text-xl font-black text-rose-400">{orderStats.canceled_orders}</span>
-              </Card>
+          {/* Metric Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <Card className="p-3 bg-[#181a20] border-[#2b303c]">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Total Orders</span>
+              <span className="text-xl font-black text-white">{orderStats?.total_orders ?? orders.length}</span>
+            </Card>
 
-              <Card className="p-3 bg-[#181a20] border-[#2b303c]">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Customer Turnover</span>
-                <span className="text-base font-black text-white">
-                  Ksh {Number(orderStats.total_revenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </span>
-              </Card>
+            <Card className="p-3 bg-[#181a20] border-[#2b303c]">
+              <span className="text-[10px] uppercase font-bold text-amber-400 block mb-0.5">Pending / In Prog</span>
+              <span className="text-xl font-black text-amber-300">
+                {orderStats
+                  ? orderStats.pending_orders + orderStats.in_progress_orders + orderStats.processing_orders
+                  : orders.filter((o) => ['pending', 'processing', 'in_progress'].includes(o.status)).length}
+              </span>
+            </Card>
 
-              <Card className="p-3 bg-[#181a20] border-emerald-500/30 bg-emerald-500/5">
-                <span className="text-[10px] uppercase font-bold text-emerald-400 block mb-0.5 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-emerald-400" />
-                  Your Net Profit
-                </span>
-                <span className="text-base font-black text-emerald-400">
-                  Ksh {Number(orderStats.total_profit || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </span>
-              </Card>
+            <Card className="p-3 bg-[#181a20] border-[#2b303c]">
+              <span className="text-[10px] uppercase font-bold text-emerald-400 block mb-0.5">Completed</span>
+              <span className="text-xl font-black text-emerald-400">
+                {orderStats?.completed_orders ?? orders.filter((o) => o.status === 'completed').length}
+              </span>
+            </Card>
+
+            <Card className="p-3 bg-[#181a20] border-[#2b303c]">
+              <span className="text-[10px] uppercase font-bold text-rose-400 block mb-0.5">Canceled</span>
+              <span className="text-xl font-black text-rose-400">
+                {orderStats?.canceled_orders ?? orders.filter((o) => ['canceled', 'failed'].includes(o.status)).length}
+              </span>
+            </Card>
+
+            <Card className="p-3 bg-[#181a20] border-[#2b303c]">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Customer Turnover</span>
+              <span className="text-base font-black text-white">
+                Ksh {Number(orderStats?.total_revenue ?? orders.reduce((acc, o) => acc + (Number(o.charge) || 0), 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </span>
+            </Card>
+
+            <Card className="p-3 bg-[#181a20] border-emerald-500/30 bg-emerald-500/5">
+              <span className="text-[10px] uppercase font-bold text-emerald-400 block mb-0.5 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-emerald-400" />
+                Your Net Profit
+              </span>
+              <span className="text-base font-black text-emerald-400">
+                Ksh {Number(orderStats?.total_profit ?? orders.reduce((acc, o) => acc + (Number(o.profit) || 0), 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </span>
+            </Card>
+          </div>
+
+          {/* Daily Orders & Revenue Calendar Tracker */}
+          <DailyRevenueCalendar
+            dailyData={dailyRevenue}
+            onRefresh={loadDailyRevenue}
+            onDateSelect={(dateStr) => setSelectedDate(dateStr)}
+            onViewMonthSummary={(mo, yr) => handleOpenMonthModal(mo, yr)}
+            title="Daily Fulfillment & Orders Calendar"
+          />
+
+          {/* Active Date Filter Indicator */}
+          {selectedDate && (
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">
+              <CalendarDays className="w-4 h-4 flex-shrink-0" />
+              <span>
+                Filtering orders placed on <strong className="text-amber-400 font-mono">{selectedDate}</strong> ({orders.length} order{orders.length === 1 ? '' : 's'} displayed)
+              </span>
+              <button
+                onClick={() => setSelectedDate(null)}
+                className="ml-auto px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+                Show All Dates
+              </button>
             </div>
           )}
 
@@ -901,6 +1040,28 @@ export const ChildPanelManagePage: React.FC = () => {
                   {s.label}
                 </button>
               ))}
+            </div>
+
+            {/* Date Input Filter */}
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <input
+                  type="date"
+                  value={selectedDate || ''}
+                  onChange={(e) => setSelectedDate(e.target.value || null)}
+                  className="px-2.5 py-1.5 bg-[#121418] border border-[#2b303c] rounded-lg text-xs text-white focus:outline-none focus:border-amber-500 cursor-pointer"
+                  title="Filter orders by specific date"
+                />
+              </div>
+              {selectedDate && (
+                <button
+                  onClick={() => setSelectedDate(null)}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  title="Clear date filter"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
             {/* Search Input */}
@@ -2235,6 +2396,219 @@ export const ChildPanelManagePage: React.FC = () => {
             setPanels((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
           }}
         />
+      )}
+
+      {/* Monthly Revenue & Profit Modal */}
+      {showMonthModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-2xl bg-[#13151b] border border-[#2b303c] rounded-3xl p-6 shadow-2xl space-y-6">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-[#2b303c]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white tracking-tight">
+                    Monthly Performance & Profits
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Aggregated turnover, wholesale cost, and net profit breakdown
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMonthModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Month & Year Selectors */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-[#181a20] p-3 rounded-2xl border border-[#2b303c]">
+              <div className="flex items-center gap-2">
+                <select
+                  value={monthModalMonth}
+                  onChange={(e) => {
+                    const m = Number(e.target.value);
+                    setMonthModalMonth(m);
+                    fetchMonthSummary(monthModalYear, m);
+                  }}
+                  className="px-3 py-1.5 bg-[#121418] border border-[#2b303c] rounded-xl text-white text-xs font-bold focus:border-amber-400 focus:outline-none cursor-pointer"
+                >
+                  {[
+                    { val: 1, name: 'January' },
+                    { val: 2, name: 'February' },
+                    { val: 3, name: 'March' },
+                    { val: 4, name: 'April' },
+                    { val: 5, name: 'May' },
+                    { val: 6, name: 'June' },
+                    { val: 7, name: 'July' },
+                    { val: 8, name: 'August' },
+                    { val: 9, name: 'September' },
+                    { val: 10, name: 'October' },
+                    { val: 11, name: 'November' },
+                    { val: 12, name: 'December' },
+                  ].map((m) => (
+                    <option key={m.val} value={m.val}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={monthModalYear}
+                  onChange={(e) => {
+                    const y = Number(e.target.value);
+                    setMonthModalYear(y);
+                    fetchMonthSummary(y, monthModalMonth);
+                  }}
+                  className="px-3 py-1.5 bg-[#121418] border border-[#2b303c] rounded-xl text-white text-xs font-bold focus:border-amber-400 focus:outline-none cursor-pointer"
+                >
+                  {[2024, 2025, 2026, 2027].map((yr) => (
+                    <option key={yr} value={yr}>
+                      {yr}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const nowYr = now.getFullYear();
+                    const nowMo = now.getMonth() + 1;
+                    setMonthModalYear(nowYr);
+                    setMonthModalMonth(nowMo);
+                    fetchMonthSummary(nowYr, nowMo);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-extrabold transition-all cursor-pointer"
+                >
+                  Current Month
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fetchMonthSummary(monthModalYear, monthModalMonth)}
+                  disabled={loadingMonthSummary}
+                  className="p-1.5 rounded-xl bg-[#121418] hover:bg-[#202530] text-slate-300 hover:text-white border border-[#2b303c] transition-colors cursor-pointer"
+                  title="Refresh"
+                >
+                  <RefreshCcw className={`w-3.5 h-3.5 ${loadingMonthSummary ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Content Display */}
+            {loadingMonthSummary ? (
+              <div className="py-12 text-center space-y-3">
+                <RefreshCcw className="w-8 h-8 text-amber-400 animate-spin mx-auto" />
+                <p className="text-xs text-slate-400">Loading monthly financial data...</p>
+              </div>
+            ) : monthSummary ? (
+              <div className="space-y-4">
+                {/* Highlight Month Header */}
+                <div className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300">
+                  <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-amber-400" />
+                    {monthSummary.month_name} {monthSummary.year} Performance
+                  </span>
+                  <span className="text-xs font-mono font-bold text-amber-400">
+                    {monthSummary.total_orders} total orders
+                  </span>
+                </div>
+
+                {/* 3 Metric Cards: Total Revenue, Gross Profit, Profit Margin */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-3 bg-[#181a20] rounded-2xl border border-[#2b303c] space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
+                      <DollarSign className="w-3.5 h-3.5 text-blue-400" />
+                      Total Turnover
+                    </span>
+                    <div className="text-lg font-black text-white font-mono">
+                      KES {monthSummary.total_revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-[#181a20] rounded-2xl border border-emerald-500/30 bg-emerald-950/10 space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider flex items-center gap-1.5">
+                      <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                      Your Net Profit
+                    </span>
+                    <div className="text-lg font-black text-emerald-400 font-mono">
+                      +KES {monthSummary.total_gross_profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-[#181a20] rounded-2xl border border-[#2b303c] space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1.5">
+                      <Percent className="w-3.5 h-3.5 text-amber-400" />
+                      Profit Margin
+                    </span>
+                    <div className="text-lg font-black text-amber-400 font-mono">
+                      {monthSummary.profit_margin_percent}%
+                    </div>
+                  </div>
+                </div>
+
+                {/* Provider cost detail */}
+                <div className="p-3 bg-[#181a20] rounded-xl border border-[#2b303c]/60 flex items-center justify-between text-xs text-slate-400">
+                  <span>Wholesale Cost Paid to SocialPulse:</span>
+                  <span className="font-mono text-slate-200">
+                    KES {monthSummary.total_provider_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                {/* Daily Breakdown for this month */}
+                <div className="space-y-2">
+                  <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                    Daily Sales & Profits Breakdown
+                  </span>
+                  {monthSummary.days && monthSummary.days.length > 0 ? (
+                    <div className="border border-[#2b303c] rounded-2xl overflow-hidden max-h-52 overflow-y-auto custom-scrollbar">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-[#11141a] text-slate-400 font-bold border-b border-[#2b303c] sticky top-0">
+                          <tr>
+                            <th className="py-2.5 px-3">Date</th>
+                            <th className="py-2.5 px-3">Orders</th>
+                            <th className="py-2.5 px-3">Turnover (KES)</th>
+                            <th className="py-2.5 px-3 text-right">Net Profit (KES)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#2b303c]/40 font-mono">
+                          {monthSummary.days.map((d) => (
+                            <tr key={d.date} className="hover:bg-[#181c24] transition-colors">
+                              <td className="py-2 px-3 text-slate-300 font-bold">{d.date}</td>
+                              <td className="py-2 px-3 text-amber-400">{d.orders_count}</td>
+                              <td className="py-2 px-3 text-white">KES {d.revenue.toFixed(2)}</td>
+                              <td className="py-2 px-3 text-right text-emerald-400 font-bold">
+                                +KES {d.profit.toFixed(2)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="py-6 text-center text-xs text-slate-500 bg-[#181a20] rounded-2xl border border-[#2b303c]">
+                      No active sales recorded for {monthSummary.month_name} {monthSummary.year}.
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {/* Footer */}
+            <div className="flex justify-end pt-2 border-t border-[#2b303c]">
+              <Button variant="ghost" size="md" onClick={() => setShowMonthModal(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

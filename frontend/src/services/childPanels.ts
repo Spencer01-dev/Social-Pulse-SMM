@@ -1,4 +1,5 @@
 import apiClient from './api';
+import { DailyRevenue, MonthlySummary } from './analytics';
 
 export type ChildPanelStatusType =
   | 'pending'
@@ -87,14 +88,28 @@ export const childPanelService = {
   // Panel Owner Management APIs
   getPanelOrders: async (
     panelId: string,
-    params?: { status?: string; search?: string; skip?: number; limit?: number }
+    params?: { status?: string; search?: string; date?: string; skip?: number; limit?: number }
   ): Promise<ChildPanelOrder[]> => {
     const response = await apiClient.get<ChildPanelOrder[]>(`/child-panels/${panelId}/orders`, { params });
     return response.data;
   },
 
-  getPanelOrderStats: async (panelId: string): Promise<ChildPanelOrderStats> => {
-    const response = await apiClient.get<ChildPanelOrderStats>(`/child-panels/${panelId}/orders/stats`);
+  getPanelOrderStats: async (panelId: string, params?: { date?: string }): Promise<ChildPanelOrderStats> => {
+    const response = await apiClient.get<ChildPanelOrderStats>(`/child-panels/${panelId}/orders/stats`, { params });
+    return response.data;
+  },
+
+  getPanelDailyRevenue: async (panelId: string, days: number = 60): Promise<DailyRevenue[]> => {
+    const response = await apiClient.get<DailyRevenue[]>(`/child-panels/${panelId}/analytics/daily-revenue`, {
+      params: { days },
+    });
+    return response.data;
+  },
+
+  getPanelMonthlySummary: async (panelId: string, year: number, month: number): Promise<MonthlySummary> => {
+    const response = await apiClient.get<MonthlySummary>(`/child-panels/${panelId}/analytics/monthly-summary`, {
+      params: { year, month },
+    });
     return response.data;
   },
 
