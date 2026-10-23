@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import and_, cast, Date, desc, func, or_, select, String
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_roles
@@ -187,7 +188,18 @@ async def override_order_status(
 
     db.add(order)
     await db.commit()
-    await db.refresh(order)
+
+    # Re-fetch order with relationships eager-loaded to avoid MissingGreenlet in async context
+    refreshed_res = await db.execute(
+        select(Order)
+        .options(
+            selectinload(Order.user),
+            selectinload(Order.service),
+            selectinload(Order.provider)
+        )
+        .where(Order.id == order_id)
+    )
+    order = refreshed_res.scalars().first()
 
     return AdminOrderResponse(
         id=order.id,
@@ -268,7 +280,17 @@ async def retry_order_dispatch(
 
     db.add(order)
     await db.commit()
-    await db.refresh(order)
+
+    refreshed_res = await db.execute(
+        select(Order)
+        .options(
+            selectinload(Order.user),
+            selectinload(Order.service),
+            selectinload(Order.provider)
+        )
+        .where(Order.id == order_id)
+    )
+    order = refreshed_res.scalars().first()
 
     prov_display = "Direct"
     if order.provider:

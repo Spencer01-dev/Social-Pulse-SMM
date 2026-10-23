@@ -224,7 +224,7 @@ export const AdminOrdersPage: React.FC = () => {
       setOverrideOrder(null);
       await fetchAdminOrders();
     } catch (err: any) {
-      alert(`Failed to cancel and refund: ${err.message}`);
+      alert(`Failed to cancel and refund: ${err.response?.data?.detail || err.message}`);
     } finally {
       setSavingOverride(false);
     }

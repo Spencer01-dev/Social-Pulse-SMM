@@ -77,7 +77,7 @@ async def refund_order(
             )
             customer = cust_res.scalars().first()
             if customer:
-                bal_before = customer.balance
+                bal_before = Decimal(str(customer.balance or "0.00"))
                 bal_after = bal_before + customer_refund
                 customer.balance = bal_after
                 db.add(customer)
@@ -175,7 +175,7 @@ async def refund_order(
                     )
                     panel_owner = owner_res.scalars().first()
                     if panel_owner:
-                        owner_bal_before = panel_owner.balance
+                        owner_bal_before = Decimal(str(panel_owner.balance or "0.00"))
                         owner_bal_after = owner_bal_before + owner_refund
                         panel_owner.balance = owner_bal_after
                         db.add(panel_owner)
