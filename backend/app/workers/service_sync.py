@@ -83,35 +83,29 @@ async def sync_services_from_provider(
     default_markup_percent: Decimal = Decimal("100.00")
 ) -> Tuple[int, int, int]:
     """
-    Fetch services from provider and atomic upsert into PostgreSQL.
+    Fetch services exclusively from JustAnotherPanel (JAP) and atomic upsert into PostgreSQL.
     Returns: (total_fetched, created_count, updated_count)
     """
-    # 1. Get or create Provider record in database
-    provider_query = await db.execute(select(Provider).where(Provider.slug == provider_slug))
+    # Enforce JAP as the only provider
+    provider_slug = "jap"
+
+    # 1. Get or create JustAnotherPanel Provider record in database
+    provider_query = await db.execute(select(Provider).where(Provider.slug == "jap"))
     provider_record = provider_query.scalars().first()
 
     if not provider_record:
-        # Determine provider metadata based on slug
-        if provider_slug in ["jap", "justanotherpanel", "just_another_panel", "just-another-panel"]:
-            p_name = "JustAnotherPanel"
-            p_url = settings.JAP_API_URL
-            p_currency = "USD"
-        else:
-            p_name = provider_slug.capitalize()
-            p_url = settings.JAP_API_URL
-            p_currency = "USD"
-
         provider_record = Provider(
-            name=p_name,
-            slug=provider_slug,
-            api_url=p_url,
+            name="JustAnotherPanel",
+            slug="jap",
+            api_url=settings.JAP_API_URL,
             is_active=True,
-            currency=p_currency,
+            currency="USD",
             balance=Decimal("0.00")
         )
         db.add(provider_record)
         await db.commit()
         await db.refresh(provider_record)
+
 
     # 2. Fetch live services from provider
     p_key = provider_record.api_key_encrypted if (provider_record and provider_record.api_key_encrypted) else None

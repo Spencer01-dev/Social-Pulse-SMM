@@ -571,32 +571,36 @@ async def list_child_panel_orders(
 
     out = []
     for o, u_name, svc_name in rows:
-        chg = Decimal(str(o.charge)) if o.charge is not None else Decimal("0.00")
-        ws = Decimal(str(o.wholesale_cost)) if o.wholesale_cost is not None else Decimal("0.00")
-        prof = Decimal(str(o.profit)) if o.profit is not None else Decimal("0.00")
-        panel_profit = (chg - ws) if ws > Decimal("0.00") else prof
+        try:
+            chg = Decimal(str(o.charge)) if o.charge is not None else Decimal("0.00")
+            ws = Decimal(str(o.wholesale_cost)) if o.wholesale_cost is not None else Decimal("0.00")
+            prof = Decimal(str(o.profit)) if o.profit is not None else Decimal("0.00")
+            panel_profit = (chg - ws) if ws > Decimal("0.00") else prof
 
-        st_val = getattr(o, "status", "pending")
-        st_str = str(getattr(st_val, "value", getattr(st_val, "name", st_val)) or "pending").lower()
+            st_val = getattr(o, "status", "pending")
+            st_str = str(getattr(st_val, "value", getattr(st_val, "name", st_val)) or "pending").lower()
 
-        out.append(
-            ChildPanelOrderResponse(
-                id=o.id,
-                order_number=o.order_number,
-                user_id=o.user_id,
-                username=u_name or "Customer",
-                service_id=o.service_id,
-                service_name=svc_name or "Service",
-                target_link=o.target_link or "",
-                quantity=o.quantity or 0,
-                charge=chg,
-                profit=panel_profit,
-                status=st_str,
-                remains=o.remains or 0,
-                start_count=o.start_count or 0,
-                created_at=o.created_at
+            out.append(
+                ChildPanelOrderResponse(
+                    id=o.id,
+                    order_number=o.order_number,
+                    user_id=o.user_id,
+                    username=u_name or "Customer",
+                    service_id=o.service_id,
+                    service_name=svc_name or "Service",
+                    target_link=o.target_link or "",
+                    quantity=o.quantity or 0,
+                    charge=chg,
+                    profit=panel_profit,
+                    status=st_str,
+                    remains=o.remains or 0,
+                    start_count=o.start_count or 0,
+                    created_at=o.created_at
+                )
             )
-        )
+        except Exception as item_err:
+            logger.warning(f"Error formatting child panel order {getattr(o, 'id', None)}: {item_err}")
+            continue
     return out
 
 

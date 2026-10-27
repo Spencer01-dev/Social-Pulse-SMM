@@ -74,18 +74,18 @@ class ChildPanelOrderStats(BaseModel):
 class ChildPanelOrderResponse(BaseModel):
     id: uuid.UUID
     order_number: Optional[int] = None
-    user_id: uuid.UUID
-    username: str
-    service_id: uuid.UUID
-    service_name: str
-    target_link: str
-    quantity: int
-    charge: Decimal
-    profit: Decimal
-    status: str
-    remains: int
-    start_count: int
-    created_at: datetime
+    user_id: Optional[uuid.UUID] = None
+    username: Optional[str] = "Customer"
+    service_id: Optional[uuid.UUID] = None
+    service_name: Optional[str] = "Service"
+    target_link: Optional[str] = ""
+    quantity: Optional[int] = 0
+    charge: Optional[Decimal] = Decimal("0.00")
+    profit: Optional[Decimal] = Decimal("0.00")
+    status: Optional[str] = "pending"
+    remains: Optional[int] = 0
+    start_count: Optional[int] = 0
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

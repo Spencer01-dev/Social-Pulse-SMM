@@ -69,3 +69,4 @@ node_modules/
 # Local test scratch scripts with credentials
 backend/test_*.py
 backend/test_api.py
+Untitled*.txt

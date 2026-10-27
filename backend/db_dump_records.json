@@ -275,22 +275,10 @@
   ],
   "providers": [
     {
-      "id": "71110e74-f334-4d14-b98e-3f5357d97489",
-      "name": "Secsers",
-      "slug": "secsers",
-      "api_url": "https://secsers.com/api/v2",
-      "api_key_encrypted": null,
-      "is_active": true,
-      "balance": "0.00",
-      "currency": "USD",
-      "description": null,
-      "created_at": "2026-09-19T06:20:39.701793+00:00",
-      "updated_at": "2026-09-19T06:20:39.701793+00:00"
-    },
-    {
       "id": "e040f927-23c8-4cf2-a27a-f6eba46f3699",
       "name": "JustAnotherPanel",
       "slug": "jap",
+
       "api_url": "https://justanotherpanel.com/api/v2",
       "api_key_encrypted": null,
       "is_active": true,

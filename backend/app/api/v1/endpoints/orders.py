@@ -247,7 +247,7 @@ async def create_order(
         initial_status = OrderStatus.PENDING
 
     # 8. Persist order record in database (using tenant_id resolved in step 2)
-    order_profit = (total_charge - wholesale_cost) if (panel and wholesale_cost > Decimal("0.00")) else profit
+    order_profit = (total_charge - wholesale_cost) if (panel and wholesale_cost > Decimal("0.00")) else round(total_charge * Decimal("0.50"), 2)
 
     order = Order(
         user_id=current_user.id,
@@ -433,26 +433,32 @@ async def list_my_orders(
     result = await db.execute(query)
     orders = result.scalars().all()
 
-    return [
-        CustomerOrderResponse(
-            id=o.id,
-            order_number=o.order_number,
-            service_id=o.service_id,
-            service_name=o.service.name if o.service else "SMM Service",
-            platform=o.service.platform if o.service else "instagram",
-            target_link=o.target_link,
-            quantity=o.quantity,
-            start_count=o.start_count,
-            remains=o.remains,
-            charge=o.charge,
-            currency=o.currency,
-            status=o.status,
-            refill_available=o.service.refill_available if o.service else False,
-            created_at=o.created_at,
-            updated_at=o.updated_at
-        )
-        for o in orders
-    ]
+    res_items = []
+    for o in orders:
+        try:
+            res_items.append(
+                CustomerOrderResponse(
+                    id=o.id,
+                    order_number=o.order_number,
+                    service_id=o.service_id,
+                    service_name=o.service.name if o.service else "SMM Service",
+                    platform=o.service.platform if o.service else "instagram",
+                    target_link=o.target_link,
+                    quantity=o.quantity,
+                    start_count=o.start_count,
+                    remains=o.remains,
+                    charge=o.charge,
+                    currency=o.currency,
+                    status=o.status,
+                    refill_available=o.service.refill_available if o.service else False,
+                    created_at=o.created_at,
+                    updated_at=o.updated_at
+                )
+            )
+        except Exception as err:
+            logger.warning(f"Error serializing customer order {getattr(o, 'id', None)}: {err}")
+            continue
+    return res_items
 
 
 @router.get("/{order_id}", response_model=CustomerOrderResponse)

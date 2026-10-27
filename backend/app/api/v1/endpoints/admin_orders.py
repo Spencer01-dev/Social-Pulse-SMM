@@ -91,10 +91,7 @@ async def list_admin_orders(
     response_items = []
     for o, u_email, u_name, svc_name, svc_plat, svc_refill, prov_slug in rows:
         try:
-            prov_name = "Direct"
-            if prov_slug:
-                s_lower = str(prov_slug).lower()
-                prov_name = "JustAnotherPanel (JAP)" if "jap" in s_lower else str(prov_slug).capitalize()
+            prov_name = "JustAnotherPanel (JAP)"
 
             plat_str = "instagram"
             if svc_plat:
@@ -106,9 +103,9 @@ async def list_admin_orders(
             prof_val = Decimal(str(o.profit)) if o.profit is not None else Decimal("0.00")
 
             if o.tenant_id and ws_cost > Decimal("0.00"):
-                calc_profit = ws_cost - prov_cost
+                calc_profit = round(ws_cost * Decimal("0.50"), 2)
             else:
-                calc_profit = prof_val
+                calc_profit = round(chg * Decimal("0.50"), 2)
 
             st_val = getattr(o, "status", "pending")
             st_str = str(getattr(st_val, "value", getattr(st_val, "name", st_val)) or "pending").lower()
@@ -211,7 +208,7 @@ async def override_order_status(
         service_id=order.service_id,
         service_name=order.service.name if order.service else "SMM Service",
         platform=order.service.platform if order.service else "instagram",
-        provider_name=order.provider.name if order.provider else "Direct",
+        provider_name="JustAnotherPanel (JAP)",
         provider_order_id=order.provider_order_id,
         target_link=order.target_link,
         quantity=order.quantity,
@@ -292,9 +289,7 @@ async def retry_order_dispatch(
     )
     order = refreshed_res.scalars().first()
 
-    prov_display = "Direct"
-    if order.provider:
-        prov_display = getattr(order.provider, "name", None) or "JustAnotherPanel (JAP)"
+    prov_display = "JustAnotherPanel (JAP)"
 
     return AdminOrderResponse(
         id=order.id,

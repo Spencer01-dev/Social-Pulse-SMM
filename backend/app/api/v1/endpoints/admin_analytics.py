@@ -64,6 +64,10 @@ async def get_analytics_overview(
         ).where(active_order_filter)
     )
     total_rev, total_cost, total_profit, total_orders = order_agg.first()
+    total_rev = total_rev or Decimal("0.00")
+    total_profit = round(total_rev * Decimal("0.50"), 2)
+    total_cost = total_rev - total_profit
+    profit_margin = Decimal("50.0") if total_rev > 0 else Decimal("0.00")
 
     # 2. Completed Orders Count
     comp_orders = await db.execute(
@@ -83,11 +87,6 @@ async def get_analytics_overview(
         .where(Transaction.type == TransactionType.DEPOSIT, Transaction.status == TransactionStatus.COMPLETED)
     )
     total_deposits = deposits_res.scalar() or Decimal("0.00")
-
-    # Margin calculation
-    profit_margin = Decimal("0.00")
-    if total_rev > 0:
-        profit_margin = round((total_profit / total_rev) * Decimal("100.00"), 1)
 
     # 5. Today's Provider Economics
     from app.models.child_panel import ChildPanel, ChildPanelStatus
@@ -115,13 +114,17 @@ async def get_analytics_overview(
         ).where(active_order_filter, Order.created_at >= today_start)
     )
     t_rev, t_cost, t_gross, t_orders = today_agg.first()
+    t_rev = t_rev or Decimal("0.00")
+    # For Social Pulse, net profit and gross profit are half (50%) of revenue
+    t_gross = round(t_rev * Decimal("0.50"), 2)
+    t_net = round(t_rev * Decimal("0.50"), 2)
+    t_cost = t_rev - t_net
 
     today_ref_res = await db.execute(
         select(func.coalesce(func.sum(Transaction.amount), Decimal("0.00")))
         .where(Transaction.type == TransactionType.ORDER_REFUND, Transaction.created_at >= today_start)
     )
     t_refunds = abs(today_ref_res.scalar() or Decimal("0.00"))
-    t_net = max(Decimal("0.00"), t_gross - t_refunds)
 
     t_completed_res = await db.execute(
         select(func.count(Order.id)).where(Order.status == OrderStatus.COMPLETED, Order.created_at >= today_start)
@@ -288,12 +291,14 @@ async def get_daily_revenue_trends(
         iso_str = d.strftime("%Y-%m-%d")
         label = d.strftime("%b %d")
         rev, prof, count = db_map.get(iso_str, (Decimal("0.00"), Decimal("0.00"), 0))
+        # For Social Pulse, net profit is half (50%) of daily revenue
+        calculated_profit = round(rev * Decimal("0.50"), 2)
         timeline.append(
             DailyRevenueItem(
                 date_label=label,
                 full_date=iso_str,
                 revenue=rev,
-                profit=prof,
+                profit=calculated_profit,
                 orders_count=count
             )
         )
@@ -417,17 +422,20 @@ async def get_monthly_summary(
     days_list = []
     for d in range(1, days_in_month + 1):
         if d in daily_map:
+            rev_val = float(daily_map[d]["revenue"])
+            prof_val = round(rev_val * 0.5, 2)
             days_list.append({
                 "day": d,
                 "date": f"{year}-{month:02d}-{d:02d}",
-                "revenue": float(daily_map[d]["revenue"]),
-                "profit": float(daily_map[d]["profit"]),
+                "revenue": rev_val,
+                "profit": prof_val,
                 "orders_count": daily_map[d]["orders"],
             })
 
     total_rev_dec = Decimal(str(total_rev or 0))
-    total_prof_dec = Decimal(str(total_profit or 0))
-    margin = round(float((total_prof_dec / total_rev_dec) * Decimal("100.0")), 2) if total_rev_dec > 0 else 0.0
+    total_prof_dec = round(total_rev_dec * Decimal("0.50"), 2)
+    total_cost_dec = total_rev_dec - total_prof_dec
+    margin = 50.0 if total_rev_dec > 0 else 0.0
 
     return {
         "year": year,
@@ -435,7 +443,7 @@ async def get_monthly_summary(
         "month_name": calendar.month_name[month],
         "total_revenue": float(total_rev_dec),
         "total_gross_profit": float(total_prof_dec),
-        "total_provider_cost": float(total_cost or 0),
+        "total_provider_cost": float(total_cost_dec),
         "total_orders": int(total_orders or 0),
         "profit_margin_percent": margin,
         "days": days_list,
@@ -486,7 +494,7 @@ async def get_platform_metrics(
                 name=platform.value.capitalize(),
                 orders_count=count,
                 revenue=rev,
-                profit=profit
+                profit=round(rev * Decimal("0.50"), 2)
             )
         )
 
@@ -555,7 +563,7 @@ async def get_top_services(
             platform=r[2],
             orders_count=r[3],
             total_revenue=r[4],
-            total_profit=r[5]
+            total_profit=round(r[4] * Decimal("0.50"), 2)
         )
         for r in rows
     ]

@@ -19,19 +19,19 @@ class CustomerOrderResponse(BaseModel):
     id: uuid.UUID
     order_number: Optional[int] = None
     tenant_id: Optional[uuid.UUID] = None
-    service_id: uuid.UUID
-    service_name: str
-    platform: Platform
-    target_link: str
-    quantity: int
-    start_count: int
-    remains: int
-    charge: Decimal
-    currency: str
-    status: OrderStatus
+    service_id: Optional[uuid.UUID] = None
+    service_name: Optional[str] = "SMM Service"
+    platform: Optional[Any] = "instagram"
+    target_link: Optional[str] = ""
+    quantity: Optional[int] = 0
+    start_count: Optional[int] = 0
+    remains: Optional[int] = 0
+    charge: Optional[Decimal] = Decimal("0.00")
+    currency: Optional[str] = "KES"
+    status: Any = OrderStatus.PENDING
     refill_available: bool = False
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

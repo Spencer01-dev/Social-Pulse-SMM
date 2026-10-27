@@ -46,7 +46,7 @@ export const AdminOrdersPage: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus | 'all'>('all');
   const [search, setSearch] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string | null>(getTodayIso());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   // Status Override Modal State
   const [overrideOrder, setOverrideOrder] = useState<AdminOrder | null>(null);
@@ -490,7 +490,10 @@ export const AdminOrdersPage: React.FC = () => {
                     <span className="text-[10px] text-slate-400">{order.user_email}</span>
                   </td>
                   <td className="py-3.5 px-4 font-mono text-xs">
-                    <span className="text-slate-200 font-semibold">{order.provider_name || 'JustAnotherPanel'}</span>
+                    <span className="text-slate-200 font-semibold">JustAnotherPanel (JAP)</span>
+
+
+
                     {order.provider_order_id ? (
                       <span className="text-[11px] font-mono text-cyan-400 block font-bold">
                         #{order.provider_order_id}

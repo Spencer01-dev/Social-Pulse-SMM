@@ -339,7 +339,6 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.providers (
     id, name, slug, api_url, api_key_encrypted, is_active, balance, currency, description, created_at, updated_at
 ) VALUES
-  ('71110e74-f334-4d14-b98e-3f5357d97489', 'ResellerSMM', 'resellersmm', 'https://resellersmm.com/api/v2', NULL, TRUE, '0.00', 'USD', NULL, '2026-09-19T06:20:39.701793+00:00', '2026-09-19T06:20:39.701793+00:00'),
   ('e040f927-23c8-4cf2-a27a-f6eba46f3699', 'JustAnotherPanel', 'jap', 'https://justanotherpanel.com/api/v2', NULL, TRUE, '0.00', 'USD', NULL, '2026-09-19T06:21:17.547596+00:00', '2026-09-19T06:21:17.547596+00:00')
 ON CONFLICT (id) DO NOTHING;
 
