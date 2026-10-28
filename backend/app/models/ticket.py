@@ -52,6 +52,9 @@ class Ticket(Base):
         index=True
     )
 
+    user_unread = Column(Boolean, default=False, nullable=False)
+    admin_unread = Column(Boolean, default=False, nullable=False)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -70,6 +73,7 @@ class TicketMessage(Base):
     
     message = Column(Text, nullable=False)
     is_admin_reply = Column(Boolean, default=False, nullable=False)
+    is_read = Column(Boolean, default=False, nullable=False)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

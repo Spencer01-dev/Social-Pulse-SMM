@@ -1,11 +1,12 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronDown, User as UserIcon, Menu, LogOut, LogIn, Zap } from 'lucide-react';
+import { ChevronDown, User as UserIcon, Menu, LogOut, LogIn, Zap, LifeBuoy } from 'lucide-react';
 import { Button } from '../common/Button';
 import { CurrencySwitcher } from '../common/CurrencySwitcher';
 import { useAuth } from '../../context/AuthContext';
 import { useCurrency } from '../../context/CurrencyContext';
 import { useTenant, isMainDomain } from '../../context/TenantContext';
+import { useTicketNotifications } from '../../context/TicketNotificationContext';
 
 interface NavbarProps {
   onToggleSidebar?: () => void;
@@ -15,6 +16,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
   const { user, isAuthenticated, logout } = useAuth();
   const { formatCurrency } = useCurrency();
   const { isTenantMode, tenant } = useTenant();
+  const { unreadCount } = useTicketNotifications();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -79,6 +81,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
 
         {isAuthenticated && user ? (
           <>
+            {/* Quick Support / Unread Tickets Notification Button */}
+            <Link
+              to="/support"
+              className="relative p-2 rounded-xl text-slate-300 hover:text-white hover:bg-[#222630] border border-[#2b303c] transition-colors shrink-0"
+              title={unreadCount > 0 ? `${unreadCount} Unread Ticket Notification${unreadCount > 1 ? 's' : ''}` : "Support Tickets"}
+            >
+              <LifeBuoy className="w-4 h-4 text-amber-400" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white rounded-full text-[10px] font-black flex items-center justify-center animate-pulse shadow-md shadow-rose-500/50">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </Link>
+
             {/* Quick M-Pesa Top Up Button */}
             <Link
               to="/deposit"

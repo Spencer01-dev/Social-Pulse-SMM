@@ -502,19 +502,19 @@ async def list_child_panel_orders(
 
     # 1. Proactively reconcile/backfill any orphaned orders where customer belongs to this child panel
     try:
+        subq = select(User.id).where(User.tenant_id == panel.id).scalar_subquery()
         await db.execute(
             update(Order)
             .where(
                 Order.tenant_id.is_(None),
-                Order.user_id.in_(
-                    select(User.id).where(User.tenant_id == panel.id)
-                )
+                Order.user_id.in_(subq)
             )
             .values(tenant_id=panel.id)
         )
         await db.commit()
     except Exception as bf_err:
-        logger.warning(f"Error backfilling orphaned orders for panel {panel.id}: {bf_err}")
+        await db.rollback()
+        logger.warning(f"Note: skipped on-the-fly backfill for panel {panel.id}: {bf_err}")
 
     # 2. Build order query with explicit JOINs to avoid any MissingGreenlet lazy-loading issues
     query = (
@@ -566,8 +566,12 @@ async def list_child_panel_orders(
             (Service.name.ilike(s))
         )
 
-    result = await db.execute(query)
-    rows = result.all()
+    try:
+        result = await db.execute(query)
+        rows = result.all()
+    except Exception as q_err:
+        logger.exception(f"Error querying orders for child panel {panel.id}: {q_err}")
+        return []
 
     out = []
     for o, u_name, svc_name in rows:
@@ -695,8 +699,12 @@ async def get_child_panel_order_stats(
         except ValueError:
             pass
 
-    orders_q = await db.execute(query)
-    rows = orders_q.all()
+    try:
+        orders_q = await db.execute(query)
+        rows = orders_q.all()
+    except Exception as stats_err:
+        logger.exception(f"Error fetching stats for panel {panel.id}: {stats_err}")
+        rows = []
 
     total = len(rows)
     pending = 0

@@ -10,6 +10,7 @@ export interface TicketMessage {
   sender_username: string;
   message: string;
   is_admin_reply: boolean;
+  is_read?: boolean;
   created_at: string;
 }
 
@@ -21,6 +22,8 @@ export interface TicketSummary {
   subject: string;
   priority: TicketPriority;
   status: TicketStatus;
+  user_unread?: boolean;
+  admin_unread?: boolean;
   last_message?: string;
   created_at: string;
   updated_at: string;
@@ -37,11 +40,24 @@ export interface TicketCreatePayload {
   message: string;
 }
 
+export interface AdminTicketCreatePayload {
+  user_id: string;
+  order_id?: string;
+  subject: string;
+  priority: TicketPriority;
+  message: string;
+}
+
 export const ticketsService = {
   // Customer APIs
   getMyTickets: async (): Promise<TicketSummary[]> => {
     const response = await apiClient.get<TicketSummary[]>('/tickets');
     return response.data;
+  },
+
+  getUnreadCount: async (): Promise<number> => {
+    const response = await apiClient.get<{ unread_count: number }>('/tickets/unread-count');
+    return response.data.unread_count;
   },
 
   getTicketDetails: async (ticketId: string): Promise<TicketDetail> => {
@@ -70,8 +86,18 @@ export const ticketsService = {
     return response.data;
   },
 
+  getAdminUnreadCount: async (): Promise<number> => {
+    const response = await apiClient.get<{ unread_count: number }>('/admin/tickets/unread-count');
+    return response.data.unread_count;
+  },
+
   getAdminTicketDetails: async (ticketId: string): Promise<TicketDetail> => {
     const response = await apiClient.get<TicketDetail>(`/admin/tickets/${ticketId}`);
+    return response.data;
+  },
+
+  adminCreateTicket: async (data: AdminTicketCreatePayload): Promise<TicketDetail> => {
+    const response = await apiClient.post<TicketDetail>('/admin/tickets', data);
     return response.data;
   },
 

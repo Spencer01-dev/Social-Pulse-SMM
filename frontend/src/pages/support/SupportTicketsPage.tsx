@@ -22,11 +22,13 @@ import {
   TicketStatus
 } from '../../services/tickets';
 import { useAuth } from '../../context/AuthContext';
+import { useTicketNotifications } from '../../context/TicketNotificationContext';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 
 export const SupportTicketsPage: React.FC = () => {
   const { user } = useAuth();
+  const { refreshCounts } = useTicketNotifications();
   const location = useLocation();
 
   const [tickets, setTickets] = useState<TicketSummary[]>([]);
@@ -80,6 +82,11 @@ export const SupportTicketsPage: React.FC = () => {
     try {
       const detail = await ticketsService.getTicketDetails(id);
       setSelectedTicket(detail);
+      // Locally mark as read in tickets list
+      setTickets((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, user_unread: false } : t))
+      );
+      refreshCounts();
     } catch (err) {
       console.error(err);
     } finally {
@@ -109,6 +116,7 @@ export const SupportTicketsPage: React.FC = () => {
       setNewOrderId('');
       await fetchTickets();
       setSelectedTicket(created);
+      refreshCounts();
     } catch (err) {
       console.error(err);
     } finally {
@@ -126,6 +134,7 @@ export const SupportTicketsPage: React.FC = () => {
       setSelectedTicket(updated);
       setReplyText('');
       await fetchTickets();
+      refreshCounts();
     } catch (err) {
       console.error(err);
     } finally {
@@ -244,14 +253,26 @@ export const SupportTicketsPage: React.FC = () => {
                   className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
                     selectedTicket?.id === t.id
                       ? 'bg-blue-950/30 border-blue-500/50 shadow-md'
+                      : t.user_unread
+                      ? 'bg-rose-950/20 border-rose-500/50 border-l-4 border-l-rose-500 shadow-lg shadow-rose-950/30'
                       : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2 mb-1.5">
-                    {getPriorityBadge(t.priority)}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {getPriorityBadge(t.priority)}
+                      {t.user_unread && (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-rose-500 text-white flex items-center gap-1 animate-pulse shadow-sm shadow-rose-500/50">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                          New Message
+                        </span>
+                      )}
+                    </div>
                     {getStatusBadge(t.status)}
                   </div>
-                  <h4 className="text-xs font-bold text-white line-clamp-1">{t.subject}</h4>
+                  <h4 className={`text-xs font-bold line-clamp-1 ${t.user_unread ? 'text-rose-200' : 'text-white'}`}>
+                    {t.subject}
+                  </h4>
                   {t.last_message && (
                     <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">{t.last_message}</p>
                   )}
@@ -316,12 +337,12 @@ export const SupportTicketsPage: React.FC = () => {
                     }`}
                   >
                     <div className="flex items-center gap-1.5 mb-1 px-1">
-                      <span className="text-[11px] font-bold text-slate-300">
-                        {m.sender_username}
+                      <span className={`text-[11px] font-bold ${m.is_admin_reply ? 'text-amber-300' : 'text-slate-300'}`}>
+                        {m.is_admin_reply ? 'Support Staff' : m.sender_username}
                       </span>
                       {m.is_admin_reply && (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                          Staff
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          Official Staff
                         </span>
                       )}
                       <span className="text-[10px] text-slate-500">
@@ -332,7 +353,7 @@ export const SupportTicketsPage: React.FC = () => {
                     <div
                       className={`p-3.5 rounded-2xl max-w-lg text-xs leading-relaxed ${
                         m.is_admin_reply
-                          ? 'bg-slate-900 border border-purple-500/30 text-white rounded-tl-sm'
+                          ? 'bg-slate-900 border border-amber-500/30 text-white rounded-tl-sm shadow-lg shadow-amber-500/5'
                           : 'bg-blue-600 text-white rounded-tr-sm shadow-md'
                       }`}
                     >

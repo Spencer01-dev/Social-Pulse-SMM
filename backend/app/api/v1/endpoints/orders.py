@@ -25,6 +25,28 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
 
+def resolve_domain_from_request(request: Optional[Request], explicit_domain: Optional[str] = None) -> Optional[str]:
+    """Helper to reliably extract the active domain from headers, origin, referer, or host."""
+    candidate = explicit_domain
+    if not candidate and request:
+        candidate = (
+            request.headers.get("x-tenant-domain")
+            or request.headers.get("X-Tenant-Domain")
+            or request.headers.get("origin")
+            or request.headers.get("referer")
+            or request.headers.get("host")
+        )
+    if not candidate:
+        return None
+    c = str(candidate).strip().lower()
+    if "://" in c:
+        c = c.split("://", 1)[1]
+    c = c.split("/", 1)[0].split(":", 1)[0].strip()
+    if c.startswith("www."):
+        c = c[4:]
+    return c or None
+
+
 @router.post("", response_model=CustomerOrderResponse, status_code=status.HTTP_201_CREATED)
 async def create_order(
     order_in: OrderCreate,
@@ -53,32 +75,24 @@ async def create_order(
     # 2. Resolve tenant context for child-panel attribution and pricing
     tenant_id = None
     panel = None
-    raw_domain = x_tenant_domain or request.headers.get("x-tenant-domain") or request.headers.get("X-Tenant-Domain")
-    if raw_domain:
-        clean_tenant_domain = (
-            raw_domain.split(":")[0]
-            .strip()
-            .lower()
-            .replace("https://", "")
-            .replace("http://", "")
-            .rstrip("/")
-        )
-        clean_no_www = clean_tenant_domain[4:] if clean_tenant_domain.startswith("www.") else clean_tenant_domain
-        clean_with_www = f"www.{clean_no_www}"
-        is_main = any(clean_no_www == d or clean_no_www.endswith(f".{d}") for d in MAIN_PLATFORM_DOMAINS)
+    clean_domain = resolve_domain_from_request(request, x_tenant_domain)
+    if clean_domain:
+        is_main = any(clean_domain == d or clean_domain.endswith(f".{d}") for d in MAIN_PLATFORM_DOMAINS)
         if not is_main:
+            clean_with_www = f"www.{clean_domain}"
             tenant_q = await db.execute(
                 select(ChildPanel).where(
                     or_(
-                        ChildPanel.domain == clean_tenant_domain,
-                        ChildPanel.domain == clean_no_www,
+                        ChildPanel.domain == clean_domain,
                         ChildPanel.domain == clean_with_www,
+                        ChildPanel.domain.ilike(f"%{clean_domain}%")
                     )
                 )
             )
             panel = tenant_q.scalars().first()
             if panel:
                 tenant_id = panel.id
+
     if not tenant_id and current_user.tenant_id:
         tenant_id = current_user.tenant_id
         if not panel:
@@ -86,6 +100,23 @@ async def create_order(
                 select(ChildPanel).where(ChildPanel.id == tenant_id)
             )
             panel = tenant_q.scalars().first()
+
+    # If ordering on own child panel as panel owner
+    if not tenant_id and clean_domain:
+        owner_q = await db.execute(
+            select(ChildPanel).where(
+                ChildPanel.user_id == current_user.id,
+                or_(
+                    ChildPanel.domain == clean_domain,
+                    ChildPanel.domain == f"www.{clean_domain}",
+                    ChildPanel.domain.ilike(f"%{clean_domain}%")
+                )
+            )
+        )
+        owner_panel = owner_q.scalars().first()
+        if owner_panel:
+            panel = owner_panel
+            tenant_id = owner_panel.id
 
     if panel:
         # Instant Expiration Guard: Block orders instantly if child panel monthly subscription has expired
@@ -361,29 +392,20 @@ async def list_my_orders(
         .limit(limit)
     )
 
-    # 1. Resolve effective tenant ID: check user account first, then incoming domain header
+    # 1. Resolve effective tenant ID: check user account first, then incoming domain header/origin/referer
     effective_tenant_id = current_user.tenant_id
     if not effective_tenant_id and request:
-        raw_domain = x_tenant_domain or request.headers.get("x-tenant-domain") or request.headers.get("X-Tenant-Domain")
-        if raw_domain:
-            clean_tenant_domain = (
-                raw_domain.split(":")[0]
-                .strip()
-                .lower()
-                .replace("https://", "")
-                .replace("http://", "")
-                .rstrip("/")
-            )
-            clean_no_www = clean_tenant_domain[4:] if clean_tenant_domain.startswith("www.") else clean_tenant_domain
-            clean_with_www = f"www.{clean_no_www}"
-            is_main = any(clean_no_www == d or clean_no_www.endswith(f".{d}") for d in MAIN_PLATFORM_DOMAINS)
+        clean_domain = resolve_domain_from_request(request, x_tenant_domain)
+        if clean_domain:
+            is_main = any(clean_domain == d or clean_domain.endswith(f".{d}") for d in MAIN_PLATFORM_DOMAINS)
             if not is_main:
+                clean_with_www = f"www.{clean_domain}"
                 tenant_q = await db.execute(
                     select(ChildPanel).where(
                         or_(
-                            ChildPanel.domain == clean_tenant_domain,
-                            ChildPanel.domain == clean_no_www,
+                            ChildPanel.domain == clean_domain,
                             ChildPanel.domain == clean_with_www,
+                            ChildPanel.domain.ilike(f"%{clean_domain}%")
                         )
                     )
                 )
@@ -400,10 +422,13 @@ async def list_my_orders(
             # Child panel admin viewing all orders of this specific child panel
             query = query.where(Order.tenant_id == effective_tenant_id)
         else:
-            # Child panel user viewing only their own orders placed on this panel
+            # Child panel user viewing their own personal orders placed on this panel
             query = query.where(
                 Order.user_id == current_user.id,
-                Order.tenant_id == effective_tenant_id
+                or_(
+                    Order.tenant_id == effective_tenant_id,
+                    Order.tenant_id.is_(None)
+                )
             )
     else:
         # User is in main platform context (SocialPulse)
@@ -413,8 +438,7 @@ async def list_my_orders(
         else:
             # Main platform customer viewing only their own personal orders
             query = query.where(
-                Order.user_id == current_user.id,
-                Order.tenant_id.is_(None)
+                Order.user_id == current_user.id
             )
 
     if status:

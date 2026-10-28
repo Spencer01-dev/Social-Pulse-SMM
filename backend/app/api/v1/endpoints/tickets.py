@@ -17,9 +17,28 @@ from app.schemas.ticket import (
     TicketReplyRequest,
     TicketResponse,
     TicketSummaryResponse,
+    UnreadCountResponse,
 )
 
 router = APIRouter(prefix="/tickets", tags=["Customer Support Tickets"])
+
+
+@router.get("/unread-count", response_model=UnreadCountResponse)
+async def get_my_unread_tickets_count(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """
+    Get total count of tickets with unread admin messages for the logged-in customer.
+    """
+    query = select(Ticket).where(
+        Ticket.user_id == current_user.id,
+        Ticket.user_unread == True,
+        Ticket.status != TicketStatus.CLOSED
+    )
+    result = await db.execute(query)
+    count = len(result.scalars().all())
+    return UnreadCountResponse(unread_count=count)
 
 
 @router.post("", response_model=TicketResponse, status_code=status.HTTP_201_CREATED)
@@ -68,7 +87,9 @@ async def create_support_ticket(
         order_id=ticket_in.order_id,
         subject=ticket_in.subject,
         priority=ticket_in.priority,
-        status=TicketStatus.OPEN
+        status=TicketStatus.OPEN,
+        user_unread=False,
+        admin_unread=True,
     )
     db.add(ticket)
     await db.flush()
@@ -78,7 +99,8 @@ async def create_support_ticket(
         ticket_id=ticket.id,
         sender_id=current_user.id,
         message=ticket_in.message,
-        is_admin_reply=False
+        is_admin_reply=False,
+        is_read=True
     )
     db.add(first_msg)
     await db.commit()
@@ -92,6 +114,8 @@ async def create_support_ticket(
         subject=ticket.subject,
         priority=ticket.priority,
         status=ticket.status,
+        user_unread=False,
+        admin_unread=True,
         messages=[
             TicketMessageResponse(
                 id=first_msg.id,
@@ -100,6 +124,7 @@ async def create_support_ticket(
                 sender_username=current_user.username,
                 message=first_msg.message,
                 is_admin_reply=first_msg.is_admin_reply,
+                is_read=first_msg.is_read,
                 created_at=first_msg.created_at
             )
         ],
@@ -114,7 +139,7 @@ async def list_my_tickets(
     current_user: User = Depends(get_current_active_user)
 ) -> Any:
     """
-    List all support tickets created by the logged-in customer.
+    List all support tickets created by or sent to the logged-in customer.
     """
     query = (
         select(Ticket)
@@ -137,6 +162,8 @@ async def list_my_tickets(
                 subject=t.subject,
                 priority=t.priority,
                 status=t.status,
+                user_unread=bool(getattr(t, "user_unread", False)),
+                admin_unread=bool(getattr(t, "admin_unread", False)),
                 last_message=last_msg,
                 created_at=t.created_at,
                 updated_at=t.updated_at
@@ -153,6 +180,7 @@ async def get_ticket_details(
 ) -> Any:
     """
     Get support ticket with full threaded messages conversation.
+    Automatically marks ticket as read for the customer.
     """
     query = (
         select(Ticket)
@@ -167,6 +195,19 @@ async def get_ticket_details(
     if not ticket:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found")
 
+    # Mark as read for customer
+    needs_commit = False
+    if getattr(ticket, "user_unread", False):
+        ticket.user_unread = False
+        needs_commit = True
+    for m in ticket.messages:
+        if m.is_admin_reply and not getattr(m, "is_read", False):
+            m.is_read = True
+            needs_commit = True
+    if needs_commit:
+        db.add(ticket)
+        await db.commit()
+
     return TicketResponse(
         id=ticket.id,
         user_id=ticket.user_id,
@@ -175,14 +216,17 @@ async def get_ticket_details(
         subject=ticket.subject,
         priority=ticket.priority,
         status=ticket.status,
+        user_unread=False,
+        admin_unread=bool(getattr(ticket, "admin_unread", False)),
         messages=[
             TicketMessageResponse(
                 id=m.id,
                 ticket_id=m.ticket_id,
                 sender_id=m.sender_id,
-                sender_username=m.sender.username if m.sender else "User",
+                sender_username=m.sender.username if m.sender else ("Support Staff" if m.is_admin_reply else "User"),
                 message=m.message,
                 is_admin_reply=m.is_admin_reply,
+                is_read=bool(getattr(m, "is_read", False)),
                 created_at=m.created_at
             )
             for m in ticket.messages
@@ -201,6 +245,7 @@ async def reply_to_ticket(
 ) -> Any:
     """
     Customer reply to an existing support ticket thread.
+    Flags ticket as unread for the admin.
     """
     query = (
         select(Ticket)
@@ -220,9 +265,12 @@ async def reply_to_ticket(
         ticket_id=ticket.id,
         sender_id=current_user.id,
         message=reply_in.message,
-        is_admin_reply=False
+        is_admin_reply=False,
+        is_read=False
     )
     ticket.status = TicketStatus.CUSTOMER_REPLY
+    ticket.user_unread = False
+    ticket.admin_unread = True  # Notify admin!
     db.add(msg)
     db.add(ticket)
     await db.commit()

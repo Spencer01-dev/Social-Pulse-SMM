@@ -603,6 +603,23 @@ async def lifespan(app: FastAPI):
                     WHERE u.tenant_id = cp.id AND u.role = 'admin';
                 """))
 
+                # Step 15: Ticket unread notifications & message read tracking migration
+                await conn.execute(text("""
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tickets' AND column_name='user_unread') THEN
+                            ALTER TABLE tickets ADD COLUMN user_unread BOOLEAN DEFAULT FALSE;
+                        END IF;
+                        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tickets' AND column_name='admin_unread') THEN
+                            ALTER TABLE tickets ADD COLUMN admin_unread BOOLEAN DEFAULT FALSE;
+                        END IF;
+                        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ticket_messages' AND column_name='is_read') THEN
+                            ALTER TABLE ticket_messages ADD COLUMN is_read BOOLEAN DEFAULT FALSE;
+                        END IF;
+                    END $$;
+                """))
+                print("[+] Step 15: Ticket unread and read tracking columns verified.")
+
                 from app.core.cache import clear_all_cache
                 clear_all_cache()
                 print("[+] Step 14: Dual-Provider catalog curated & rates calibrated (lowest price 18.70 KES everywhere).")

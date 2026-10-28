@@ -10,7 +10,9 @@ import {
   Search,
   Filter,
   Check,
-  User as UserIcon
+  User as UserIcon,
+  Plus,
+  X,
 } from 'lucide-react';
 import {
   ticketsService,
@@ -19,6 +21,9 @@ import {
   TicketPriority,
   TicketStatus
 } from '../../services/tickets';
+import { analyticsService } from '../../services/analytics';
+import { useTicketNotifications } from '../../context/TicketNotificationContext';
+import { User } from '../../types';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 
@@ -28,10 +33,65 @@ export const AdminTicketsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<TicketStatus | 'all'>('all');
   const [search, setSearch] = useState('');
 
+  const { refreshCounts } = useTicketNotifications();
+
   const [selectedTicket, setSelectedTicket] = useState<TicketDetail | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [adminReplyText, setAdminReplyText] = useState('');
   const [submittingReply, setSubmittingReply] = useState(false);
+
+  // New Ticket / Contact Customer Modal
+  const [isNewTicketModalOpen, setIsNewTicketModalOpen] = useState(false);
+  const [usersList, setUsersList] = useState<User[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [newSubject, setNewSubject] = useState('');
+  const [newPriority, setNewPriority] = useState<TicketPriority>('medium');
+  const [newOrderId, setNewOrderId] = useState('');
+  const [newMessage, setNewMessage] = useState('');
+  const [creatingTicket, setCreatingTicket] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState('');
+
+  const handleOpenNewTicketModal = async () => {
+    setIsNewTicketModalOpen(true);
+    if (usersList.length === 0) {
+      try {
+        const users = await analyticsService.getUsers({ limit: 100 });
+        setUsersList(users);
+        if (users.length > 0 && !selectedUserId) {
+          setSelectedUserId(users[0].id);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  const handleCreateAdminTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserId || !newSubject.trim() || !newMessage.trim()) return;
+
+    setCreatingTicket(true);
+    try {
+      const created = await ticketsService.adminCreateTicket({
+        user_id: selectedUserId,
+        order_id: newOrderId.trim() || undefined,
+        subject: newSubject.trim(),
+        priority: newPriority,
+        message: newMessage.trim(),
+      });
+      setIsNewTicketModalOpen(false);
+      setNewSubject('');
+      setNewMessage('');
+      setNewOrderId('');
+      await fetchTickets();
+      setSelectedTicket(created);
+      refreshCounts();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to send message to customer');
+    } finally {
+      setCreatingTicket(false);
+    }
+  };
 
   const fetchTickets = async () => {
     setLoading(true);
@@ -140,9 +200,20 @@ export const AdminTicketsPage: React.FC = () => {
           </p>
         </div>
 
-        <Button variant="ghost" size="sm" onClick={fetchTickets} leftIcon={<RefreshCw className="w-4 h-4" />}>
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2.5">
+          <Button variant="ghost" size="sm" onClick={fetchTickets} leftIcon={<RefreshCw className="w-4 h-4" />}>
+            Refresh
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleOpenNewTicketModal}
+            leftIcon={<Plus className="w-4 h-4" />}
+            className="bg-indigo-600 hover:bg-indigo-500"
+          >
+            Contact Customer
+          </Button>
+        </div>
       </div>
 
       {/* Main Grid */}
@@ -191,11 +262,18 @@ export const AdminTicketsPage: React.FC = () => {
                   className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
                     selectedTicket?.id === t.id
                       ? 'bg-blue-950/30 border-blue-500/50 shadow-md'
+                      : t.admin_unread
+                      ? 'bg-rose-950/20 border-rose-500/40 border-l-4 border-l-rose-500'
                       : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-xs font-bold text-white">@{t.username}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-white">@{t.username}</span>
+                      {t.admin_unread && (
+                        <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" title="Unread Customer Reply" />
+                      )}
+                    </div>
                     {getStatusBadge(t.status)}
                   </div>
                   <h4 className="text-xs font-semibold text-slate-300 line-clamp-1">{t.subject}</h4>
@@ -320,6 +398,154 @@ export const AdminTicketsPage: React.FC = () => {
           )}
         </Card>
       </div>
+
+      {/* Contact Customer / New Support Ticket Modal */}
+      {isNewTicketModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg glass-card rounded-3xl p-6 sm:p-7 border border-slate-800 relative space-y-5 animate-in fade-in duration-200">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-800">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-8 h-8 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                    <MessageSquare className="w-4 h-4" />
+                  </span>
+                  <h3 className="text-lg font-bold text-white">Contact Customer Personally</h3>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Open a new official support ticket thread. The customer will receive an instant notification badge.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNewTicketModalOpen(false)}
+                className="w-8 h-8 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateAdminTicket} className="space-y-4">
+              {/* Select Customer */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Select Customer
+                </label>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    placeholder="Search username or email..."
+                    className="w-full px-3 py-1.5 bg-slate-950/80 border border-slate-800 rounded-xl text-white text-xs"
+                  />
+                  <select
+                    value={selectedUserId}
+                    onChange={(e) => setSelectedUserId(e.target.value)}
+                    required
+                    className="w-full px-3.5 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="">-- Choose Customer --</option>
+                    {usersList
+                      .filter(
+                        (u) =>
+                          u.username.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                          u.email.toLowerCase().includes(customerSearch.toLowerCase())
+                      )
+                      .map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.username} ({u.email})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Subject & Priority */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div className="sm:col-span-3">
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Subject Line
+                  </label>
+                  <input
+                    type="text"
+                    value={newSubject}
+                    onChange={(e) => setNewSubject(e.target.value)}
+                    placeholder="e.g. Account Notice, Order Fulfillment Update..."
+                    required
+                    className="w-full px-3.5 py-2 bg-slate-950/60 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    Priority
+                  </label>
+                  <select
+                    value={newPriority}
+                    onChange={(e) => setNewPriority(e.target.value as TicketPriority)}
+                    className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Optional Order ID */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Linked Order ID (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={newOrderId}
+                  onChange={(e) => setNewOrderId(e.target.value)}
+                  placeholder="Paste UUID or leave blank"
+                  className="w-full px-3.5 py-2 bg-slate-950/60 border border-slate-800 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Message */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Message Content
+                </label>
+                <textarea
+                  rows={4}
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Type your message to the customer..."
+                  required
+                  className="w-full p-3 bg-slate-950/60 border border-slate-800 rounded-xl text-white text-xs focus:outline-none focus:border-indigo-500 font-sans"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="md"
+                  onClick={() => setIsNewTicketModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  isLoading={creatingTicket}
+                  rightIcon={<Send className="w-3.5 h-3.5" />}
+                  className="bg-indigo-600 hover:bg-indigo-500"
+                >
+                  Send Message
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

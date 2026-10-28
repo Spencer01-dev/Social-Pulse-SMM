@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTenant, isMainDomain } from '../../context/TenantContext';
+import { useTicketNotifications } from '../../context/TicketNotificationContext';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -35,6 +36,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { user, isAuthenticated, logout } = useAuth();
   const { isTenantMode, tenant } = useTenant();
+  const { unreadCount, adminUnreadCount } = useTicketNotifications();
   const navigate = useNavigate();
   const location = useLocation();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
@@ -57,7 +59,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { name: 'Add Funds', href: '/deposit', icon: CreditCard, badge: 'M-Pesa' },
     { name: 'Orders', href: '/orders', icon: ListOrdered },
     { name: 'Services', href: '/services', icon: Layers },
-    { name: 'Tickets', href: '/support', icon: LifeBuoy },
+    {
+      name: 'Tickets',
+      href: '/support',
+      icon: LifeBuoy,
+      badge: unreadCount > 0 ? `${unreadCount} New` : undefined,
+      isUnreadBadge: unreadCount > 0
+    },
     { name: 'Api', href: '/api-docs', icon: Code2 },
     ...(!isChildPanel
       ? [
@@ -73,14 +81,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { name: 'Orders Monitor', href: '/child-panel/manage?tab=orders', icon: Package },
     { name: 'Services & Markups', href: '/child-panel/manage?tab=services', icon: Sliders },
     { name: 'Payment Settings', href: '/child-panel/manage?tab=payments', icon: CreditCard, badge: 'Till' },
-    { name: 'Support Helpdesk', href: '/child-panel/manage?tab=tickets', icon: Headphones },
+    {
+      name: 'Support Helpdesk',
+      href: '/child-panel/manage?tab=tickets',
+      icon: Headphones,
+      badge: adminUnreadCount > 0 ? `${adminUnreadCount} New` : undefined,
+      isUnreadBadge: adminUnreadCount > 0
+    },
     { name: 'User Management', href: '/child-panel/manage?tab=users', icon: Users },
   ];
 
   const adminNav = [
     { name: 'Admin Console', href: '/admin', icon: ShieldAlert, badge: 'Staff' },
     { name: 'Orders Monitor', href: '/admin/orders', icon: Package },
-    { name: 'Support Helpdesk', href: '/admin/tickets', icon: Headphones },
+    {
+      name: 'Support Helpdesk',
+      href: '/admin/tickets',
+      icon: Headphones,
+      badge: adminUnreadCount > 0 ? `${adminUnreadCount} New` : undefined,
+      isUnreadBadge: adminUnreadCount > 0
+    },
     { name: 'Service Management', href: '/admin/services', icon: Sliders },
     { name: 'User Management', href: '/admin/users', icon: Users },
     { name: 'Platform Settings', href: '/admin/settings', icon: Settings },
@@ -166,12 +186,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                     </div>
                     {item.badge && (
                       <span
-                        className={`px-1.5 py-0.5 text-[9px] font-black tracking-wide uppercase rounded ${
-                          item.badge === 'M-Pesa'
+                        className={`px-1.5 py-0.5 text-[9px] font-black tracking-wide uppercase rounded flex items-center gap-1 ${
+                          (item as any).isUnreadBadge
+                            ? 'bg-rose-500 text-white animate-pulse shadow-sm shadow-rose-500/50'
+                            : item.badge === 'M-Pesa'
                             ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                             : 'bg-[#2b303c] text-amber-300 border border-amber-500/30'
                         }`}
                       >
+                        {(item as any).isUnreadBadge && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                         {item.badge}
                       </span>
                     )}
@@ -207,7 +230,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                         <span>{item.name}</span>
                       </div>
                       {item.badge && (
-                        <span className="px-1.5 py-0.2 text-[9px] font-black uppercase bg-[#2b303c] text-amber-300 rounded border border-amber-500/30">
+                        <span
+                          className={`px-1.5 py-0.5 text-[9px] font-black uppercase rounded flex items-center gap-1 ${
+                            (item as any).isUnreadBadge
+                              ? 'bg-rose-500 text-white animate-pulse shadow-sm shadow-rose-500/50'
+                              : 'bg-[#2b303c] text-amber-300 border border-amber-500/30'
+                          }`}
+                        >
+                          {(item as any).isUnreadBadge && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                           {item.badge}
                         </span>
                       )}

@@ -10,14 +10,101 @@ from app.core.database import get_db
 from app.models.ticket import Ticket, TicketMessage, TicketPriority, TicketStatus
 from app.models.user import User, UserRole
 from app.schemas.ticket import (
+    AdminTicketCreate,
     TicketMessageResponse,
     TicketReplyRequest,
     TicketResponse,
     TicketStatusUpdate,
     TicketSummaryResponse,
+    UnreadCountResponse,
 )
 
 router = APIRouter(prefix="/admin/tickets", tags=["Admin Support Helpdesk"])
+
+
+@router.get("/unread-count", response_model=UnreadCountResponse)
+async def get_admin_unread_count(
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
+) -> Any:
+    """
+    Get the total count of tickets that require admin response (unread customer replies or open tickets).
+    """
+    query = select(Ticket).where(
+        (Ticket.status == TicketStatus.CUSTOMER_REPLY) | (Ticket.admin_unread == True)
+    )
+    result = await db.execute(query)
+    count = len(result.scalars().all())
+    return UnreadCountResponse(unread_count=count)
+
+
+@router.post("", response_model=TicketResponse, status_code=status.HTTP_201_CREATED)
+async def admin_create_ticket_for_user(
+    ticket_in: AdminTicketCreate,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_roles([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
+) -> Any:
+    """
+    Admin opens a personal support ticket to contact a customer (e.g. regarding an order issue or notice).
+    Automatically flags the ticket as unread for the customer.
+    """
+    # 1. Verify target customer exists
+    user_res = await db.execute(select(User).where(User.id == ticket_in.user_id))
+    customer = user_res.scalars().first()
+    if not customer:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target customer not found")
+
+    # 2. Create the ticket thread
+    new_ticket = Ticket(
+        user_id=customer.id,
+        tenant_id=customer.tenant_id,
+        order_id=ticket_in.order_id,
+        subject=ticket_in.subject,
+        priority=ticket_in.priority,
+        status=TicketStatus.ANSWERED,
+        user_unread=True,    # Immediately alert the customer with unread notification badge!
+        admin_unread=False,
+    )
+    db.add(new_ticket)
+    await db.flush()
+
+    # 3. Add admin's initial message
+    first_msg = TicketMessage(
+        ticket_id=new_ticket.id,
+        sender_id=admin.id,
+        message=ticket_in.message,
+        is_admin_reply=True,
+        is_read=False
+    )
+    db.add(first_msg)
+    await db.commit()
+    await db.refresh(new_ticket)
+
+    return TicketResponse(
+        id=new_ticket.id,
+        user_id=new_ticket.user_id,
+        username=customer.username,
+        order_id=new_ticket.order_id,
+        subject=new_ticket.subject,
+        priority=new_ticket.priority,
+        status=new_ticket.status,
+        user_unread=True,
+        admin_unread=False,
+        messages=[
+            TicketMessageResponse(
+                id=first_msg.id,
+                ticket_id=first_msg.ticket_id,
+                sender_id=first_msg.sender_id,
+                sender_username=admin.username,
+                message=first_msg.message,
+                is_admin_reply=True,
+                is_read=False,
+                created_at=first_msg.created_at
+            )
+        ],
+        created_at=new_ticket.created_at,
+        updated_at=new_ticket.updated_at
+    )
 
 
 @router.get("", response_model=List[TicketSummaryResponse])
@@ -53,6 +140,8 @@ async def list_all_tickets(
                 subject=t.subject,
                 priority=t.priority,
                 status=t.status,
+                user_unread=bool(getattr(t, "user_unread", False)),
+                admin_unread=bool(getattr(t, "admin_unread", False) or t.status == TicketStatus.CUSTOMER_REPLY),
                 last_message=last_msg,
                 created_at=t.created_at,
                 updated_at=t.updated_at
@@ -69,6 +158,7 @@ async def get_admin_ticket_details(
 ) -> Any:
     """
     Get support ticket with full threaded messages for admin inspection.
+    Marks admin_unread as False since admin has now opened it.
     """
     query = (
         select(Ticket)
@@ -83,6 +173,12 @@ async def get_admin_ticket_details(
     if not ticket:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found")
 
+    # Mark as read for admin
+    if getattr(ticket, "admin_unread", False):
+        ticket.admin_unread = False
+        db.add(ticket)
+        await db.commit()
+
     return TicketResponse(
         id=ticket.id,
         user_id=ticket.user_id,
@@ -91,6 +187,8 @@ async def get_admin_ticket_details(
         subject=ticket.subject,
         priority=ticket.priority,
         status=ticket.status,
+        user_unread=bool(getattr(ticket, "user_unread", False)),
+        admin_unread=bool(getattr(ticket, "admin_unread", False)),
         messages=[
             TicketMessageResponse(
                 id=m.id,
@@ -99,6 +197,7 @@ async def get_admin_ticket_details(
                 sender_username=m.sender.username if m.sender else "Support Staff",
                 message=m.message,
                 is_admin_reply=m.is_admin_reply,
+                is_read=bool(getattr(m, "is_read", False)),
                 created_at=m.created_at
             )
             for m in ticket.messages
@@ -117,6 +216,7 @@ async def admin_reply_to_ticket(
 ) -> Any:
     """
     Admin reply to support ticket and automatically mark status as 'Answered'.
+    Flags user_unread as True so customer gets instant notification.
     """
     query = (
         select(Ticket)
@@ -135,9 +235,12 @@ async def admin_reply_to_ticket(
         ticket_id=ticket.id,
         sender_id=admin.id,
         message=reply_in.message,
-        is_admin_reply=True
+        is_admin_reply=True,
+        is_read=False
     )
     ticket.status = TicketStatus.ANSWERED
+    ticket.user_unread = True  # Customer receives notification badge!
+    ticket.admin_unread = False
     db.add(msg)
     db.add(ticket)
     await db.commit()

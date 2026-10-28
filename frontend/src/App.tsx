@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { CurrencyProvider } from './context/CurrencyContext';
 import { TenantProvider } from './context/TenantContext';
+import { TicketNotificationProvider } from './context/TicketNotificationContext';
 import { TenantSimulationBanner } from './components/common/TenantSimulationBanner';
 import { MainLayout } from './components/layout/MainLayout';
 import { ProtectedRoute } from './components/common/ProtectedRoute';
@@ -47,7 +48,8 @@ export const App: React.FC = () => {
     <AuthProvider>
       <CurrencyProvider>
         <TenantProvider>
-          <BrowserRouter>
+          <TicketNotificationProvider>
+            <BrowserRouter>
             <MetaPixelTracker />
             <TenantSimulationBanner />
             <WhatsAppChannelPopup />
@@ -229,6 +231,7 @@ export const App: React.FC = () => {
       </Suspense>
     </ErrorBoundary>
   </BrowserRouter>
+          </TicketNotificationProvider>
         </TenantProvider>
       </CurrencyProvider>
     </AuthProvider>
