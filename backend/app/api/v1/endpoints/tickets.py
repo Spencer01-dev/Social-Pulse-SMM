@@ -81,56 +81,99 @@ async def create_support_ticket(
                 if panel:
                     tenant_id = panel.id
 
-    ticket = Ticket(
-        user_id=current_user.id,
-        tenant_id=tenant_id,
-        order_id=ticket_in.order_id,
-        subject=ticket_in.subject,
-        priority=ticket_in.priority,
-        status=TicketStatus.OPEN,
-        user_unread=False,
-        admin_unread=True,
-    )
-    db.add(ticket)
-    await db.flush()
+    # 0. Self-healing DDL: ensure ticket columns exist on live production database
+    try:
+        from sqlalchemy import text
+        await db.execute(text("""
+            ALTER TABLE tickets ADD COLUMN IF NOT EXISTS user_unread BOOLEAN DEFAULT FALSE;
+            ALTER TABLE tickets ADD COLUMN IF NOT EXISTS admin_unread BOOLEAN DEFAULT FALSE;
+            ALTER TABLE tickets ADD COLUMN IF NOT EXISTS tenant_id UUID;
+            ALTER TABLE ticket_messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;
+        """))
+        await db.commit()
+    except Exception:
+        await db.rollback()
 
-    # Initial message
-    first_msg = TicketMessage(
-        ticket_id=ticket.id,
-        sender_id=current_user.id,
-        message=ticket_in.message,
-        is_admin_reply=False,
-        is_read=True
-    )
-    db.add(first_msg)
-    await db.commit()
-    await db.refresh(ticket)
+    try:
+        valid_order_id = None
+        if ticket_in.order_id:
+            try:
+                from app.models.order import Order
+                ord_check = await db.execute(select(Order.id).where(Order.id == ticket_in.order_id))
+                if ord_check.scalar():
+                    valid_order_id = ticket_in.order_id
+            except Exception:
+                valid_order_id = None
 
-    return TicketResponse(
-        id=ticket.id,
-        user_id=ticket.user_id,
-        username=current_user.username,
-        order_id=ticket.order_id,
-        subject=ticket.subject,
-        priority=ticket.priority,
-        status=ticket.status,
-        user_unread=False,
-        admin_unread=True,
-        messages=[
-            TicketMessageResponse(
-                id=first_msg.id,
-                ticket_id=first_msg.ticket_id,
-                sender_id=first_msg.sender_id,
-                sender_username=current_user.username,
-                message=first_msg.message,
-                is_admin_reply=first_msg.is_admin_reply,
-                is_read=first_msg.is_read,
-                created_at=first_msg.created_at
+        ticket = Ticket(
+            user_id=current_user.id,
+            tenant_id=tenant_id,
+            order_id=valid_order_id,
+            subject=ticket_in.subject.strip(),
+            priority=ticket_in.priority or TicketPriority.MEDIUM,
+            status=TicketStatus.OPEN,
+            user_unread=False,
+            admin_unread=True,
+        )
+        db.add(ticket)
+        await db.flush()
+
+        # Initial message
+        first_msg = TicketMessage(
+            ticket_id=ticket.id,
+            sender_id=current_user.id,
+            message=ticket_in.message.strip(),
+            is_admin_reply=False,
+            is_read=True
+        )
+        db.add(first_msg)
+        await db.commit()
+
+        reload_q = (
+            select(Ticket)
+            .options(
+                selectinload(Ticket.user),
+                selectinload(Ticket.messages).selectinload(TicketMessage.sender)
             )
-        ],
-        created_at=ticket.created_at,
-        updated_at=ticket.updated_at
-    )
+            .where(Ticket.id == ticket.id)
+        )
+        res = await db.execute(reload_q)
+        fresh_ticket = res.scalars().first()
+
+        return TicketResponse(
+            id=fresh_ticket.id,
+            user_id=fresh_ticket.user_id,
+            username=current_user.username,
+            order_id=fresh_ticket.order_id,
+            subject=fresh_ticket.subject,
+            priority=fresh_ticket.priority,
+            status=fresh_ticket.status,
+            user_unread=bool(getattr(fresh_ticket, "user_unread", False)),
+            admin_unread=bool(getattr(fresh_ticket, "admin_unread", True)),
+            messages=[
+                TicketMessageResponse(
+                    id=m.id,
+                    ticket_id=m.ticket_id,
+                    sender_id=m.sender_id,
+                    sender_username=m.sender.username if m.sender else current_user.username,
+                    message=m.message,
+                    is_admin_reply=m.is_admin_reply,
+                    is_read=bool(getattr(m, "is_read", False)),
+                    created_at=m.created_at
+                )
+                for m in fresh_ticket.messages
+            ],
+            created_at=fresh_ticket.created_at,
+            updated_at=fresh_ticket.updated_at
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to submit ticket: {str(exc)}"
+        )
 
 
 @router.get("", response_model=List[TicketSummaryResponse])

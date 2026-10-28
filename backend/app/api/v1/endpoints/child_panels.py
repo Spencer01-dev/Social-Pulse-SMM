@@ -1083,76 +1083,108 @@ async def create_child_panel_customer_ticket(
     """Child panel owner/admin proactively opens a support ticket to contact a customer."""
     panel = await get_panel_and_verify_owner(panel_id, db, current_user)
 
-    user_res = await db.execute(select(User).where(User.id == ticket_in.user_id))
-    target_user = user_res.scalars().first()
-    if not target_user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target customer not found.")
+    # 0. Self-healing DDL: ensure ticket columns exist on live production database
+    try:
+        await db.execute(text("""
+            ALTER TABLE tickets ADD COLUMN IF NOT EXISTS user_unread BOOLEAN DEFAULT FALSE;
+            ALTER TABLE tickets ADD COLUMN IF NOT EXISTS admin_unread BOOLEAN DEFAULT FALSE;
+            ALTER TABLE tickets ADD COLUMN IF NOT EXISTS tenant_id UUID;
+            ALTER TABLE ticket_messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;
+        """))
+        await db.commit()
+    except Exception as ddl_err:
+        await db.rollback()
 
-    if target_user.tenant_id and target_user.tenant_id != panel.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot contact customer from a different child panel."
-        )
+    try:
+        # 1. Verify target customer exists
+        user_res = await db.execute(select(User).where(User.id == ticket_in.user_id))
+        target_user = user_res.scalars().first()
+        if not target_user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target customer not found.")
 
-    ticket = Ticket(
-        user_id=target_user.id,
-        tenant_id=panel.id,
-        order_id=ticket_in.order_id,
-        subject=ticket_in.subject.strip(),
-        priority=ticket_in.priority or TicketPriority.MEDIUM,
-        status=TicketStatus.OPEN,
-        user_unread=True,
-        admin_unread=False
-    )
-    db.add(ticket)
-    await db.flush()
-
-    message = TicketMessage(
-        ticket_id=ticket.id,
-        sender_id=current_user.id,
-        message=ticket_in.message.strip(),
-        is_admin_reply=True
-    )
-    db.add(message)
-    await db.commit()
-
-    query = (
-        select(Ticket)
-        .options(
-            selectinload(Ticket.user),
-            selectinload(Ticket.messages).selectinload(TicketMessage.sender)
-        )
-        .where(Ticket.id == ticket.id)
-    )
-    res = await db.execute(query)
-    fresh_ticket = res.scalars().first()
-
-    return TicketResponse(
-        id=fresh_ticket.id,
-        user_id=fresh_ticket.user_id,
-        username=fresh_ticket.user.username if fresh_ticket.user else "Customer",
-        order_id=fresh_ticket.order_id,
-        subject=fresh_ticket.subject,
-        priority=fresh_ticket.priority,
-        status=fresh_ticket.status,
-        user_unread=fresh_ticket.user_unread,
-        admin_unread=fresh_ticket.admin_unread,
-        messages=[
-            TicketMessageResponse(
-                id=m.id,
-                ticket_id=m.ticket_id,
-                sender_id=m.sender_id,
-                sender_username=m.sender.username if m.sender else "Staff",
-                message=m.message,
-                is_admin_reply=m.is_admin_reply,
-                is_read=m.is_read,
-                created_at=m.created_at
+        if target_user.tenant_id and target_user.tenant_id != panel.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot contact customer from a different child panel."
             )
-            for m in fresh_ticket.messages
-        ],
-        created_at=fresh_ticket.created_at,
-        updated_at=fresh_ticket.updated_at
-    )
+
+        valid_order_id = None
+        if ticket_in.order_id:
+            try:
+                ord_check = await db.execute(select(Order.id).where(Order.id == ticket_in.order_id))
+                if ord_check.scalar():
+                    valid_order_id = ticket_in.order_id
+            except Exception:
+                valid_order_id = None
+
+        ticket = Ticket(
+            user_id=target_user.id,
+            tenant_id=panel.id,
+            order_id=valid_order_id,
+            subject=ticket_in.subject.strip(),
+            priority=ticket_in.priority or TicketPriority.MEDIUM,
+            status=TicketStatus.OPEN,
+            user_unread=True,
+            admin_unread=False
+        )
+        db.add(ticket)
+        await db.flush()
+
+        message = TicketMessage(
+            ticket_id=ticket.id,
+            sender_id=current_user.id,
+            message=ticket_in.message.strip(),
+            is_admin_reply=True,
+            is_read=False
+        )
+        db.add(message)
+        await db.commit()
+
+        query = (
+            select(Ticket)
+            .options(
+                selectinload(Ticket.user),
+                selectinload(Ticket.messages).selectinload(TicketMessage.sender)
+            )
+            .where(Ticket.id == ticket.id)
+        )
+        res = await db.execute(query)
+        fresh_ticket = res.scalars().first()
+
+        return TicketResponse(
+            id=fresh_ticket.id,
+            user_id=fresh_ticket.user_id,
+            username=fresh_ticket.user.username if fresh_ticket.user else "Customer",
+            order_id=fresh_ticket.order_id,
+            subject=fresh_ticket.subject,
+            priority=fresh_ticket.priority,
+            status=fresh_ticket.status,
+            user_unread=bool(getattr(fresh_ticket, "user_unread", True)),
+            admin_unread=bool(getattr(fresh_ticket, "admin_unread", False)),
+            messages=[
+                TicketMessageResponse(
+                    id=m.id,
+                    ticket_id=m.ticket_id,
+                    sender_id=m.sender_id,
+                    sender_username=m.sender.username if m.sender else "Staff",
+                    message=m.message,
+                    is_admin_reply=m.is_admin_reply,
+                    is_read=bool(getattr(m, "is_read", False)),
+                    created_at=m.created_at
+                )
+                for m in fresh_ticket.messages
+            ],
+            created_at=fresh_ticket.created_at,
+            updated_at=fresh_ticket.updated_at
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to create ticket: {str(exc)}"
+        )
 
 
 @router.get("/{panel_id}/tickets/{ticket_id}", response_model=TicketResponse)

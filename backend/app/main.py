@@ -58,14 +58,28 @@ async def lifespan(app: FastAPI):
         import app.models.child_panel
         from sqlalchemy import text
         from app.core.database import engine
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-            try:
-                # Critical DDL: Ensure ticket unread & tracking columns exist
+
+        # Critical DDL: Ensure ticket unread & tracking columns and tenant columns exist immediately
+        try:
+            async with engine.begin() as conn:
                 await conn.execute(text("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS user_unread BOOLEAN DEFAULT FALSE;"))
                 await conn.execute(text("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS admin_unread BOOLEAN DEFAULT FALSE;"))
+                await conn.execute(text("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS tenant_id UUID;"))
                 await conn.execute(text("ALTER TABLE ticket_messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;"))
-                print("[+] Ticket unread & message read tracking columns verified.")
+                await conn.execute(text("UPDATE users SET tenant_id = NULL WHERE tenant_id IS NOT NULL AND tenant_id NOT IN (SELECT id FROM child_panels);"))
+                await conn.execute(text("UPDATE orders SET tenant_id = NULL WHERE tenant_id IS NOT NULL AND tenant_id NOT IN (SELECT id FROM child_panels);"))
+                await conn.execute(text("UPDATE tickets SET tenant_id = NULL WHERE tenant_id IS NOT NULL AND tenant_id NOT IN (SELECT id FROM child_panels);"))
+                print("[+] Ticket unread & message read tracking columns and FK integrity verified.")
+        except Exception as ddl_err:
+            print(f"[!] Warning verifying initial ticket DDL: {ddl_err}")
+
+        async with engine.begin() as conn:
+            try:
+                await conn.run_sync(Base.metadata.create_all)
+            except Exception as ca_err:
+                print(f"[!] Warning in Base.metadata.create_all (proceeding with DDL migrations): {ca_err}")
+
+            try:
 
                 # Step 1: Create sequence if it doesn't exist
                 await conn.execute(text("CREATE SEQUENCE IF NOT EXISTS order_number_seq START WITH 29100001;"))

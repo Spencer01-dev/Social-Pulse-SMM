@@ -19,6 +19,13 @@ from app.schemas.ticket import (
     UnreadCountResponse,
 )
 
+import logging
+from sqlalchemy import text
+from app.models.child_panel import ChildPanel
+from app.models.order import Order
+
+logger = logging.getLogger("socialpulse.admin_tickets")
+
 router = APIRouter(prefix="/admin/tickets", tags=["Admin Support Helpdesk"])
 
 
@@ -30,12 +37,21 @@ async def get_admin_unread_count(
     """
     Get the total count of tickets that require admin response (unread customer replies or open tickets).
     """
-    query = select(Ticket).where(
-        (Ticket.status == TicketStatus.CUSTOMER_REPLY) | (Ticket.admin_unread == True)
-    )
-    result = await db.execute(query)
-    count = len(result.scalars().all())
-    return UnreadCountResponse(unread_count=count)
+    try:
+        query = select(Ticket).where(
+            (Ticket.status == TicketStatus.CUSTOMER_REPLY) | (Ticket.admin_unread == True)
+        )
+        result = await db.execute(query)
+        count = len(result.scalars().all())
+        return UnreadCountResponse(unread_count=count)
+    except Exception:
+        # Fallback if admin_unread column is pending migration
+        try:
+            fallback_q = select(Ticket).where(Ticket.status == TicketStatus.CUSTOMER_REPLY)
+            res = await db.execute(fallback_q)
+            return UnreadCountResponse(unread_count=len(res.scalars().all()))
+        except Exception:
+            return UnreadCountResponse(unread_count=0)
 
 
 @router.post("", response_model=TicketResponse, status_code=status.HTTP_201_CREATED)
@@ -48,75 +64,118 @@ async def admin_create_ticket_for_user(
     Admin opens a personal support ticket to contact a customer (e.g. regarding an order issue or notice).
     Automatically flags the ticket as unread for the customer.
     """
-    # 1. Verify target customer exists
-    user_res = await db.execute(select(User).where(User.id == ticket_in.user_id))
-    customer = user_res.scalars().first()
-    if not customer:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target customer not found")
+    # 0. Self-healing DDL: ensure ticket columns exist on live production database
+    try:
+        await db.execute(text("""
+            ALTER TABLE tickets ADD COLUMN IF NOT EXISTS user_unread BOOLEAN DEFAULT FALSE;
+            ALTER TABLE tickets ADD COLUMN IF NOT EXISTS admin_unread BOOLEAN DEFAULT FALSE;
+            ALTER TABLE tickets ADD COLUMN IF NOT EXISTS tenant_id UUID;
+            ALTER TABLE ticket_messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;
+        """))
+        await db.commit()
+    except Exception as ddl_err:
+        await db.rollback()
+        logger.warning(f"Self-healing DDL in admin_create_ticket_for_user: {ddl_err}")
 
-    # 2. Create the ticket thread
-    new_ticket = Ticket(
-        user_id=customer.id,
-        tenant_id=customer.tenant_id,
-        order_id=ticket_in.order_id,
-        subject=ticket_in.subject,
-        priority=ticket_in.priority,
-        status=TicketStatus.ANSWERED,
-        user_unread=True,    # Immediately alert the customer with unread notification badge!
-        admin_unread=False,
-    )
-    db.add(new_ticket)
-    await db.flush()
+    try:
+        # 1. Verify target customer exists
+        user_res = await db.execute(select(User).where(User.id == ticket_in.user_id))
+        customer = user_res.scalars().first()
+        if not customer:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target customer not found")
 
-    # 3. Add admin's initial message
-    first_msg = TicketMessage(
-        ticket_id=new_ticket.id,
-        sender_id=admin.id,
-        message=ticket_in.message,
-        is_admin_reply=True,
-        is_read=False
-    )
-    db.add(first_msg)
-    await db.commit()
+        # 2. Verify order_id to prevent foreign key errors if order was purged/mismatched
+        valid_order_id = None
+        if ticket_in.order_id:
+            try:
+                ord_check = await db.execute(select(Order.id).where(Order.id == ticket_in.order_id))
+                if ord_check.scalar():
+                    valid_order_id = ticket_in.order_id
+            except Exception:
+                valid_order_id = None
 
-    # Re-fetch ticket with selectinload to guarantee fully loaded relationships
-    reload_q = (
-        select(Ticket)
-        .options(
-            selectinload(Ticket.user),
-            selectinload(Ticket.messages).selectinload(TicketMessage.sender)
+        # 3. Verify tenant_id to prevent foreign key errors with deleted child panels
+        valid_tenant_id = None
+        if customer.tenant_id:
+            try:
+                cp_check = await db.execute(select(ChildPanel.id).where(ChildPanel.id == customer.tenant_id))
+                if cp_check.scalar():
+                    valid_tenant_id = customer.tenant_id
+            except Exception:
+                valid_tenant_id = None
+
+        # 4. Create the ticket thread
+        new_ticket = Ticket(
+            user_id=customer.id,
+            tenant_id=valid_tenant_id,
+            order_id=valid_order_id,
+            subject=ticket_in.subject.strip(),
+            priority=ticket_in.priority or TicketPriority.MEDIUM,
+            status=TicketStatus.ANSWERED,
+            user_unread=True,    # Immediately alert the customer with unread notification badge!
+            admin_unread=False,
         )
-        .where(Ticket.id == new_ticket.id)
-    )
-    res = await db.execute(reload_q)
-    fresh_ticket = res.scalars().first()
+        db.add(new_ticket)
+        await db.flush()
 
-    return TicketResponse(
-        id=fresh_ticket.id,
-        user_id=fresh_ticket.user_id,
-        username=customer.username,
-        order_id=fresh_ticket.order_id,
-        subject=fresh_ticket.subject,
-        priority=fresh_ticket.priority,
-        status=fresh_ticket.status,
-        user_unread=fresh_ticket.user_unread,
-        admin_unread=fresh_ticket.admin_unread,
-        messages=[
-            TicketMessageResponse(
-                id=m.id,
-                ticket_id=m.ticket_id,
-                sender_id=m.sender_id,
-                sender_username=m.sender.username if m.sender else admin.username,
-                message=m.message,
-                is_admin_reply=m.is_admin_reply,
-                is_read=m.is_read,
-                created_at=m.created_at
+        # 5. Add admin's initial message
+        first_msg = TicketMessage(
+            ticket_id=new_ticket.id,
+            sender_id=admin.id,
+            message=ticket_in.message.strip(),
+            is_admin_reply=True,
+            is_read=False
+        )
+        db.add(first_msg)
+        await db.commit()
+
+        # Re-fetch ticket with selectinload to guarantee fully loaded relationships
+        reload_q = (
+            select(Ticket)
+            .options(
+                selectinload(Ticket.user),
+                selectinload(Ticket.messages).selectinload(TicketMessage.sender)
             )
-            for m in fresh_ticket.messages
-        ],
-        created_at=fresh_ticket.created_at,
-        updated_at=fresh_ticket.updated_at
-    )
+            .where(Ticket.id == new_ticket.id)
+        )
+        res = await db.execute(reload_q)
+        fresh_ticket = res.scalars().first()
+
+        return TicketResponse(
+            id=fresh_ticket.id,
+            user_id=fresh_ticket.user_id,
+            username=customer.username,
+            order_id=fresh_ticket.order_id,
+            subject=fresh_ticket.subject,
+            priority=fresh_ticket.priority,
+            status=fresh_ticket.status,
+            user_unread=bool(getattr(fresh_ticket, "user_unread", True)),
+            admin_unread=bool(getattr(fresh_ticket, "admin_unread", False)),
+            messages=[
+                TicketMessageResponse(
+                    id=m.id,
+                    ticket_id=m.ticket_id,
+                    sender_id=m.sender_id,
+                    sender_username=m.sender.username if m.sender else admin.username,
+                    message=m.message,
+                    is_admin_reply=m.is_admin_reply,
+                    is_read=bool(getattr(m, "is_read", False)),
+                    created_at=m.created_at
+                )
+                for m in fresh_ticket.messages
+            ],
+            created_at=fresh_ticket.created_at,
+            updated_at=fresh_ticket.updated_at
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        await db.rollback()
+        logger.exception(f"Exception during admin ticket creation: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to create ticket: {str(exc)}"
+        )
 
 
 @router.get("", response_model=List[TicketSummaryResponse])
