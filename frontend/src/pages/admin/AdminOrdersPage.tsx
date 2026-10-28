@@ -65,6 +65,7 @@ export const AdminOrdersPage: React.FC = () => {
   const [contactPriority, setContactPriority] = useState<TicketPriority>('medium');
   const [sendingContactMessage, setSendingContactMessage] = useState(false);
   const [contactSuccessMessage, setContactSuccessMessage] = useState<string | null>(null);
+  const [contactErrorMessage, setContactErrorMessage] = useState<string | null>(null);
 
   const sanitizeCustomerErrorMessage = (rawError?: string | null): string => {
     if (!rawError) return '';
@@ -105,6 +106,7 @@ export const AdminOrdersPage: React.FC = () => {
     const orderRef = order.order_number ? `#${order.order_number}` : `#${order.id.slice(0, 8)}`;
     setContactPriority('medium');
     setContactSuccessMessage(null);
+    setContactErrorMessage(null);
 
     if (order.error_message) {
       const friendlyIssue = sanitizeCustomerErrorMessage(order.error_message);
@@ -125,6 +127,7 @@ export const AdminOrdersPage: React.FC = () => {
     if (!contactOrder || !contactSubject.trim() || !contactMessage.trim()) return;
 
     setSendingContactMessage(true);
+    setContactErrorMessage(null);
     try {
       await ticketsService.adminCreateTicket({
         user_id: contactOrder.user_id,
@@ -134,14 +137,15 @@ export const AdminOrdersPage: React.FC = () => {
         message: contactMessage.trim(),
       });
       setContactSuccessMessage(
-        `Message sent! A ticket thread was opened for ${contactOrder.username}. They will see an unread notification badge on their Tickets page.`
+        `Message sent! A ticket thread was opened for @${contactOrder.username}. They will see an unread notification badge on their Tickets page.`
       );
       setTimeout(() => {
         setContactOrder(null);
         setContactSuccessMessage(null);
       }, 2500);
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to send message to customer');
+      const msg = err.response?.data?.detail || 'Failed to send message to customer. Please verify credentials.';
+      setContactErrorMessage(msg);
     } finally {
       setSendingContactMessage(false);
     }
@@ -984,6 +988,29 @@ export const AdminOrdersPage: React.FC = () => {
               <div className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
                 <Check className="w-4 h-4 shrink-0 text-emerald-400" />
                 <span>{contactSuccessMessage}</span>
+              </div>
+            )}
+
+            {/* Error Notification Alert */}
+            {contactErrorMessage && (
+              <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <span>{contactErrorMessage}</span>
+                </div>
+                {(contactErrorMessage.includes('expired') || contactErrorMessage.includes('credentials') || contactErrorMessage.includes('token')) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      localStorage.removeItem('access_token');
+                      localStorage.removeItem('refresh_token');
+                      window.location.href = '/login';
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-rose-500 hover:bg-rose-400 text-white font-bold text-[10px] transition-colors shrink-0"
+                  >
+                    Log In Again
+                  </button>
+                )}
               </div>
             )}
 
