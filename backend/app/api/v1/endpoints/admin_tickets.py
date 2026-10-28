@@ -78,32 +78,44 @@ async def admin_create_ticket_for_user(
     )
     db.add(first_msg)
     await db.commit()
-    await db.refresh(new_ticket)
+
+    # Re-fetch ticket with selectinload to guarantee fully loaded relationships
+    reload_q = (
+        select(Ticket)
+        .options(
+            selectinload(Ticket.user),
+            selectinload(Ticket.messages).selectinload(TicketMessage.sender)
+        )
+        .where(Ticket.id == new_ticket.id)
+    )
+    res = await db.execute(reload_q)
+    fresh_ticket = res.scalars().first()
 
     return TicketResponse(
-        id=new_ticket.id,
-        user_id=new_ticket.user_id,
+        id=fresh_ticket.id,
+        user_id=fresh_ticket.user_id,
         username=customer.username,
-        order_id=new_ticket.order_id,
-        subject=new_ticket.subject,
-        priority=new_ticket.priority,
-        status=new_ticket.status,
-        user_unread=True,
-        admin_unread=False,
+        order_id=fresh_ticket.order_id,
+        subject=fresh_ticket.subject,
+        priority=fresh_ticket.priority,
+        status=fresh_ticket.status,
+        user_unread=fresh_ticket.user_unread,
+        admin_unread=fresh_ticket.admin_unread,
         messages=[
             TicketMessageResponse(
-                id=first_msg.id,
-                ticket_id=first_msg.ticket_id,
-                sender_id=first_msg.sender_id,
-                sender_username=admin.username,
-                message=first_msg.message,
-                is_admin_reply=True,
-                is_read=False,
-                created_at=first_msg.created_at
+                id=m.id,
+                ticket_id=m.ticket_id,
+                sender_id=m.sender_id,
+                sender_username=m.sender.username if m.sender else admin.username,
+                message=m.message,
+                is_admin_reply=m.is_admin_reply,
+                is_read=m.is_read,
+                created_at=m.created_at
             )
+            for m in fresh_ticket.messages
         ],
-        created_at=new_ticket.created_at,
-        updated_at=new_ticket.updated_at
+        created_at=fresh_ticket.created_at,
+        updated_at=fresh_ticket.updated_at
     )
 
 

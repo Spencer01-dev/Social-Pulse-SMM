@@ -60,8 +60,13 @@ async def lifespan(app: FastAPI):
         from app.core.database import engine
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-            # Ensure order_number sequence and column exist on orders table
             try:
+                # Critical DDL: Ensure ticket unread & tracking columns exist
+                await conn.execute(text("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS user_unread BOOLEAN DEFAULT FALSE;"))
+                await conn.execute(text("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS admin_unread BOOLEAN DEFAULT FALSE;"))
+                await conn.execute(text("ALTER TABLE ticket_messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;"))
+                print("[+] Ticket unread & message read tracking columns verified.")
+
                 # Step 1: Create sequence if it doesn't exist
                 await conn.execute(text("CREATE SEQUENCE IF NOT EXISTS order_number_seq START WITH 29100001;"))
                 print("[+] order_number_seq sequence ready.")
