@@ -272,8 +272,10 @@ async def retry_order_dispatch(
         order.status = OrderStatus.IN_PROGRESS if p_order_id else OrderStatus.PROCESSING
         order.error_message = None
     except Exception as e:
-        order.error_message = str(e)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Retry failed: {str(e)}")
+        clean_e = getattr(e, "detail", str(e))
+        clean_e = str(clean_e).replace("JustAnotherPanel", "").replace("JAP", "").replace("Provider Error:", "").strip(" :")
+        order.error_message = clean_e
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Retry failed: {clean_e}")
 
     db.add(order)
     await db.commit()
@@ -372,9 +374,11 @@ async def retry_all_pending_orders(
                     dispatched_count += 1
                     db.add(order)
             except Exception as err:
-                order.error_message = str(err)
+                clean_err = getattr(err, "detail", str(err))
+                clean_err = str(clean_err).replace("JustAnotherPanel", "").replace("JAP", "").replace("Provider Error:", "").strip(" :")
+                order.error_message = clean_err
                 db.add(order)
-                errors.append(f"Order #{getattr(order, 'id', '')}: {err}")
+                errors.append(f"Order #{getattr(order, 'id', '')}: {clean_err}")
 
         await db.commit()
         return {

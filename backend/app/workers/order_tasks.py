@@ -233,7 +233,8 @@ async def sync_single_order(db: AsyncSession, order: Order) -> Tuple[bool, Order
                     logger.warning(f"[!] Cannot retry dispatch: service not found for order #{str(order.id)[:8]}")
             except Exception as retry_err:
                 logger.warning(f"[!] Retry dispatch FAILED for order #{str(order.id)[:8]}: {retry_err}")
-                order.error_message = f"Retry failed: {str(retry_err)}"
+                clean_err = str(retry_err).replace("JustAnotherPanel", "").replace("JAP", "").replace("Provider Error:", "").strip(" :")
+                order.error_message = f"Retry failed: {clean_err}"
                 db.add(order)
                 await db.commit()
         return False, order

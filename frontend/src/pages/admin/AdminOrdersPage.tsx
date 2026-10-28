@@ -66,6 +66,40 @@ export const AdminOrdersPage: React.FC = () => {
   const [sendingContactMessage, setSendingContactMessage] = useState(false);
   const [contactSuccessMessage, setContactSuccessMessage] = useState<string | null>(null);
 
+  const sanitizeCustomerErrorMessage = (rawError?: string | null): string => {
+    if (!rawError) return '';
+    let cleaned = rawError
+      .replace(/justanotherpanel/gi, '')
+      .replace(/\bjap\b/gi, '')
+      .replace(/provider error:?/gi, '')
+      .replace(/\b502:?/gi, '')
+      .replace(/\b500:?/gi, '')
+      .replace(/\b504:?/gi, '')
+      .replace(/retry failed:?/gi, '')
+      .replace(/http error \d+/gi, '')
+      .replace(/upstream provider/gi, 'fulfillment server')
+      .replace(/upstream/gi, 'server')
+      .replace(/provider/gi, 'server')
+      .trim();
+
+    cleaned = cleaned.replace(/^[:\s-]+/, '').trim();
+
+    const lower = cleaned.toLowerCase();
+    if (lower.includes('missing username') || lower.includes('username missing') || lower.includes('invalid username')) {
+      return 'The link or username provided is missing or incorrect. Please ensure you provide a valid public profile username or direct post link.';
+    }
+    if (lower.includes('private') || lower.includes('not public')) {
+      return 'The account or post appears to be set to Private. Please make it public so fulfillment can proceed.';
+    }
+    if (lower.includes('not found') || lower.includes('invalid link') || lower.includes('wrong link')) {
+      return 'The submitted link could not be reached. Please check that the URL is working and accessible.';
+    }
+    if (lower.includes('quantity')) {
+      return 'The requested order quantity is outside the allowed range.';
+    }
+    return cleaned || 'Server encountered an issue with the submitted link format.';
+  };
+
   const handleOpenContactCustomer = (order: AdminOrder) => {
     setContactOrder(order);
     const orderRef = order.order_number ? `#${order.order_number}` : `#${order.id.slice(0, 8)}`;
@@ -73,9 +107,10 @@ export const AdminOrdersPage: React.FC = () => {
     setContactSuccessMessage(null);
 
     if (order.error_message) {
+      const friendlyIssue = sanitizeCustomerErrorMessage(order.error_message);
       setContactSubject(`Regarding Order ${orderRef} - Issue Notification`);
       setContactMessage(
-        `Hello ${order.username},\n\nWe encountered an issue with your order ${orderRef} (${order.service_name}):\n"${order.error_message}".\n\nPlease ensure your profile or post link is set to PUBLIC and not restricted, or reply directly to this ticket with your updated link so we can resume fulfillment immediately.`
+        `Hello ${order.username},\n\nWe noticed an issue with your order ${orderRef} (${order.service_name}):\n"${friendlyIssue}"\n\nPlease ensure your profile or link is set to PUBLIC, or reply directly to this ticket with your updated link so we can resume fulfillment immediately.`
       );
     } else {
       setContactSubject(`Regarding Order ${orderRef} - Update`);
@@ -870,8 +905,9 @@ export const AdminOrdersPage: React.FC = () => {
                 Service: <span className="text-slate-200">{contactOrder.service_name}</span>
               </div>
               {contactOrder.error_message && (
-                <div className="text-[11px] text-rose-300 font-mono bg-rose-500/10 px-2 py-1 rounded-lg border border-rose-500/20">
-                  Provider Issue: {contactOrder.error_message}
+                <div className="text-[11px] text-rose-300 font-sans bg-rose-500/10 px-3 py-2 rounded-xl border border-rose-500/20">
+                  <span className="font-bold">Detected Issue: </span>
+                  <span>{sanitizeCustomerErrorMessage(contactOrder.error_message)}</span>
                 </div>
               )}
             </div>

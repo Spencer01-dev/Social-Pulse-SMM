@@ -53,25 +53,25 @@ class JustAnotherPanelProvider(ProviderInterface):
 
                 if isinstance(result, dict) and "error" in result:
                     err_msg = result.get("error")
-                    logger.warning(f"JAP Provider API error: {err_msg}")
+                    logger.warning(f"Fulfillment API error: {err_msg}")
                     raise HTTPException(
                         status_code=status.HTTP_502_BAD_GATEWAY,
-                        detail=f"JustAnotherPanel Provider Error: {err_msg}",
+                        detail=f"{err_msg}",
                     )
                 return result
             except HTTPException:
                 raise
             except httpx.HTTPStatusError as exc:
-                logger.error(f"JAP HTTP status error {exc.response.status_code}")
+                logger.error(f"Fulfillment HTTP status error {exc.response.status_code}")
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail=f"JustAnotherPanel HTTP Error {exc.response.status_code}",
+                    detail=f"Fulfillment Server HTTP Error {exc.response.status_code}",
                 )
             except httpx.RequestError as exc:
-                logger.error(f"JAP connection error: {str(exc)}")
+                logger.error(f"Fulfillment connection error: {str(exc)}")
                 raise HTTPException(
                     status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-                    detail=f"Failed to connect to JustAnotherPanel: {str(exc)}",
+                    detail="Failed to connect to fulfillment server",
                 )
 
     async def get_services(self) -> List[ProviderServiceItem]:
@@ -156,7 +156,7 @@ class JustAnotherPanelProvider(ProviderInterface):
         if not isinstance(data, dict) or "order" not in data:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"JustAnotherPanel returned unexpected order response: {data}",
+                detail=f"Fulfillment server returned unexpected response: {data}",
             )
 
         return ProviderOrderResponse(

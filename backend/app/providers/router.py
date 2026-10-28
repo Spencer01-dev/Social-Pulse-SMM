@@ -76,6 +76,6 @@ class SmartProviderRouter:
             **kwargs
         )
 
-        logger.info(f"[+] Order successfully dispatched to JustAnotherPanel (JAP)! Provider Order ID: {resp.provider_order_id}")
-        return p_id_str, resp.provider_order_id, "Dispatched to JustAnotherPanel (JAP)"
+        logger.info(f"[+] Order successfully dispatched! Provider Order ID: {resp.provider_order_id}")
+        return p_id_str, resp.provider_order_id, "Dispatched to fulfillment server"
 
