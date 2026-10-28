@@ -136,6 +136,25 @@ export const childPanelService = {
     return response.data;
   },
 
+  getPanelTicketsUnreadCount: async (panelId: string): Promise<{ unread_count: number }> => {
+    const response = await apiClient.get<{ unread_count: number }>(`/child-panels/${panelId}/tickets/unread-count`);
+    return response.data;
+  },
+
+  createPanelTicket: async (
+    panelId: string,
+    data: {
+      user_id: string;
+      subject: string;
+      message: string;
+      priority?: string;
+      order_id?: string;
+    }
+  ): Promise<ChildPanelTicketDetail> => {
+    const response = await apiClient.post<ChildPanelTicketDetail>(`/child-panels/${panelId}/tickets`, data);
+    return response.data;
+  },
+
   getPanelTicketDetail: async (panelId: string, ticketId: string): Promise<ChildPanelTicketDetail> => {
     const response = await apiClient.get<ChildPanelTicketDetail>(`/child-panels/${panelId}/tickets/${ticketId}`);
     return response.data;
@@ -253,6 +272,7 @@ export interface ChildPanelOrder {
   status: string;
   remains: number;
   start_count: number;
+  error_message?: string;
   created_at: string;
 }
 
@@ -276,6 +296,8 @@ export interface ChildPanelTicket {
   priority: 'low' | 'medium' | 'high' | 'urgent';
   status: 'open' | 'answered' | 'customer_reply' | 'closed';
   last_message?: string;
+  user_unread?: boolean;
+  admin_unread?: boolean;
   created_at: string;
   updated_at: string;
 }

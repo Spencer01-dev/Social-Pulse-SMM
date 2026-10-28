@@ -144,6 +144,18 @@ export const ChildPanelManagePage: React.FC = () => {
   const [replyMessage, setReplyMessage] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
   const [ticketSearch, setTicketSearch] = useState('');
+  const [panelUnreadCount, setPanelUnreadCount] = useState<number>(0);
+
+  // Contact Client Modal State
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [contactOrder, setContactOrder] = useState<ChildPanelOrder | null>(null);
+  const [contactUser, setContactUser] = useState<ChildPanelUser | null>(null);
+  const [contactUserId, setContactUserId] = useState<string>('');
+  const [contactSubject, setContactSubject] = useState('');
+  const [contactMessage, setContactMessage] = useState('');
+  const [contactPriority, setContactPriority] = useState<string>('medium');
+  const [sendingContactMessage, setSendingContactMessage] = useState(false);
+  const [contactSuccessMessage, setContactSuccessMessage] = useState<string | null>(null);
 
   // ---------------------------------------------------------------------------
   // TAB 3: USERS STATE
@@ -486,6 +498,7 @@ export const ChildPanelManagePage: React.FC = () => {
         status: ticketStatusFilter !== 'all' ? ticketStatusFilter : undefined,
       });
       setTickets(ticketsData);
+      loadPanelUnreadCount();
       if (ticketsData.length > 0 && !selectedTicket) {
         loadTicketDetail(ticketsData[0].id);
       }
@@ -496,12 +509,34 @@ export const ChildPanelManagePage: React.FC = () => {
     }
   };
 
+  const loadPanelUnreadCount = async () => {
+    if (!activePanel) return;
+    try {
+      const res = await childPanelService.getPanelTicketsUnreadCount(activePanel.id);
+      setPanelUnreadCount(res.unread_count || 0);
+    } catch {
+      // silent
+    }
+  };
+
+  useEffect(() => {
+    if (activePanel) {
+      loadPanelUnreadCount();
+      const interval = setInterval(loadPanelUnreadCount, 20000);
+      return () => clearInterval(interval);
+    }
+  }, [activePanel?.id]);
+
   const loadTicketDetail = async (ticketId: string) => {
     if (!activePanel) return;
     setLoadingTicketDetail(true);
     try {
       const detail = await childPanelService.getPanelTicketDetail(activePanel.id, ticketId);
       setSelectedTicket(detail);
+      setTickets((prev) =>
+        prev.map((t) => (t.id === ticketId ? { ...t, admin_unread: false } : t))
+      );
+      loadPanelUnreadCount();
     } catch (err: any) {
       showToast('error', err.response?.data?.detail || 'Failed to load ticket details.');
     } finally {
@@ -654,6 +689,133 @@ export const ChildPanelManagePage: React.FC = () => {
       showToast('error', err.response?.data?.detail || 'Failed to adjust balance.');
     } finally {
       setSubmittingAdjust(false);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // CONTACT CUSTOMER & PROVIDER SANITIZER
+  // ---------------------------------------------------------------------------
+  const sanitizeCustomerErrorMessage = (rawError?: string | null): string => {
+    if (!rawError) return '';
+    let cleaned = rawError
+      .replace(/justanotherpanel/gi, '')
+      .replace(/\bjap\b/gi, '')
+      .replace(/provider error:?/gi, '')
+      .replace(/\b502:?/gi, '')
+      .replace(/\b500:?/gi, '')
+      .replace(/\b504:?/gi, '')
+      .replace(/retry failed:?/gi, '')
+      .replace(/http error \d+/gi, '')
+      .replace(/upstream provider/gi, 'fulfillment server')
+      .replace(/upstream/gi, 'server')
+      .replace(/provider/gi, 'server')
+      .trim();
+
+    cleaned = cleaned.replace(/^[:\s-]+/, '').trim();
+
+    const lower = cleaned.toLowerCase();
+    if (lower.includes('missing username') || lower.includes('username missing') || lower.includes('invalid username')) {
+      return 'The link or username provided is missing or incorrect. Please ensure you provide a valid public profile username or direct post link.';
+    }
+    if (lower.includes('private') || lower.includes('not public')) {
+      return 'The account or post appears to be set to Private. Please make it public so fulfillment can proceed.';
+    }
+    if (lower.includes('not found') || lower.includes('invalid link') || lower.includes('wrong link')) {
+      return 'The submitted link could not be reached. Please check that the URL is working and accessible.';
+    }
+    if (lower.includes('quantity')) {
+      return 'The requested order quantity is outside the allowed range.';
+    }
+    return cleaned || 'Server encountered an issue with the submitted link format.';
+  };
+
+  const handleOpenContactCustomerFromOrder = (order: ChildPanelOrder) => {
+    setContactOrder(order);
+    setContactUser(null);
+    setContactUserId(order.user_id);
+    const orderRef = order.order_number ? `#${order.order_number}` : `#${order.id.slice(0, 8)}`;
+    setShowContactModal(true);
+    setContactSuccessMessage(null);
+
+    if (order.error_message) {
+      const friendlyIssue = sanitizeCustomerErrorMessage(order.error_message);
+      setContactSubject(`Regarding Order ${orderRef} - Issue Notification`);
+      setContactPriority('high');
+      setContactMessage(
+        `Hello ${order.username},\n\nWe noticed an issue with your order ${orderRef} (${order.service_name}):\n"${friendlyIssue}"\n\nPlease ensure your profile or link is set to PUBLIC, or reply directly to this ticket with your updated link so we can resume fulfillment immediately.`
+      );
+    } else {
+      setContactSubject(`Regarding Order ${orderRef} - Update`);
+      setContactPriority('medium');
+      setContactMessage(
+        `Hello ${order.username},\n\nWe are reaching out regarding your order ${orderRef} for ${order.service_name}.\n\nPlease reply here if you have any questions or require any assistance with this order.`
+      );
+    }
+  };
+
+  const handleOpenContactClient = (targetUser?: ChildPanelUser) => {
+    setContactOrder(null);
+    setContactUser(targetUser || null);
+    setContactUserId(targetUser ? targetUser.id : (usersList[0]?.id || ''));
+    setShowContactModal(true);
+    setContactSuccessMessage(null);
+    setContactPriority('medium');
+    if (targetUser) {
+      setContactSubject(`Assistance from Support - ${activePanel?.domain || 'Panel Support'}`);
+      setContactMessage(
+        `Hello ${targetUser.username},\n\nWe are checking in with you regarding your account. Please let us know if you need any assistance with your orders or services.`
+      );
+    } else {
+      setContactSubject('');
+      setContactMessage('');
+    }
+    if (usersList.length === 0) {
+      loadUsers();
+    }
+  };
+
+  const handleSendContactTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activePanel) return;
+    const targetId = contactOrder?.user_id || contactUser?.id || contactUserId;
+    if (!targetId) {
+      showToast('error', 'Please select or specify a target customer.');
+      return;
+    }
+    if (!contactSubject.trim() || !contactMessage.trim()) {
+      showToast('error', 'Subject and message are required.');
+      return;
+    }
+
+    setSendingContactMessage(true);
+    try {
+      const newTicket = await childPanelService.createPanelTicket(activePanel.id, {
+        user_id: targetId,
+        subject: contactSubject.trim(),
+        message: contactMessage.trim(),
+        priority: contactPriority,
+        order_id: contactOrder?.id,
+      });
+
+      const recipientName =
+        contactOrder?.username ||
+        contactUser?.username ||
+        usersList.find((u) => u.id === targetId)?.username ||
+        'Customer';
+
+      setContactSuccessMessage(
+        `Support ticket successfully opened for @${recipientName}! The message was delivered to their tickets dashboard with an unread notification.`
+      );
+      showToast('success', `Ticket sent to @${recipientName}`);
+      loadTickets();
+      loadPanelUnreadCount();
+      if (newTicket && newTicket.id) {
+        setSelectedTicket(newTicket);
+      }
+    } catch (err: any) {
+      showToast('error', err.response?.data?.detail || 'Failed to send ticket to customer.');
+    } finally {
+      setSendingContactMessage(false);
     }
   };
 
@@ -818,7 +980,11 @@ export const ChildPanelManagePage: React.FC = () => {
         >
           <LifeBuoy className="w-4 h-4" />
           <span>Support Helpdesk</span>
-          {tickets.length > 0 && (
+          {panelUnreadCount > 0 ? (
+            <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full bg-rose-500 text-white animate-pulse">
+              {panelUnreadCount} NEW
+            </span>
+          ) : tickets.length > 0 ? (
             <span
               className={`px-1.5 py-0.5 text-[10px] font-black rounded-full ${
                 activeTab === 'tickets' ? 'bg-slate-950/20 text-slate-950' : 'bg-[#222630] text-amber-300'
@@ -826,7 +992,7 @@ export const ChildPanelManagePage: React.FC = () => {
             >
               {tickets.filter((t) => t.status === 'open' || t.status === 'customer_reply').length} open
             </span>
-          )}
+          ) : null}
         </button>
 
         <button
@@ -1124,8 +1290,16 @@ export const ChildPanelManagePage: React.FC = () => {
                         <td className="py-3 px-4 font-bold text-amber-300">
                           @{o.username}
                         </td>
-                        <td className="py-3 px-4 max-w-[200px] truncate" title={o.service_name}>
-                          {o.service_name}
+                        <td className="py-3 px-4 max-w-[200px]" title={o.service_name}>
+                          <span className="truncate block font-semibold text-slate-200">{o.service_name}</span>
+                          {o.error_message && (
+                            <span
+                              className="text-[10px] text-rose-300 bg-rose-500/10 border border-rose-500/20 px-1.5 py-0.5 rounded font-sans mt-0.5 inline-block truncate max-w-[190px]"
+                              title={sanitizeCustomerErrorMessage(o.error_message)}
+                            >
+                              ⚠️ {sanitizeCustomerErrorMessage(o.error_message)}
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-4 max-w-[180px]">
                           <div className="flex items-center gap-1.5">
@@ -1195,6 +1369,14 @@ export const ChildPanelManagePage: React.FC = () => {
                         </td>
                         <td className="py-3 px-4 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleOpenContactCustomerFromOrder(o)}
+                              className="px-2 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 text-amber-300 hover:text-amber-200 text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1"
+                              title="Directly message customer regarding this order via Support Ticket"
+                            >
+                              <MessageSquare className="w-2.5 h-2.5" />
+                              <span>Contact</span>
+                            </button>
                             {o.status !== 'completed' && o.status !== 'canceled' && (
                               <button
                                 onClick={() => handleSyncOrder(o.id)}
@@ -1242,9 +1424,18 @@ export const ChildPanelManagePage: React.FC = () => {
                   <LifeBuoy className="w-3.5 h-3.5 text-amber-400" />
                   Panel Tickets
                 </span>
-                <Button variant="outline" size="sm" onClick={loadTickets} isLoading={loadingTickets} leftIcon={<RefreshCcw className="w-3 h-3" />}>
-                  Refresh
-                </Button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleOpenContactClient()}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold transition-colors cursor-pointer shadow-sm shadow-amber-500/20"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5" />
+                    <span>Contact Client</span>
+                  </button>
+                  <Button variant="outline" size="sm" onClick={loadTickets} isLoading={loadingTickets} leftIcon={<RefreshCcw className="w-3 h-3" />}>
+                    Refresh
+                  </Button>
+                </div>
               </div>
 
               {/* Status Tabs */}
@@ -1302,12 +1493,19 @@ export const ChildPanelManagePage: React.FC = () => {
                       className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
                         isSelected
                           ? 'bg-[#222630] border-amber-500/50 shadow-md shadow-amber-500/5'
+                          : t.admin_unread
+                          ? 'bg-[#1e2330] border-amber-500/30 hover:border-amber-500/50'
                           : 'bg-[#181a20] border-[#2b303c] hover:border-slate-500/40 hover:bg-[#1c2027]'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2 mb-1.5">
-                        <div className="font-bold text-xs text-white truncate max-w-[200px]">
-                          {t.subject}
+                        <div className="font-bold text-xs text-white truncate max-w-[190px] flex items-center gap-1.5">
+                          {t.admin_unread && (
+                            <span className="px-1.5 py-0.2 rounded-full text-[8px] font-black bg-rose-500 text-white animate-pulse shrink-0">
+                              NEW
+                            </span>
+                          )}
+                          <span className="truncate">{t.subject}</span>
                         </div>
                         <span
                           className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
@@ -1559,6 +1757,14 @@ export const ChildPanelManagePage: React.FC = () => {
                         </td>
                         <td className="py-3 px-4 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleOpenContactClient(u)}
+                              className="p-1.5 rounded bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 text-amber-300 hover:text-amber-200 transition-colors cursor-pointer"
+                              title={`Contact @${u.username} via Support Ticket`}
+                            >
+                              <MessageSquare className="w-3.5 h-3.5" />
+                            </button>
+
                             <button
                               onClick={() => {
                                 setAdjustModalUser(u);
@@ -2607,6 +2813,281 @@ export const ChildPanelManagePage: React.FC = () => {
                 Close
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL: CONTACT CUSTOMER / OPEN DIRECT SUPPORT TICKET */}
+      {/* ===================================================================== */}
+      {showContactModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="w-full max-w-xl bg-gradient-to-b from-[#1c202a] to-[#121418] border border-[#2b303c] rounded-3xl p-6 shadow-2xl relative space-y-5 text-left my-8">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 border-b border-[#2b303c] pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white tracking-tight flex items-center gap-2">
+                    <span>Contact Customer Directly</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Open an official support ticket thread for your client. Delivered directly to their tickets dashboard.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowContactModal(false);
+                  setContactOrder(null);
+                  setContactUser(null);
+                  setContactSuccessMessage(null);
+                }}
+                className="w-8 h-8 rounded-xl bg-[#222630] hover:bg-[#2b303c] text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Success Feedback Alert */}
+            {contactSuccessMessage && (
+              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs space-y-2">
+                <div className="flex items-center gap-2 font-bold">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>{contactSuccessMessage}</span>
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={() => {
+                      setShowContactModal(false);
+                      setContactOrder(null);
+                      setContactUser(null);
+                      setContactSuccessMessage(null);
+                      setActiveTab('tickets');
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <LifeBuoy className="w-3.5 h-3.5" />
+                    <span>View Ticket in Helpdesk</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Context Card (When opened for an order) */}
+            {contactOrder ? (
+              <div className="p-3.5 rounded-2xl bg-[#14161c] border border-[#2b303c] text-xs space-y-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 font-semibold text-slate-300">
+                    <span>Customer:</span>
+                    <span className="text-amber-300 font-bold font-mono">@{contactOrder.username}</span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
+                    Order #{contactOrder.order_number ? contactOrder.order_number : contactOrder.id.slice(0, 8)}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400 truncate">
+                  Service: <span className="text-slate-200">{contactOrder.service_name}</span>
+                </div>
+                {contactOrder.error_message && (
+                  <div className="text-[11px] text-rose-300 font-sans bg-rose-500/10 px-3 py-2 rounded-xl border border-rose-500/20">
+                    <span className="font-bold">Detected Issue: </span>
+                    <span>{sanitizeCustomerErrorMessage(contactOrder.error_message)}</span>
+                  </div>
+                )}
+              </div>
+            ) : contactUser ? (
+              <div className="p-3.5 rounded-2xl bg-[#14161c] border border-[#2b303c] text-xs flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400">Recipient:</span>
+                  <span className="text-amber-300 font-bold font-mono">@{contactUser.username}</span>
+                  <span className="text-slate-400 text-[11px]">({contactUser.email})</span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  Balance: Ksh {Number(contactUser.balance).toFixed(2)}
+                </span>
+              </div>
+            ) : (
+              /* User Selector dropdown when opening general message */
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">
+                  Select Customer Recipient:
+                </label>
+                <select
+                  value={contactUserId}
+                  onChange={(e) => setContactUserId(e.target.value)}
+                  className="w-full px-3 py-2 bg-[#121418] border border-[#2b303c] rounded-xl text-xs text-white focus:outline-none focus:border-amber-500"
+                >
+                  <option value="">-- Choose a registered customer --</option>
+                  {usersList.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      @{u.username} ({u.email})
+                    </option>
+                  ))}
+                </select>
+                {usersList.length === 0 && (
+                  <p className="text-[11px] text-slate-500 italic">No customers found on this panel yet.</p>
+                )}
+              </div>
+            )}
+
+            {/* Quick Preset Buttons (if order attached) */}
+            {contactOrder && (
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-2">
+                  Quick Issue Templates:
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const orderRef = contactOrder.order_number
+                        ? `#${contactOrder.order_number}`
+                        : `#${contactOrder.id.slice(0, 8)}`;
+                      setContactSubject(`Action Required: Order ${orderRef} - Private Profile or Invalid Link`);
+                      setContactPriority('high');
+                      setContactMessage(
+                        `Hello ${contactOrder.username},\n\nWe noticed an issue fulfilling your order ${orderRef} (${contactOrder.service_name}):\nThe link provided appears to be private or unreachable:\nLink: ${contactOrder.target_link}\n\nPlease ensure your account or post is set to PUBLIC and reply directly here with your updated link so we can resume fulfillment immediately.`
+                      );
+                    }}
+                    className="px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[11px] font-semibold text-left transition-colors cursor-pointer"
+                  >
+                    ⚠️ Private / Invalid Link
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const orderRef = contactOrder.order_number
+                        ? `#${contactOrder.order_number}`
+                        : `#${contactOrder.id.slice(0, 8)}`;
+                      setContactSubject(`Notice: Order ${orderRef} - Fulfillment Queue Update`);
+                      setContactPriority('medium');
+                      setContactMessage(
+                        `Hello ${contactOrder.username},\n\nWe are writing to update you that your order ${orderRef} (${contactOrder.service_name}) is currently queued on the fulfillment server. Start time may take slightly longer than usual.\n\nOur team is actively monitoring progress, and fulfillment will proceed automatically. Thank you for your patience!`
+                      );
+                    }}
+                    className="px-2.5 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-[11px] font-semibold text-left transition-colors cursor-pointer"
+                  >
+                    ⏳ Queue Notice
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const orderRef = contactOrder.order_number
+                        ? `#${contactOrder.order_number}`
+                        : `#${contactOrder.id.slice(0, 8)}`;
+                      setContactSubject(`Information Needed: Order ${orderRef} Link Clarification`);
+                      setContactPriority('medium');
+                      setContactMessage(
+                        `Hello ${contactOrder.username},\n\nCould you please confirm the exact link or username you would like targeted for order ${orderRef}?\n\nCurrently provided: ${contactOrder.target_link}\n\nPlease reply directly to this ticket so we can ensure accurate delivery.`
+                      );
+                    }}
+                    className="px-2.5 py-1.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-[11px] font-semibold text-left transition-colors cursor-pointer"
+                  >
+                    ❓ Link Clarification
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const orderRef = contactOrder.order_number
+                        ? `#${contactOrder.order_number}`
+                        : `#${contactOrder.id.slice(0, 8)}`;
+                      setContactSubject(`Regarding Order ${orderRef} - Update`);
+                      setContactPriority('low');
+                      setContactMessage(
+                        `Hello ${contactOrder.username},\n\nWe are checking in regarding your order ${orderRef} for ${contactOrder.service_name}.\n\nIf you have any questions or need further assistance, please feel free to reply right here!`
+                      );
+                    }}
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[11px] font-semibold text-left transition-colors cursor-pointer"
+                  >
+                    💬 General Update
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handleSendContactTicket} className="space-y-4">
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block mb-1">
+                  Ticket Subject:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={contactSubject}
+                  onChange={(e) => setContactSubject(e.target.value)}
+                  placeholder="e.g. Action Required: Order #1234 Link Issue"
+                  className="w-full px-3.5 py-2.5 bg-[#121418] border border-[#2b303c] rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block mb-1">
+                  Priority:
+                </label>
+                <select
+                  value={contactPriority}
+                  onChange={(e) => setContactPriority(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-[#121418] border border-[#2b303c] rounded-xl text-xs text-white focus:outline-none focus:border-amber-500"
+                >
+                  <option value="low">Low - Routine notice</option>
+                  <option value="medium">Medium - Standard inquiry</option>
+                  <option value="high">High - Action required for fulfillment</option>
+                  <option value="urgent">Urgent - Critical issue</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block mb-1">
+                  Message Body (Customer will see this and can reply):
+                </label>
+                <textarea
+                  required
+                  rows={5}
+                  value={contactMessage}
+                  onChange={(e) => setContactMessage(e.target.value)}
+                  placeholder="Type your message to the customer here..."
+                  className="w-full p-3.5 bg-[#121418] border border-[#2b303c] rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 leading-relaxed font-sans"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Upstream provider details are automatically stripped to protect your platform identity.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#2b303c]">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="md"
+                  onClick={() => {
+                    setShowContactModal(false);
+                    setContactOrder(null);
+                    setContactUser(null);
+                    setContactSuccessMessage(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  isLoading={sendingContactMessage}
+                  leftIcon={<Send className="w-3.5 h-3.5" />}
+                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold"
+                >
+                  Send Ticket Message
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

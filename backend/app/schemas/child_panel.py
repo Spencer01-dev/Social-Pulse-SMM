@@ -85,6 +85,7 @@ class ChildPanelOrderResponse(BaseModel):
     status: Optional[str] = "pending"
     remains: Optional[int] = 0
     start_count: Optional[int] = 0
+    error_message: Optional[str] = None
     created_at: Optional[datetime] = None
 
     class Config:

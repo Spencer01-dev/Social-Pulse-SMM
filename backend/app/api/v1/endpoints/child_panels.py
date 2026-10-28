@@ -39,11 +39,13 @@ from app.schemas.child_panel import (
     ChildPanelUserStatusUpdate,
 )
 from app.schemas.ticket import (
+    AdminTicketCreate,
     TicketMessageResponse,
     TicketReplyRequest,
     TicketResponse,
     TicketStatusUpdate,
     TicketSummaryResponse,
+    UnreadCountResponse,
 )
 
 router = APIRouter(prefix="/child-panels", tags=["Child Panels"])
@@ -584,6 +586,10 @@ async def list_child_panel_orders(
             st_val = getattr(o, "status", "pending")
             st_str = str(getattr(st_val, "value", getattr(st_val, "name", st_val)) or "pending").lower()
 
+            clean_err = None
+            if getattr(o, "error_message", None):
+                clean_err = str(o.error_message).replace("JustAnotherPanel", "").replace("JAP", "").replace("Provider Error:", "").strip(" :")
+
             out.append(
                 ChildPanelOrderResponse(
                     id=o.id,
@@ -599,6 +605,7 @@ async def list_child_panel_orders(
                     status=st_str,
                     remains=o.remains or 0,
                     start_count=o.start_count or 0,
+                    error_message=clean_err,
                     created_at=o.created_at
                 )
             )
@@ -1035,11 +1042,117 @@ async def list_child_panel_tickets(
                 priority=t.priority,
                 status=t.status,
                 last_message=last_msg,
+                user_unread=getattr(t, "user_unread", False),
+                admin_unread=getattr(t, "admin_unread", False),
                 created_at=t.created_at,
                 updated_at=t.updated_at
             )
         )
     return summaries
+
+
+@router.get("/{panel_id}/tickets/unread-count", response_model=UnreadCountResponse)
+async def get_child_panel_tickets_unread_count(
+    panel_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """Get total count of customer tickets with unread replies for child panel staff."""
+    panel = await get_panel_and_verify_owner(panel_id, db, current_user)
+    res = await db.execute(
+        select(func.count(Ticket.id))
+        .where(
+            or_(
+                Ticket.tenant_id == panel.id,
+                Ticket.user.has(User.tenant_id == panel.id)
+            ),
+            Ticket.admin_unread == True
+        )
+    )
+    count = res.scalar() or 0
+    return UnreadCountResponse(unread_count=count)
+
+
+@router.post("/{panel_id}/tickets", response_model=TicketResponse, status_code=status.HTTP_201_CREATED)
+async def create_child_panel_customer_ticket(
+    panel_id: uuid.UUID,
+    ticket_in: AdminTicketCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """Child panel owner/admin proactively opens a support ticket to contact a customer."""
+    panel = await get_panel_and_verify_owner(panel_id, db, current_user)
+
+    user_res = await db.execute(select(User).where(User.id == ticket_in.user_id))
+    target_user = user_res.scalars().first()
+    if not target_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target customer not found.")
+
+    if target_user.tenant_id and target_user.tenant_id != panel.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot contact customer from a different child panel."
+        )
+
+    ticket = Ticket(
+        user_id=target_user.id,
+        tenant_id=panel.id,
+        order_id=ticket_in.order_id,
+        subject=ticket_in.subject.strip(),
+        priority=ticket_in.priority or TicketPriority.MEDIUM,
+        status=TicketStatus.OPEN,
+        user_unread=True,
+        admin_unread=False
+    )
+    db.add(ticket)
+    await db.flush()
+
+    message = TicketMessage(
+        ticket_id=ticket.id,
+        sender_id=current_user.id,
+        message=ticket_in.message.strip(),
+        is_admin_reply=True
+    )
+    db.add(message)
+    await db.commit()
+
+    query = (
+        select(Ticket)
+        .options(
+            selectinload(Ticket.user),
+            selectinload(Ticket.messages).selectinload(TicketMessage.sender)
+        )
+        .where(Ticket.id == ticket.id)
+    )
+    res = await db.execute(query)
+    fresh_ticket = res.scalars().first()
+
+    return TicketResponse(
+        id=fresh_ticket.id,
+        user_id=fresh_ticket.user_id,
+        username=fresh_ticket.user.username if fresh_ticket.user else "Customer",
+        order_id=fresh_ticket.order_id,
+        subject=fresh_ticket.subject,
+        priority=fresh_ticket.priority,
+        status=fresh_ticket.status,
+        user_unread=fresh_ticket.user_unread,
+        admin_unread=fresh_ticket.admin_unread,
+        messages=[
+            TicketMessageResponse(
+                id=m.id,
+                ticket_id=m.ticket_id,
+                sender_id=m.sender_id,
+                sender_username=m.sender.username if m.sender else "Staff",
+                message=m.message,
+                is_admin_reply=m.is_admin_reply,
+                is_read=m.is_read,
+                created_at=m.created_at
+            )
+            for m in fresh_ticket.messages
+        ],
+        created_at=fresh_ticket.created_at,
+        updated_at=fresh_ticket.updated_at
+    )
 
 
 @router.get("/{panel_id}/tickets/{ticket_id}", response_model=TicketResponse)
@@ -1071,6 +1184,12 @@ async def get_child_panel_ticket_detail(
     if not ticket:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found for this panel.")
 
+    # Automatically mark admin_unread as False when panel staff opens the ticket
+    if ticket.admin_unread:
+        ticket.admin_unread = False
+        db.add(ticket)
+        await db.commit()
+
     return TicketResponse(
         id=ticket.id,
         user_id=ticket.user_id,
@@ -1079,6 +1198,8 @@ async def get_child_panel_ticket_detail(
         subject=ticket.subject,
         priority=ticket.priority,
         status=ticket.status,
+        user_unread=ticket.user_unread,
+        admin_unread=ticket.admin_unread,
         messages=[
             TicketMessageResponse(
                 id=m.id,
@@ -1087,6 +1208,7 @@ async def get_child_panel_ticket_detail(
                 sender_username=m.sender.username if m.sender else "Staff",
                 message=m.message,
                 is_admin_reply=m.is_admin_reply,
+                is_read=m.is_read,
                 created_at=m.created_at
             )
             for m in ticket.messages
@@ -1133,6 +1255,8 @@ async def reply_child_panel_ticket(
         is_admin_reply=True
     )
     ticket.status = TicketStatus.ANSWERED
+    ticket.user_unread = True
+    ticket.admin_unread = False
     db.add(msg)
     db.add(ticket)
     await db.commit()
@@ -1158,6 +1282,8 @@ async def reply_child_panel_ticket(
         subject=fresh_ticket.subject,
         priority=fresh_ticket.priority,
         status=fresh_ticket.status,
+        user_unread=fresh_ticket.user_unread,
+        admin_unread=fresh_ticket.admin_unread,
         messages=[
             TicketMessageResponse(
                 id=m.id,
@@ -1166,6 +1292,7 @@ async def reply_child_panel_ticket(
                 sender_username=m.sender.username if m.sender else "Staff",
                 message=m.message,
                 is_admin_reply=m.is_admin_reply,
+                is_read=m.is_read,
                 created_at=m.created_at
             )
             for m in fresh_ticket.messages
