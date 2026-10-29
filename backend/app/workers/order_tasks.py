@@ -73,14 +73,19 @@ async def reconcile_provider_cost_and_deduction(
         order.provider_cost = actual_kes
         changed = True
 
+    # Enforce 50% markup on sales (charge = wholesale_cost * 1.50, profit = wholesale_cost * 0.50)
+    expected_charge = round(actual_kes * Decimal("1.50"), 2)
+    expected_profit = round(expected_charge - actual_kes, 2)
+    order.charge = expected_charge
+    order.profit = expected_profit
+    changed = True
+
     # 2. For child panel orders, wholesale cost = actual provider cost
     if order.tenant_id:
         current_ws = Decimal(str(order.wholesale_cost or "0.00"))
         if abs(current_ws - actual_kes) > Decimal("0.01"):
             diff = actual_kes - current_ws  # positive: deduct more from owner; negative: refund excess
             order.wholesale_cost = actual_kes
-            order.profit = max(Decimal("0.00"), Decimal(str(order.charge or "0.00")) - actual_kes)
-            changed = True
 
             # Adjust child panel owner balance so SocialPulse deducts exact live provider cost
             from app.models.child_panel import ChildPanel
@@ -135,21 +140,19 @@ async def reconcile_provider_cost_and_deduction(
     return changed
 
 
-async def reconcile_recent_child_panel_orders(db: AsyncSession, days: int = 14) -> int:
+async def reconcile_recent_child_panel_orders(db: AsyncSession, days: int = 30) -> int:
     """
-    Reconciles all recent child panel orders against live provider charges,
-    ensuring wholesale_cost matches provider_cost and balances are accurately deducted.
+    Reconciles all recent orders against live provider charges from JAP,
+    ensuring wholesale_cost matches real provider_cost, enforcing 50% markup,
+    and synchronizing child panel owner deductions.
     """
     from datetime import datetime, timedelta, timezone
+    from app.models.service import Service
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     query = (
         select(Order)
-        .options(selectinload(Order.provider))
-        .where(
-            Order.tenant_id.isnot(None),
-            Order.provider_order_id.isnot(None),
-            Order.created_at >= cutoff
-        )
+        .options(selectinload(Order.service), selectinload(Order.provider))
+        .where(Order.created_at >= cutoff)
     )
     result = await db.execute(query)
     orders = result.scalars().all()
@@ -158,8 +161,91 @@ async def reconcile_recent_child_panel_orders(db: AsyncSession, days: int = 14) 
 
     for ord_item in orders:
         try:
-            status_data = await provider_client.get_order_status(ord_item.provider_order_id)
-            if await reconcile_provider_cost_and_deduction(db, ord_item, status_data):
+            status_data = None
+            if ord_item.provider_order_id:
+                try:
+                    status_data = await provider_client.get_order_status(ord_item.provider_order_id)
+                except Exception:
+                    status_data = None
+
+            # 1. Determine actual provider cost from JAP or service provider rate
+            if status_data and getattr(status_data, "charge", None) and Decimal(str(status_data.charge)) > Decimal("0.00"):
+                chg_dec = Decimal(str(status_data.charge))
+                curr = getattr(status_data, "currency", "USD") or "USD"
+                if str(curr).upper() == "USD":
+                    actual_kes = round(chg_dec * Decimal(str(settings.DEFAULT_USD_TO_KES)), 2)
+                else:
+                    actual_kes = round(chg_dec, 2)
+            elif ord_item.service and ord_item.service.provider_rate and ord_item.service.provider_rate > Decimal("0.00"):
+                is_pkg = ord_item.service.service_type and str(ord_item.service.service_type).lower() == "package"
+                qty = ord_item.quantity or 1
+                if is_pkg:
+                    actual_kes = round(ord_item.service.provider_rate * Decimal(qty), 2)
+                else:
+                    actual_kes = round((ord_item.service.provider_rate * Decimal(qty)) / Decimal(1000), 2)
+            else:
+                actual_kes = Decimal(str(ord_item.provider_cost or ord_item.wholesale_cost or "0.00"))
+
+            if actual_kes > Decimal("0.00"):
+                # 50% markup over wholesale
+                correct_charge = round(actual_kes * Decimal("1.50"), 2)
+                correct_profit = round(correct_charge - actual_kes, 2)
+
+                prev_ws = Decimal(str(ord_item.wholesale_cost or "0.00"))
+                diff = actual_kes - prev_ws
+
+                ord_item.provider_cost = actual_kes
+                ord_item.wholesale_cost = actual_kes
+                ord_item.charge = correct_charge
+                ord_item.profit = correct_profit
+
+                # Reconcile child panel owner balance if applicable
+                if ord_item.tenant_id and abs(diff) > Decimal("0.01"):
+                    from app.models.child_panel import ChildPanel
+                    from app.models.user import UserRole
+                    p_res = await db.execute(select(ChildPanel).where(ChildPanel.id == ord_item.tenant_id))
+                    panel = p_res.scalars().first()
+                    if panel and panel.user_id:
+                        owner_res = await db.execute(
+                            select(User).where(User.id == panel.user_id).with_for_update()
+                        )
+                        panel_owner = owner_res.scalars().first()
+                        if panel_owner:
+                            bal_before = panel_owner.balance
+                            bal_after = max(Decimal("0.00"), bal_before - diff)
+                            panel_owner.balance = bal_after
+                            db.add(panel_owner)
+
+                            adj_tx = Transaction(
+                                user_id=panel_owner.id,
+                                order_id=ord_item.id,
+                                tenant_id=panel.id,
+                                type=TransactionType.ORDER_PAYMENT if diff > 0 else TransactionType.ORDER_REFUND,
+                                amount=-diff,
+                                balance_before=bal_before,
+                                balance_after=bal_after,
+                                currency="KES",
+                                payment_method=PaymentMethod.INTERNAL,
+                                payment_reference=f"WHOLESALE-ADJUST-{ord_item.order_number or str(ord_item.id)[:8]}",
+                                status=TransactionStatus.COMPLETED,
+                                description=(
+                                    f"Wholesale price sync for Order #{ord_item.order_number or str(ord_item.id)[:8]} "
+                                    f"(JAP provider cost: KES {actual_kes:,.2f})"
+                                )
+                            )
+                            db.add(adj_tx)
+
+                            # Keep child panel admin user in sync
+                            admin_res = await db.execute(
+                                select(User).where(
+                                    User.tenant_id == panel.id,
+                                    User.role == UserRole.ADMIN,
+                                ).with_for_update()
+                            )
+                            for admin_u in admin_res.scalars().all():
+                                admin_u.balance = bal_after
+                                db.add(admin_u)
+
                 db.add(ord_item)
                 updated_count += 1
         except Exception as e:
@@ -168,7 +254,7 @@ async def reconcile_recent_child_panel_orders(db: AsyncSession, days: int = 14) 
 
     if updated_count > 0:
         await db.commit()
-    logger.info(f"[+] Reconciled {updated_count} recent child panel orders.")
+    logger.info(f"[+] Corrected {updated_count} recent orders to live JAP wholesale prices and 50% markup.")
     return updated_count
 
 

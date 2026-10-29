@@ -131,16 +131,18 @@ async def create_order(
     # Determine retail charge rate:
     # Child panels get direct provider rates (service.provider_rate) with NO deduction in between.
     # If the child panel owner configured a custom markup percent, apply it directly over provider_rate.
-    charge_rate = service.selling_rate
+    # 50% baseline markup over wholesale / JAP provider rate
+    base_wholesale = service.wholesale_rate if (service.wholesale_rate and service.wholesale_rate > Decimal("0.00")) else service.provider_rate
+    charge_rate = round(base_wholesale * Decimal("1.50"), 2)
+
     if panel and panel.branding_json:
         try:
-            panel_markup = Decimal(str(panel.branding_json.get("default_markup_percent", 0)))
-            if panel_markup > Decimal("0"):
-                # Wholesale price base (matches upstream provider pricing)
-                base_rate = service.wholesale_rate if (service.wholesale_rate and service.wholesale_rate > Decimal("0.00")) else service.provider_rate
-                charge_rate = round(base_rate * (Decimal("1") + (panel_markup / Decimal("100"))), 2)
+            panel_markup = Decimal(str(panel.branding_json.get("default_markup_percent", 50)))
+            if panel_markup <= Decimal("0"):
+                panel_markup = Decimal("50.00")  # Default to 50% markup
+            charge_rate = round(base_wholesale * (Decimal("1") + (panel_markup / Decimal("100"))), 2)
         except Exception:
-            charge_rate = service.selling_rate
+            charge_rate = round(base_wholesale * Decimal("1.50"), 2)
 
     # 3. Validate quantity boundaries & determine package vs per-1000 pricing
     is_package = (

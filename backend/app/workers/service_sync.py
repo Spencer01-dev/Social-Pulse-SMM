@@ -80,7 +80,7 @@ def calculate_selling_rate(
 async def sync_services_from_provider(
     db: AsyncSession,
     provider_slug: str = "jap",
-    default_markup_percent: Decimal = Decimal("100.00")
+    default_markup_percent: Decimal = Decimal("50.00")
 ) -> Tuple[int, int, int]:
     """
     Fetch services exclusively from JustAnotherPanel (JAP) and atomic upsert into PostgreSQL.
@@ -167,20 +167,13 @@ async def sync_services_from_provider(
             if item.description and not existing_service.description:
                 existing_service.description = item.description
 
-            # Always keep wholesale_rate matching provider_rate for child panels & resellers
+            # Always keep wholesale_rate matching live provider_rate from JAP
             if effective_rate > 0:
                 existing_service.wholesale_rate = effective_rate
-
-            if existing_service.markup_type != MarkupType.MANUAL:
-                existing_service.selling_rate = calculate_selling_rate(
-                    provider_rate=effective_rate,
-                    markup_type=existing_service.markup_type,
-                    markup_value=existing_service.markup_value
-                )
-            else:
-                # Invariant: Guarantee manual selling rate never drops below provider cost
-                if existing_service.selling_rate < effective_rate:
-                    existing_service.selling_rate = round(effective_rate * Decimal("1.35"), 2)
+                # Enforce standard 50% markup over wholesale rate
+                existing_service.markup_type = MarkupType.PERCENTAGE
+                existing_service.markup_value = Decimal("50.00")
+                existing_service.selling_rate = round(effective_rate * Decimal("1.50"), 2)
 
             db.add(existing_service)
             updated_count += 1

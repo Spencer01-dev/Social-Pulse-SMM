@@ -289,10 +289,14 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const calculateMarkedUpPrice = useCallback(
     (retailPrice: number, wholesaleRate?: number): number => {
-      // If child panel has configured their custom markup %, calculate price over wholesale rate (1.30x provider rate)
+      // If child panel has configured their custom markup %, calculate price over wholesale rate
       if (tenant?.default_markup_percent && tenant.default_markup_percent > 0) {
         const base = wholesaleRate && wholesaleRate > 0 ? wholesaleRate : retailPrice;
         return Number((base * (1 + tenant.default_markup_percent / 100)).toFixed(2));
+      }
+      // Standard 50% markup over wholesale rate
+      if (wholesaleRate && wholesaleRate > 0) {
+        return Number((wholesaleRate * 1.50).toFixed(2));
       }
       return retailPrice;
     },
