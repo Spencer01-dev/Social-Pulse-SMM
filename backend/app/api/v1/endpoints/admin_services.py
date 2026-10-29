@@ -2,7 +2,7 @@ import uuid
 from decimal import Decimal
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select, update
 from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -232,33 +232,47 @@ async def apply_bulk_markup(
 ) -> Any:
     """
     Apply a bulk markup percentage or fixed amount across an entire platform or category.
+    Executes in a single atomic SQL statement for lightning speed across 5,800+ services.
     """
-    query = select(Service)
-    if req.platform:
-        query = query.where(Service.platform == req.platform)
-    if req.category:
-        query = query.where(Service.category.ilike(f"%{req.category}%"))
+    m_type = req.markup_type
+    m_val = Decimal(str(req.markup_value))
 
-    result = await db.execute(query)
-    services = result.scalars().all()
+    if m_type == MarkupType.PERCENTAGE:
+        factor = Decimal("1.00") + (m_val / Decimal("100.00"))
+        calc_expr = func.round(Service.provider_rate * factor, 2)
+        floor_expr = func.greatest(calc_expr, Service.provider_rate, Decimal("0.80"))
+    elif m_type == MarkupType.FIXED_AMOUNT:
+        calc_expr = func.round(Service.provider_rate + m_val, 2)
+        floor_expr = func.greatest(calc_expr, Service.provider_rate, Decimal("0.80"))
+    else:  # MANUAL
+        floor_expr = func.greatest(Service.provider_rate, Decimal("0.80"))
 
-    for s in services:
-        s.markup_type = req.markup_type
-        s.markup_value = req.markup_value
-        s.selling_rate = calculate_selling_rate(
-            provider_rate=s.provider_rate,
-            markup_type=req.markup_type,
-            markup_value=req.markup_value
+    stmt = (
+        update(Service)
+        .values(
+            markup_type=m_type,
+            markup_value=m_val,
+            selling_rate=floor_expr,
+            wholesale_rate=Service.provider_rate
         )
-        db.add(s)
+    )
+    if req.platform:
+        plat_val = req.platform.value if hasattr(req.platform, 'value') else str(req.platform)
+        stmt = stmt.where(Service.platform == plat_val)
+    if req.category:
+        stmt = stmt.where(Service.category.ilike(f"%{req.category}%"))
 
+    res = await db.execute(stmt)
     await db.commit()
     clear_all_cache()
+
+    affected = res.rowcount or 0
+    unit = "%" if m_type == MarkupType.PERCENTAGE else " KES"
     return {
-        "message": f"Successfully updated markup on {len(services)} services",
-        "affected_count": len(services),
-        "markup_type": req.markup_type.value,
-        "markup_value": float(req.markup_value)
+        "message": f"Successfully applied {float(m_val)}{unit} markup across {affected} services",
+        "affected_count": affected,
+        "markup_type": m_type.value if hasattr(m_type, 'value') else str(m_type),
+        "markup_value": float(m_val)
     }
 
 

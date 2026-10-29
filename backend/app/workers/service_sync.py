@@ -170,10 +170,16 @@ async def sync_services_from_provider(
             # Always keep wholesale_rate matching live provider_rate from JAP
             if effective_rate > 0:
                 existing_service.wholesale_rate = effective_rate
-                # Enforce standard 50% markup over wholesale rate
-                existing_service.markup_type = MarkupType.PERCENTAGE
-                existing_service.markup_value = Decimal("50.00")
-                existing_service.selling_rate = round(effective_rate * Decimal("1.50"), 2)
+                # Preserve service's existing markup percentage/type configured by admin
+                m_type = existing_service.markup_type or MarkupType.PERCENTAGE
+                m_val = existing_service.markup_value if (existing_service.markup_value is not None and existing_service.markup_value > Decimal("0.00")) else default_markup_percent
+                existing_service.markup_type = m_type
+                existing_service.markup_value = m_val
+                existing_service.selling_rate = calculate_selling_rate(
+                    provider_rate=effective_rate,
+                    markup_type=m_type,
+                    markup_value=m_val
+                )
 
             db.add(existing_service)
             updated_count += 1

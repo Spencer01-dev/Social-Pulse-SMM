@@ -12,6 +12,7 @@ from app.api.deps import get_current_active_user
 from app.api.v1.endpoints.tenant import MAIN_PLATFORM_DOMAINS
 from app.core.database import get_db
 from app.models.child_panel import ChildPanel, ChildPanelStatus
+from app.models.child_panel_service import ChildPanelServiceConfig
 from app.models.order import Order, OrderStatus
 from app.models.service import Service
 from app.models.transaction import PaymentMethod, Transaction, TransactionStatus, TransactionType
@@ -129,20 +130,34 @@ async def create_order(
             )
 
     # Determine retail charge rate:
-    # Child panels get direct provider rates (service.provider_rate) with NO deduction in between.
-    # If the child panel owner configured a custom markup percent, apply it directly over provider_rate.
-    # 50% baseline markup over wholesale / JAP provider rate
+    # 1. Base wholesale is the actual JAP provider cost
     base_wholesale = service.wholesale_rate if (service.wholesale_rate and service.wholesale_rate > Decimal("0.00")) else service.provider_rate
-    charge_rate = round(base_wholesale * Decimal("1.50"), 2)
 
-    if panel and panel.branding_json:
-        try:
-            panel_markup = Decimal(str(panel.branding_json.get("default_markup_percent", 50)))
-            if panel_markup <= Decimal("0"):
-                panel_markup = Decimal("50.00")  # Default to 50% markup
-            charge_rate = round(base_wholesale * (Decimal("1") + (panel_markup / Decimal("100"))), 2)
-        except Exception:
-            charge_rate = round(base_wholesale * Decimal("1.50"), 2)
+    # 2. Platform retail selling rate configured by admin (via bulk markup or single-service edit)
+    charge_rate = service.selling_rate if (service.selling_rate and service.selling_rate > Decimal("0.00")) else round(base_wholesale * Decimal("1.50"), 2)
+
+    # 3. If order is placed via a child panel, apply panel-specific custom markup over wholesale
+    if panel:
+        custom_svc_q = await db.execute(
+            select(ChildPanelServiceConfig.custom_markup_percent).where(
+                ChildPanelServiceConfig.panel_id == panel.id,
+                ChildPanelServiceConfig.service_id == service.id,
+                ChildPanelServiceConfig.custom_markup_percent.isnot(None)
+            )
+        )
+        custom_svc_markup = custom_svc_q.scalars().first()
+        if custom_svc_markup is not None and custom_svc_markup > Decimal("0.00"):
+            charge_rate = round(base_wholesale * (Decimal("1") + (custom_svc_markup / Decimal("100"))), 2)
+        elif panel.branding_json:
+            try:
+                panel_markup = Decimal(str(panel.branding_json.get("default_markup_percent", 0)))
+                if panel_markup > Decimal("0.00"):
+                    charge_rate = round(base_wholesale * (Decimal("1") + (panel_markup / Decimal("100"))), 2)
+            except Exception:
+                pass
+
+    # Ensure selling rate is never below provider cost
+    charge_rate = max(charge_rate, base_wholesale)
 
     # 3. Validate quantity boundaries & determine package vs per-1000 pricing
     is_package = (

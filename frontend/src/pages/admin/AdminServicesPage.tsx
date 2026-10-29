@@ -47,8 +47,9 @@ export const AdminServicesPage: React.FC = () => {
   // Bulk Markup Modal State
   const [showMarkupModal, setShowMarkupModal] = useState(false);
   const [markupType, setMarkupType] = useState<MarkupType>('percentage');
-  const [markupValue, setMarkupValue] = useState<string>('80');
+  const [markupValue, setMarkupValue] = useState<string>('100');
   const [applyingMarkup, setApplyingMarkup] = useState(false);
+  const [markupModalError, setMarkupModalError] = useState<string | null>(null);
 
   const fetchAdminData = async (overrideSearch?: string) => {
     setLoading(true);
@@ -127,15 +128,18 @@ export const AdminServicesPage: React.FC = () => {
   const handleApplyBulkMarkup = async (e: React.FormEvent) => {
     e.preventDefault();
     setApplyingMarkup(true);
+    setMarkupModalError(null);
     try {
-      await servicesService.applyBulkMarkup({
+      const res = await servicesService.applyBulkMarkup({
         markup_type: markupType,
         markup_value: Number(markupValue),
       });
       setShowMarkupModal(false);
+      setSyncResult(res.message || `Successfully applied ${markupValue}% markup across all services!`);
       await fetchAdminData();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setMarkupModalError(err.response?.data?.detail || err.message || 'Failed to apply markup');
     } finally {
       setApplyingMarkup(false);
     }
@@ -554,10 +558,25 @@ export const AdminServicesPage: React.FC = () => {
       {showMarkupModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-md glass-card rounded-3xl p-6 border border-slate-800 relative">
-            <h3 className="text-lg font-bold text-white mb-1">Apply Bulk Markup</h3>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-lg font-bold text-white">Apply Bulk Markup</h3>
+              <button
+                type="button"
+                onClick={() => { setShowMarkupModal(false); setMarkupModalError(null); }}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                ✕
+              </button>
+            </div>
             <p className="text-xs text-slate-400 mb-5">
               Automatically calculate selling prices across services based on provider wholesale cost.
             </p>
+
+            {markupModalError && (
+              <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+                {markupModalError}
+              </div>
+            )}
 
             <form onSubmit={handleApplyBulkMarkup} className="space-y-4">
               <div>

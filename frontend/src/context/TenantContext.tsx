@@ -294,10 +294,7 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const base = wholesaleRate && wholesaleRate > 0 ? wholesaleRate : retailPrice;
         return Number((base * (1 + tenant.default_markup_percent / 100)).toFixed(2));
       }
-      // Standard 50% markup over wholesale rate
-      if (wholesaleRate && wholesaleRate > 0) {
-        return Number((wholesaleRate * 1.50).toFixed(2));
-      }
+      // Otherwise child panel uses the platform's retail selling rate
       return retailPrice;
     },
     [tenant]

@@ -73,12 +73,16 @@ async def reconcile_provider_cost_and_deduction(
         order.provider_cost = actual_kes
         changed = True
 
-    # Enforce 50% markup on sales (charge = wholesale_cost * 1.50, profit = wholesale_cost * 0.50)
-    expected_charge = round(actual_kes * Decimal("1.50"), 2)
-    expected_profit = round(expected_charge - actual_kes, 2)
-    order.charge = expected_charge
-    order.profit = expected_profit
-    changed = True
+    # Order charge & profit reconciliation:
+    # Protect against mispriced orders where provider charge exceeds original retail charge
+    if order.charge < actual_kes:
+        order.charge = actual_kes
+        changed = True
+
+    expected_profit = round(order.charge - actual_kes, 2)
+    if order.profit != expected_profit:
+        order.profit = expected_profit
+        changed = True
 
     # 2. For child panel orders, wholesale cost = actual provider cost
     if order.tenant_id:
@@ -187,17 +191,17 @@ async def reconcile_recent_child_panel_orders(db: AsyncSession, days: int = 30) 
                 actual_kes = Decimal(str(ord_item.provider_cost or ord_item.wholesale_cost or "0.00"))
 
             if actual_kes > Decimal("0.00"):
-                # 50% markup over wholesale
-                correct_charge = round(actual_kes * Decimal("1.50"), 2)
-                correct_profit = round(correct_charge - actual_kes, 2)
-
                 prev_ws = Decimal(str(ord_item.wholesale_cost or "0.00"))
                 diff = actual_kes - prev_ws
 
                 ord_item.provider_cost = actual_kes
                 ord_item.wholesale_cost = actual_kes
-                ord_item.charge = correct_charge
-                ord_item.profit = correct_profit
+                
+                # Protect customer charge against negative margin
+                if ord_item.charge < actual_kes:
+                    ord_item.charge = actual_kes
+                
+                ord_item.profit = round(ord_item.charge - actual_kes, 2)
 
                 # Reconcile child panel owner balance if applicable
                 if ord_item.tenant_id and abs(diff) > Decimal("0.01"):
