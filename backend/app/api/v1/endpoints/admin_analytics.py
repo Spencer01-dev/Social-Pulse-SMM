@@ -65,9 +65,9 @@ async def get_analytics_overview(
     )
     total_rev, total_cost, total_profit, total_orders = order_agg.first()
     total_rev = total_rev or Decimal("0.00")
-    total_profit = round(total_rev * Decimal("0.50"), 2)
-    total_cost = total_rev - total_profit
-    profit_margin = Decimal("50.0") if total_rev > 0 else Decimal("0.00")
+    total_cost = total_cost or Decimal("0.00")
+    total_profit = total_profit if (total_profit is not None and total_profit > Decimal("0.00")) else max(Decimal("0.00"), total_rev - total_cost)
+    profit_margin = round((total_profit / total_rev) * Decimal("100.0"), 1) if total_rev > Decimal("0.00") else Decimal("0.00")
 
     # 2. Completed Orders Count
     comp_orders = await db.execute(
@@ -115,10 +115,9 @@ async def get_analytics_overview(
     )
     t_rev, t_cost, t_gross, t_orders = today_agg.first()
     t_rev = t_rev or Decimal("0.00")
-    # For Social Pulse, net profit and gross profit are half (50%) of revenue
-    t_gross = round(t_rev * Decimal("0.50"), 2)
-    t_net = round(t_rev * Decimal("0.50"), 2)
-    t_cost = t_rev - t_net
+    t_cost = t_cost or Decimal("0.00")
+    t_gross = t_gross if (t_gross is not None and t_gross > Decimal("0.00")) else max(Decimal("0.00"), t_rev - t_cost)
+    t_net = t_gross
 
     today_ref_res = await db.execute(
         select(func.coalesce(func.sum(Transaction.amount), Decimal("0.00")))
@@ -291,8 +290,7 @@ async def get_daily_revenue_trends(
         iso_str = d.strftime("%Y-%m-%d")
         label = d.strftime("%b %d")
         rev, prof, count = db_map.get(iso_str, (Decimal("0.00"), Decimal("0.00"), 0))
-        # For Social Pulse, net profit is half (50%) of daily revenue
-        calculated_profit = round(rev * Decimal("0.50"), 2)
+        calculated_profit = prof if (prof is not None and prof > Decimal("0.00")) else max(Decimal("0.00"), rev - Decimal("0.00"))
         timeline.append(
             DailyRevenueItem(
                 date_label=label,
@@ -423,7 +421,7 @@ async def get_monthly_summary(
     for d in range(1, days_in_month + 1):
         if d in daily_map:
             rev_val = float(daily_map[d]["revenue"])
-            prof_val = round(rev_val * 0.5, 2)
+            prof_val = float(daily_map[d].get("profit", 0.0)) or max(0.0, rev_val - float(daily_map[d].get("cost", 0.0)))
             days_list.append({
                 "day": d,
                 "date": f"{year}-{month:02d}-{d:02d}",
@@ -433,9 +431,9 @@ async def get_monthly_summary(
             })
 
     total_rev_dec = Decimal(str(total_rev or 0))
-    total_prof_dec = round(total_rev_dec * Decimal("0.50"), 2)
-    total_cost_dec = total_rev_dec - total_prof_dec
-    margin = 50.0 if total_rev_dec > 0 else 0.0
+    total_cost_dec = Decimal(str(total_cost or 0))
+    total_prof_dec = total_profit if (total_profit is not None and total_profit > Decimal("0.00")) else max(Decimal("0.00"), total_rev_dec - total_cost_dec)
+    margin = float(round((total_prof_dec / total_rev_dec) * Decimal("100.0"), 1)) if total_rev_dec > Decimal("0.00") else 0.0
 
     return {
         "year": year,
@@ -494,7 +492,7 @@ async def get_platform_metrics(
                 name=platform.value.capitalize(),
                 orders_count=count,
                 revenue=rev,
-                profit=round(rev * Decimal("0.50"), 2)
+                profit=profit if (profit is not None and profit > Decimal("0.00")) else max(Decimal("0.00"), rev - Decimal("0.00"))
             )
         )
 

@@ -136,8 +136,9 @@ async def create_order(
         try:
             panel_markup = Decimal(str(panel.branding_json.get("default_markup_percent", 0)))
             if panel_markup > Decimal("0"):
-                # Direct provider price base from JAP
-                charge_rate = round(service.provider_rate * (Decimal("1") + (panel_markup / Decimal("100"))), 2)
+                # Wholesale price base (matches upstream provider pricing)
+                base_rate = service.wholesale_rate if (service.wholesale_rate and service.wholesale_rate > Decimal("0.00")) else service.provider_rate
+                charge_rate = round(base_rate * (Decimal("1") + (panel_markup / Decimal("100"))), 2)
         except Exception:
             charge_rate = service.selling_rate
 
@@ -201,7 +202,7 @@ async def create_order(
     panel_owner = None
     wholesale_cost = Decimal("0.00")
     if panel and panel.user_id:
-        wholesale_rate = service.provider_rate
+        wholesale_rate = service.wholesale_rate if (service.wholesale_rate and service.wholesale_rate > Decimal("0.00")) else service.provider_rate
         if is_package:
             wholesale_cost = round(wholesale_rate * Decimal(order_in.quantity), 2)
         else:
@@ -278,7 +279,7 @@ async def create_order(
         initial_status = OrderStatus.PENDING
 
     # 8. Persist order record in database (using tenant_id resolved in step 2)
-    order_profit = (total_charge - wholesale_cost) if (panel and wholesale_cost > Decimal("0.00")) else round(total_charge * Decimal("0.50"), 2)
+    order_profit = max(Decimal("0.00"), total_charge - wholesale_cost) if (panel and wholesale_cost > Decimal("0.00")) else max(Decimal("0.00"), total_charge - provider_cost)
 
     order = Order(
         user_id=current_user.id,

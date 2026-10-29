@@ -375,7 +375,14 @@ export const AdminOrdersPage: React.FC = () => {
       : (Number(o.charge) || 0);
     return acc + rev;
   }, 0);
-  const totalProfit = activeOrders.reduce((acc, o) => acc + (Number(o.profit) || 0), 0);
+  const totalProfit = activeOrders.reduce((acc, o) => {
+    // For child panel orders, platform profit is (wholesale_cost - provider_cost)
+    if (o.tenant_id && o.wholesale_cost && Number(o.wholesale_cost) > 0) {
+      const pCost = Number(o.provider_cost) || 0;
+      return acc + Math.max(0, Number(o.wholesale_cost) - pCost);
+    }
+    return acc + (Number(o.profit) || 0);
+  }, 0);
 
   return (
     <div className="space-y-6">
@@ -659,11 +666,16 @@ export const AdminOrdersPage: React.FC = () => {
                             Wholesale
                           </span>
                         </div>
+                        {order.provider_cost !== undefined && Number(order.provider_cost) > 0 && (
+                          <span className="text-[10px] text-slate-500 block">
+                            Provider Cost: KES {Number(order.provider_cost).toFixed(2)}
+                          </span>
+                        )}
                         <span className="text-[10px] text-slate-400 block mt-0.5">
                           Retail: KES {Number(order.charge).toFixed(2)}
                         </span>
                         <span className="text-[10px] text-indigo-300 font-medium">
-                          +KES {Number(order.profit).toFixed(2)} margin
+                          +KES {Math.max(0, Number(order.charge) - Number(order.wholesale_cost)).toFixed(2)} margin
                         </span>
                       </div>
                     ) : (
@@ -671,6 +683,11 @@ export const AdminOrdersPage: React.FC = () => {
                         <span className="text-emerald-400 font-semibold block">
                           KES {Number(order.charge).toFixed(2)}
                         </span>
+                        {order.provider_cost !== undefined && Number(order.provider_cost) > 0 && (
+                          <span className="text-[10px] text-slate-500 block">
+                            Provider Cost: KES {Number(order.provider_cost).toFixed(2)}
+                          </span>
+                        )}
                         <span className="text-[10px] text-indigo-300 font-medium">
                           +KES {Number(order.profit).toFixed(2)}
                         </span>

@@ -41,6 +41,28 @@ async def order_status_poller_loop():
         await asyncio.sleep(8)
 
 
+async def service_catalog_sync_loop():
+    """
+    Periodic worker that keeps provider rates, wholesale rates, and catalog
+    synchronized with upstream JAP every 3 hours.
+    """
+    logger.info("[*] Periodic service catalog sync worker started.")
+    while True:
+        try:
+            await asyncio.sleep(3 * 3600)  # every 3 hours
+            async with AsyncSessionLocal() as session:
+                from app.workers.service_sync import sync_services_from_provider
+                from app.core.cache import clear_all_cache
+                logger.info("[*] Running scheduled service catalog sync from upstream provider...")
+                total, created, updated = await sync_services_from_provider(session, provider_slug="jap")
+                logger.info(f"[+] Scheduled catalog sync finished: {total} fetched, {created} created, {updated} updated.")
+                clear_all_cache()
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"[!] Error in scheduled service catalog sync: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup tasks
@@ -809,8 +831,9 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         print(f"[!] Warning during retroactive cancel refund reconciliation: {exc}")
 
-    # Start background poller immediately so startup yields without delay
+    # Start background poller & catalog sync worker immediately so startup yields without delay
     poller_task = asyncio.create_task(order_status_poller_loop())
+    catalog_sync_task = asyncio.create_task(service_catalog_sync_loop())
 
     # Background service sync: ensure JAP services are loaded if missing
     async def initial_services_check():
@@ -843,14 +866,16 @@ async def lifespan(app: FastAPI):
                 )
                 jap_service_count = jap_cnt.scalar() or 0
 
-                if jap_service_count == 0:
-                    print("[*] JAP services missing from DB. Starting background sync for JAP...")
-                    total, created, updated = await sync_services_from_provider(db, provider_slug="jap")
-                    print(f"[+] JAP initial sync complete: {total} fetched, {created} created, {updated} updated.")
-                    from app.core.cache import clear_all_cache
-                    clear_all_cache()
-                else:
-                    print(f"[*] JAP services already initialized ({jap_service_count} in DB).")
+                print(f"[*] Running live background service catalog sync from JAP ({jap_service_count} in DB)...")
+                total, created, updated = await sync_services_from_provider(db, provider_slug="jap")
+                print(f"[+] JAP catalog sync complete: {total} fetched, {created} created, {updated} updated.")
+                from app.core.cache import clear_all_cache
+                clear_all_cache()
+
+                # Reconcile recent child panel orders so provider_cost, wholesale_cost, and owner balance match live JAP charges
+                from app.workers.order_tasks import reconcile_recent_child_panel_orders
+                reconciled = await reconcile_recent_child_panel_orders(db, days=14)
+                print(f"[+] Startup child panel order reconciliation complete: {reconciled} orders synchronized.")
         except Exception as exc:
             print(f"[!] Warning during background JAP service check: {exc}")
 
@@ -859,8 +884,13 @@ async def lifespan(app: FastAPI):
     # Shutdown tasks
     print(f"[*] Shutting down {settings.PROJECT_NAME} backend...")
     poller_task.cancel()
+    catalog_sync_task.cancel()
     try:
         await poller_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await catalog_sync_task
     except asyncio.CancelledError:
         pass
 

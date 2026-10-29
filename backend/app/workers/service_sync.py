@@ -167,14 +167,20 @@ async def sync_services_from_provider(
             if item.description and not existing_service.description:
                 existing_service.description = item.description
 
+            # Always keep wholesale_rate matching provider_rate for child panels & resellers
+            if effective_rate > 0:
+                existing_service.wholesale_rate = effective_rate
+
             if existing_service.markup_type != MarkupType.MANUAL:
                 existing_service.selling_rate = calculate_selling_rate(
                     provider_rate=effective_rate,
                     markup_type=existing_service.markup_type,
                     markup_value=existing_service.markup_value
                 )
-                if effective_rate > 0:
-                    existing_service.wholesale_rate = effective_rate
+            else:
+                # Invariant: Guarantee manual selling rate never drops below provider cost
+                if existing_service.selling_rate < effective_rate:
+                    existing_service.selling_rate = round(effective_rate * Decimal("1.35"), 2)
 
             db.add(existing_service)
             updated_count += 1

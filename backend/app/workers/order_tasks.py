@@ -9,6 +9,7 @@ from app.models.order import Order, OrderStatus
 from app.models.provider import Provider
 from app.models.transaction import PaymentMethod, Transaction, TransactionStatus, TransactionType
 from app.models.user import User
+from app.core.config import settings
 from app.providers.manager import get_provider
 
 logger = logging.getLogger("socialpulse.order_tasks")
@@ -34,6 +35,141 @@ def map_provider_status(provider_status_str: str) -> OrderStatus:
     elif "fail" in s or "error" in s:
         return OrderStatus.FAILED
     return OrderStatus.IN_PROGRESS
+
+
+async def reconcile_provider_cost_and_deduction(
+    db: AsyncSession,
+    order: Order,
+    status_data
+) -> bool:
+    """
+    Sync actual charge from upstream provider (JAP) to order.provider_cost.
+    If the order was placed on a Child Panel, ensure order.wholesale_cost equals provider_cost,
+    and adjust the child panel owner's balance accordingly so SocialPulse never under- or over-deducts.
+    """
+    if not status_data or getattr(status_data, "charge", None) is None:
+        return False
+
+    try:
+        charge_raw = Decimal(str(status_data.charge))
+    except Exception:
+        return False
+
+    if charge_raw <= Decimal("0.00"):
+        return False
+
+    # Convert to KES if provider reported in USD
+    currency = getattr(status_data, "currency", "USD") or "USD"
+    if str(currency).upper() == "USD":
+        actual_kes = round(charge_raw * Decimal(str(settings.DEFAULT_USD_TO_KES)), 2)
+    else:
+        actual_kes = round(charge_raw, 2)
+
+    changed = False
+
+    # 1. Update order.provider_cost if different
+    current_prov = Decimal(str(order.provider_cost or "0.00"))
+    if abs(current_prov - actual_kes) > Decimal("0.01"):
+        order.provider_cost = actual_kes
+        changed = True
+
+    # 2. For child panel orders, wholesale cost = actual provider cost
+    if order.tenant_id:
+        current_ws = Decimal(str(order.wholesale_cost or "0.00"))
+        if abs(current_ws - actual_kes) > Decimal("0.01"):
+            diff = actual_kes - current_ws  # positive: deduct more from owner; negative: refund excess
+            order.wholesale_cost = actual_kes
+            order.profit = max(Decimal("0.00"), Decimal(str(order.charge or "0.00")) - actual_kes)
+            changed = True
+
+            # Adjust child panel owner balance so SocialPulse deducts exact live provider cost
+            from app.models.child_panel import ChildPanel
+            from app.models.user import UserRole
+            p_res = await db.execute(select(ChildPanel).where(ChildPanel.id == order.tenant_id))
+            panel = p_res.scalars().first()
+            if panel and panel.user_id:
+                owner_res = await db.execute(
+                    select(User).where(User.id == panel.user_id).with_for_update()
+                )
+                panel_owner = owner_res.scalars().first()
+                if panel_owner:
+                    bal_before = panel_owner.balance
+                    bal_after = max(Decimal("0.00"), bal_before - diff)
+                    panel_owner.balance = bal_after
+                    db.add(panel_owner)
+
+                    adj_tx = Transaction(
+                        user_id=panel_owner.id,
+                        order_id=order.id,
+                        tenant_id=panel.id,
+                        type=TransactionType.ORDER_PAYMENT if diff > 0 else TransactionType.ORDER_REFUND,
+                        amount=-diff,
+                        balance_before=bal_before,
+                        balance_after=bal_after,
+                        currency="KES",
+                        payment_method=PaymentMethod.INTERNAL,
+                        payment_reference=f"WHOLESALE-ADJUST-{order.order_number or str(order.id)[:8]}",
+                        status=TransactionStatus.COMPLETED,
+                        description=(
+                            f"Wholesale cost sync for Order #{order.order_number or str(order.id)[:8]} "
+                            f"(Provider actual cost: KES {actual_kes:,.2f})"
+                        )
+                    )
+                    db.add(adj_tx)
+
+                    # Keep child panel admin user in sync
+                    admin_res = await db.execute(
+                        select(User).where(
+                            User.tenant_id == panel.id,
+                            User.role == UserRole.ADMIN,
+                        ).with_for_update()
+                    )
+                    for admin_u in admin_res.scalars().all():
+                        admin_u.balance = bal_after
+                        db.add(admin_u)
+
+    elif not order.tenant_id:
+        order.profit = max(Decimal("0.00"), Decimal(str(order.charge or "0.00")) - actual_kes)
+        changed = True
+
+    return changed
+
+
+async def reconcile_recent_child_panel_orders(db: AsyncSession, days: int = 14) -> int:
+    """
+    Reconciles all recent child panel orders against live provider charges,
+    ensuring wholesale_cost matches provider_cost and balances are accurately deducted.
+    """
+    from datetime import datetime, timedelta, timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    query = (
+        select(Order)
+        .options(selectinload(Order.provider))
+        .where(
+            Order.tenant_id.isnot(None),
+            Order.provider_order_id.isnot(None),
+            Order.created_at >= cutoff
+        )
+    )
+    result = await db.execute(query)
+    orders = result.scalars().all()
+    updated_count = 0
+    provider_client = get_provider(slug="jap")
+
+    for ord_item in orders:
+        try:
+            status_data = await provider_client.get_order_status(ord_item.provider_order_id)
+            if await reconcile_provider_cost_and_deduction(db, ord_item, status_data):
+                db.add(ord_item)
+                updated_count += 1
+        except Exception as e:
+            logger.warning(f"Failed to reconcile order {ord_item.id}: {e}")
+            continue
+
+    if updated_count > 0:
+        await db.commit()
+    logger.info(f"[+] Reconciled {updated_count} recent child panel orders.")
+    return updated_count
 
 
 async def sync_active_orders(db: AsyncSession) -> Tuple[int, int]:
@@ -91,6 +227,11 @@ async def sync_active_orders(db: AsyncSession) -> Tuple[int, int]:
                 changed = True
             if status_data.remains is not None and order.remains != status_data.remains:
                 order.remains = status_data.remains
+                changed = True
+
+            # Sync live provider charge and reconcile child panel wholesale cost & deduction
+            cost_reconciled = await reconcile_provider_cost_and_deduction(db, order, status_data)
+            if cost_reconciled:
                 changed = True
 
             # Check if status has changed
@@ -268,6 +409,11 @@ async def sync_single_order(db: AsyncSession, order: Order) -> Tuple[bool, Order
             changed = True
         if status_data.remains is not None and order.remains != status_data.remains:
             order.remains = status_data.remains
+            changed = True
+
+        # Sync live provider charge and reconcile child panel wholesale cost & deduction
+        cost_reconciled = await reconcile_provider_cost_and_deduction(db, order, status_data)
+        if cost_reconciled:
             changed = True
 
         if new_status != order.status:
