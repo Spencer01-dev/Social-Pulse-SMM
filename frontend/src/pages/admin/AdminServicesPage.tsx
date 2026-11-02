@@ -414,10 +414,11 @@ export const AdminServicesPage: React.FC = () => {
                 className="px-3 py-1.5 bg-slate-950/80 border border-slate-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-blue-500 cursor-pointer"
               >
                 <option value="all">All Platforms</option>
-                <option value="whatsapp">WhatsApp</option>
-                <option value="instagram">Instagram</option>
-                <option value="facebook">Facebook</option>
+                <option value="youtube">YouTube</option>
                 <option value="tiktok">TikTok</option>
+                <option value="facebook">Facebook</option>
+                <option value="instagram">Instagram</option>
+                <option value="whatsapp">WhatsApp</option>
                 <option value="telegram">Telegram</option>
                 <option value="other">Other Platforms</option>
               </select>

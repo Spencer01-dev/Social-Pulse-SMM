@@ -274,7 +274,7 @@ export const ChildPanelManagePage: React.FC = () => {
     setLoadingServices(true);
     try {
       // Load all platforms in parallel to avoid the 500-limit cutting off some platforms
-      const platforms = ['tiktok', 'instagram', 'facebook', 'whatsapp', 'telegram'];
+      const platforms = ['tiktok', 'youtube', 'instagram', 'facebook', 'whatsapp', 'telegram'];
       const results = await Promise.all(
         platforms.map((p) =>
           childPanelServiceMgmt.listServices(activePanel.id, { platform: p, limit: 500 })
@@ -2326,6 +2326,7 @@ export const ChildPanelManagePage: React.FC = () => {
                   className="px-3 py-2 bg-[#121418] border border-[#2b303c] rounded-xl text-white text-xs focus:outline-none focus:border-amber-500"
                 >
                   <option value="all">All Platforms</option>
+                  <option value="youtube">YouTube</option>
                   <option value="tiktok">TikTok</option>
                   <option value="instagram">Instagram</option>
                   <option value="facebook">Facebook</option>
@@ -2402,6 +2403,7 @@ export const ChildPanelManagePage: React.FC = () => {
             const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedServiceIds.has(id));
 
             const PLATFORM_COLORS: Record<string, string> = {
+              youtube: 'text-red-400 bg-red-500/10 border-red-500/20',
               tiktok: 'text-pink-400 bg-pink-500/10 border-pink-500/20',
               instagram: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
               facebook: 'text-blue-400 bg-blue-500/10 border-blue-500/20',

@@ -1515,6 +1515,7 @@ _PUBLIC_PLATFORMS = [
     Platform.INSTAGRAM,
     Platform.WHATSAPP,
     Platform.TELEGRAM,
+    Platform.YOUTUBE,
 ]
 
 
